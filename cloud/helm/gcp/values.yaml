@@ -18,14 +18,6 @@ liferay-default:
         type: keda
     configmap:
         data:
-            com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config: |
-                authenticationEnabled=B"true"
-                httpSSLEnabled=B"false"
-                networkHostAddresses=["$[env:ELASTICSEARCH_URL]"]
-                operationMode="REMOTE"
-                password="$[env:ELASTICSEARCH_PASSWORD]"
-                productionModeEnabled=B"true"
-                username="$[env:ELASTICSEARCH_USERNAME]"
             com.liferay.portal.search.elasticsearch8.configuration.ElasticsearchConfiguration.config: |
                 authenticationEnabled=B"true"
                 httpSSLEnabled=B"false"
@@ -118,9 +110,6 @@ liferay-default:
                 name: liferay-license
                 subPath: license.xml
         x-liferay-gcp:
-            -   mountPath: /opt/liferay/osgi/configs/com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config
-                name: liferay-configmap
-                subPath: com.liferay.portal.search.elasticsearch7.configuration.ElasticsearchConfiguration.config
             -   mountPath: /opt/liferay/osgi/configs/com.liferay.portal.search.elasticsearch8.configuration.ElasticsearchConfiguration.config
                 name: liferay-configmap
                 subPath: com.liferay.portal.search.elasticsearch8.configuration.ElasticsearchConfiguration.config
