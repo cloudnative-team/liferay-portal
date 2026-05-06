@@ -326,27 +326,7 @@ resource "kubernetes_manifest" "resources_appproject" {
 			description="ArgoCD project for Liferay deployment-scoped cloud resources."
 			destinations=[
 				{
-					namespace=var.argocd_namespace
-					server="https://kubernetes.default.svc"
-				},
-				{
-					namespace="cluster-bootstrap-system"
-					server="https://kubernetes.default.svc"
-				},
-				{
-					namespace=var.crossplane_namespace
-					server="https://kubernetes.default.svc"
-				},
-				{
-					namespace=var.external_secrets_namespace
-					server="https://kubernetes.default.svc"
-				},
-				{
-					namespace=var.gateway_namespace
-					server="https://kubernetes.default.svc"
-				},
-				{
-					namespace=local.liferay_namespace_pattern
+					namespace=var.resources_namespace
 					server="https://kubernetes.default.svc"
 				},
 			]
