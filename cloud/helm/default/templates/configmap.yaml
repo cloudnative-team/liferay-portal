@@ -36,11 +36,28 @@ data:
         {{- $v.portalProperties | nindent 8 }}
         {{- end }}
         {{- end }}
+        {{- range $k, $v := .Values.dependenciesTemplates }}
+        {{- if $v.portalProperties }}
+        {{- $rendered := tpl $v.portalProperties $.Values | trim }}
+        {{- if $rendered }}
+        {{- $rendered | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
         configuration.override.com.liferay.portal.bundle.blacklist.internal.configuration.BundleBlacklistConfiguration_blacklistBundleSymbolicNames=[\
             {{- $PREFIX := "" }}
             {{- range $bundle := .Values.portalBundleDenyList }}
             {{ $PREFIX }}{{ $bundle | quote }}\
             {{- $PREFIX = "," -}}
+            {{- end }}
+            {{- range $k, $v := .Values.portalBundleDenyListTemplates }}
+            {{- $rendered := tpl $v $.Values | trim }}
+            {{- if $rendered }}
+            {{- range $bundle := ($rendered | fromYamlArray) }}
+            {{ $PREFIX }}{{ $bundle | quote }}\
+            {{- $PREFIX = "," -}}
+            {{- end }}
+            {{- end }}
             {{- end }}
             {{- range $k, $v := .Values.dependencies }}
             {{- range $bundle := $v.portalBundleDenyList }}
@@ -78,8 +95,19 @@ data:
         {{- tpl (.Files.Get "resources/unicast.xml") $ | nindent 8 }}
     {{- end }}
     {{- end }}
-    {{- if .Values.configmap.data }}
-    {{- toYaml .Values.configmap.data | nindent 4 }}
+    {{- range $k, $v := .Values.configmap.data }}
+    {{- $trimmed := $v | trim }}
+    {{- if $trimmed }}
+    {{ $k }}: |
+        {{- $trimmed | nindent 8 }}
+    {{- end }}
+    {{- end }}
+    {{- range $k, $v := .Values.configmap.dataTemplates }}
+    {{- $rendered := tpl $v $.Values | trim }}
+    {{- if $rendered }}
+    {{ $k }}: |
+        {{- $rendered | nindent 8 }}
+    {{- end }}
     {{- end }}
 kind: ConfigMap
 metadata:

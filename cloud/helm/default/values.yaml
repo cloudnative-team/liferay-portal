@@ -37,9 +37,12 @@ autoscaling:
 configmap:
     annotations: {}
     data: {}
+    dataTemplates: {}
     overrideDefaults: false
 customEnv: {}
 customEnvFrom: {}
+customEnvFromTemplates: {}
+customEnvTemplates: {}
 customInitContainers:
     x-liferay-overlay:
         -   containerTemplate: |
@@ -201,13 +204,16 @@ customPullSecrets: {}
 customServicePorts: {}
 customVolumeClaimTemplates: {}
 customVolumeMounts: {}
+customVolumeMountsTemplates: {}
 customVolumes:
     x-liferay-init-scripts-default:
         -   configMap:
                 defaultMode: 0755
                 name: liferay-init-scripts-default
             name: liferay-init-scripts-default
+customVolumesTemplates: {}
 dependencies: {}
+dependenciesTemplates: {}
 env:
     -   name: DNS_MEMBERSHIP_SERVICE_NAME
         value: liferay-default-headless
@@ -320,6 +326,7 @@ podSecurityContext:
     seccompProfile:
         type: RuntimeDefault
 portalBundleDenyList: []
+portalBundleDenyListTemplates: {}
 portalComponentDenyList: []
 portalProperties:
 ports:
