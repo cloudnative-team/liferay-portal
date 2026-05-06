@@ -319,8 +319,8 @@ resource "kubernetes_manifest" "resources_appproject" {
 		spec={
 			clusterResourceWhitelist=[
 				{
-					group="*"
-					kind="*"
+					group="storage.gcp.m.upbound.io"
+					kind="Bucket"
 				},
 			]
 			description="ArgoCD project for Liferay deployment-scoped cloud resources."
