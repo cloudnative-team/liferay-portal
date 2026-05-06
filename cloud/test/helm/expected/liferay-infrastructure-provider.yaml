@@ -664,51 +664,6 @@ spec:
                                     value: "{{steps.apply-infrastructure.outputs.parameters.generation}}"
                         name: wait-for-infrastructure
                         template: wait-for-infrastructure
-        -   container:
-                args:
-                    -   storage
-                    -   rm
-                    -   --recursive
-                    -   "gs://{{inputs.parameters.dl-bucket-id}}/**"
-                command: [gcloud]
-                env:
-                    -   name: CLOUDSDK_CONFIG
-                        value: /tmp/gcloud
-                image: "google/cloud-sdk:565.0.0-stable"
-                resources:
-                    limits:
-                      cpu: 250m
-                      memory: 256Mi
-                    requests:
-                      cpu: 100m
-                      memory: 128Mi
-            inputs:
-                parameters:
-                    -   name: dl-bucket-id
-            name: clean-up-dl-bucket
-        -   inputs:
-                parameters:
-                    -   name: dl-bucket-id
-                    -   name: liferay-infrastructure-name
-                    -   name: target-active-data-plane
-            name: clean-up-infrastructure
-            steps:
-                -   -   arguments:
-                            parameters:
-                                -   name: liferay-infrastructure-name
-                                    value: "{{inputs.parameters.liferay-infrastructure-name}}"
-                                -   name: restore-phase
-                                    value: none
-                                -   name: target-active-data-plane
-                                    value: "{{inputs.parameters.target-active-data-plane}}"
-                        name: clean-up-cloudsql-instance
-                        template: apply-wait-infrastructure
-                    -   arguments:
-                            parameters:
-                                -   name: dl-bucket-id
-                                    value: "{{inputs.parameters.dl-bucket-id}}"
-                        name: clean-up-dl-bucket
-                        template: clean-up-dl-bucket
         -   inputs:
                 parameters:
                     -   name: liferay-backup-namespace
@@ -724,12 +679,6 @@ spec:
                     -   name: database-snapshot-uuid
                         valueFrom:
                             path: /tmp/database-snapshot-uuid.txt
-                    -   name: dl-bucket-active
-                        valueFrom:
-                            path: /tmp/dl-bucket-active.txt
-                    -   name: dl-bucket-inactive
-                        valueFrom:
-                            path: /tmp/dl-bucket-inactive.txt
                     -   name: liferay-infrastructure-name
                         valueFrom:
                             path: /tmp/liferay-infrastructure-name.txt
@@ -857,27 +806,13 @@ spec:
                     			--selector "component=liferay")
                     
                     	echo "${liferay_workload_name}" > /tmp/liferay-workload-name.txt
-                    
-                    	kubectl \
-                    		get \
-                    		buckets.storage.gcp.m.upbound.io \
-                    		--output jsonpath="{.items[0].metadata.name}" \
-                    		--selector "dataPlane=${data_plane_active}" \
-                    		> /tmp/dl-bucket-active.txt
-                    
-                    	kubectl \
-                    		get \
-                    		buckets.storage.gcp.m.upbound.io \
-                    		--output jsonpath="{.items[0].metadata.name}" \
-                    		--selector "dataPlane=${data_plane_inactive}" \
-                    		> /tmp/dl-bucket-inactive.txt
                     }
                     
                     main
         -   container:
                 args:
                     -   get
-                    -   databaseinstances.sql.gcp.m.upbound.io
+                    -   "{{inputs.parameters.resource-type}}"
                     -   --output
                     -   jsonpath={.items[0].metadata.name}
                     -   --selector
@@ -894,7 +829,8 @@ spec:
             inputs:
                 parameters:
                     -   name: data-inactive
-            name: get-inactive-cloudsql-instance
+                    -   name: resource-type
+            name: get-inactive-resource
         -   container:
                 args:
                     -   rollout
@@ -938,15 +874,15 @@ spec:
                 tasks:
                     -   arguments:
                             parameters:
-                                -   name: dl-bucket-id
-                                    value: "{{tasks.get-current-infrastructure-state.outputs.parameters.dl-bucket-active}}"
                                 -   name: liferay-infrastructure-name
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.liferay-infrastructure-name}}"
+                                -   name: restore-phase
+                                    value: none
                                 -   name: target-active-data-plane
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
                         depends: restart-liferay
-                        name: clean-up-infrastructure
-                        template: clean-up-infrastructure
+                        name: clean-up-original-data-plane
+                        template: apply-wait-infrastructure
                     -   arguments:
                             parameters:
                                 -   name: liferay-backup-namespace
@@ -957,9 +893,20 @@ spec:
                             parameters:
                                 -   name: data-inactive
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
-                        depends: provision-inactive-data-plane
+                                -   name: resource-type
+                                    value: databaseinstances.sql.gcp.m.upbound.io
+                        depends: provision-target-data-plane
                         name: get-inactive-cloudsql-instance
-                        template: get-inactive-cloudsql-instance
+                        template: get-inactive-resource
+                    -   arguments:
+                            parameters:
+                                -   name: data-inactive
+                                    value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
+                                -   name: resource-type
+                                    value: buckets.storage.gcp.m.upbound.io
+                        depends: provision-target-data-plane
+                        name: get-inactive-dl-bucket
+                        template: get-inactive-resource
                     -   arguments:
                             parameters:
                                 -   name: liferay-infrastructure-name
@@ -969,7 +916,7 @@ spec:
                                 -   name: target-active-data-plane
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
                         depends: restore-cloudsql-backup && restore-dl-bucket
-                        name: promote-inactive-data-plane
+                        name: promote-target-data-plane
                         template: apply-wait-infrastructure
                     -   arguments:
                             parameters:
@@ -980,13 +927,13 @@ spec:
                                 -   name: target-active-data-plane
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
                         depends: get-current-infrastructure-state
-                        name: provision-inactive-data-plane
+                        name: provision-target-data-plane
                         template: apply-wait-infrastructure
                     -   arguments:
                             parameters:
                                 -   name: liferay-workload-name
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.liferay-workload-name}}"
-                        depends: promote-inactive-data-plane
+                        depends: promote-target-data-plane
                         name: restart-liferay
                         template: restart-liferay
                     -   arguments:
@@ -1001,36 +948,34 @@ spec:
                     -   arguments:
                             parameters:
                                 -   name: dl-bucket-inactive
-                                    value: "{{tasks.get-current-infrastructure-state.outputs.parameters.dl-bucket-inactive}}"
+                                    value: "{{tasks.get-inactive-dl-bucket.outputs.result}}"
                                 -   name: vault-bucket
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.vault-bucket}}"
                                 -   name: vault-path
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.vault-path}}"
-                        depends: get-current-infrastructure-state
+                        depends: get-inactive-dl-bucket
                         name: restore-dl-bucket
                         template: restore-dl-bucket
                     -   arguments:
                             parameters:
-                                -   name: dl-bucket-id
-                                    value: "{{tasks.get-current-infrastructure-state.outputs.parameters.dl-bucket-inactive}}"
                                 -   name: liferay-infrastructure-name
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.liferay-infrastructure-name}}"
+                                -   name: restore-phase
+                                    value: none
                                 -   name: target-active-data-plane
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-active}}"
-                        depends: "(!provision-inactive-data-plane.Omitted && !provision-inactive-data-plane.Skipped || !restore-cloudsql-backup.Omitted && !restore-cloudsql-backup.Skipped || !restore-dl-bucket.Omitted && !restore-dl-bucket.Skipped) && !promote-inactive-data-plane.Succeeded"
-                        name: roll-back-infrastructure
-                        template: clean-up-infrastructure
+                        depends: "(!provision-target-data-plane.Omitted && !provision-target-data-plane.Skipped || !restore-cloudsql-backup.Omitted && !restore-cloudsql-backup.Skipped || !restore-dl-bucket.Omitted && !restore-dl-bucket.Skipped) && !promote-target-data-plane.Succeeded"
+                        name: clean-up-target-data-plane
+                        template: apply-wait-infrastructure
                     -   arguments:
                             parameters:
-                                -   name: dl-bucket-id
-                                    value: "{{tasks.get-current-infrastructure-state.outputs.parameters.dl-bucket-inactive}}"
                                 -   name: liferay-infrastructure-name
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.liferay-infrastructure-name}}"
                                 -   name: liferay-workload-name
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.liferay-workload-name}}"
                                 -   name: target-active-data-plane
                                     value: "{{tasks.get-current-infrastructure-state.outputs.parameters.data-active}}"
-                        depends: "promote-inactive-data-plane.Succeeded && !restart-liferay.Succeeded"
+                        depends: "promote-target-data-plane.Succeeded && !restart-liferay.Succeeded"
                         name: roll-back-restart
                         template: roll-back-restart
             name: main
@@ -1108,7 +1053,6 @@ spec:
             name: restore-dl-bucket
         -   inputs:
                 parameters:
-                    -   name: dl-bucket-id
                     -   name: liferay-infrastructure-name
                     -   name: liferay-workload-name
                     -   name: target-active-data-plane
@@ -1122,7 +1066,7 @@ spec:
                                     value: promoting
                                 -   name: target-active-data-plane
                                     value: "{{inputs.parameters.target-active-data-plane}}"
-                        name: apply-wait-infrastructure
+                        name: promote-original-data-plane
                         template: apply-wait-infrastructure
                 -   -   arguments:
                             parameters:
@@ -1132,14 +1076,14 @@ spec:
                         template: restart-liferay
                 -   -   arguments:
                             parameters:
-                                -   name: dl-bucket-id
-                                    value: "{{inputs.parameters.dl-bucket-id}}"
                                 -   name: liferay-infrastructure-name
                                     value: "{{inputs.parameters.liferay-infrastructure-name}}"
+                                -   name: restore-phase
+                                    value: none
                                 -   name: target-active-data-plane
                                     value: "{{inputs.parameters.target-active-data-plane}}"
-                        name: clean-up-infrastructure
-                        template: clean-up-infrastructure
+                        name: clean-up-target-data-plane
+                        template: apply-wait-infrastructure
         -   inputs:
                 parameters:
                     -   name: expected-generation
@@ -1331,9 +1275,9 @@ kind: Composition
 metadata:
     annotations:
         argocd.argoproj.io/sync-wave: "-50"
-        liferay.com/template-hash: "db4e771f550f42a2442171957ff9c8eb4ac6f1070c2323eb0a2e21e088bf09d8"
+        liferay.com/template-hash: "32920d15133fb3aa5cbe59bf81f13066aecab119672a30ef2f5ebbbf74fcad45"
     labels:
-        liferay.com/template-hash: "h-db4e771f550f42a2442171957ff9c8eb4ac6f1070c2323eb0a2e21e088bf0"
+        liferay.com/template-hash: "h-32920d15133fb3aa5cbe59bf81f13066aecab119672a30ef2f5ebbbf74fca"
     name: liferay-gcp-infrastructure-provider.gcp.liferay.com
 spec:
     compositeTypeRef:
@@ -1866,7 +1810,7 @@ spec:
                         {{- end }}
                         ---
                         
-                        {{- range $i, $dataPlane := list "blue" "green" }}
+                        {{- range $i, $dataPlane := $dataPlanes }}
                         {{- if $i }}
                         ---
                         {{- end }}
@@ -1885,7 +1829,7 @@ spec:
                                 encryption:
                                     defaultKmsKeyName: {{ $cmkKeyName }}
                                 {{- end }}
-                                forceDestroy: {{ $forceDestroy }}
+                                forceDestroy: {{ or $forceDestroy (ne $dataPlane $activeDataPlane) }}
                                 labels:
                                     {{- $backupTargetLabels | toYaml | nindent 12 }}
                                     active: {{ printf "%t" (eq $dataPlane $activeDataPlane) | quote }}
@@ -2175,7 +2119,7 @@ spec:
                                 storageClass: {{ $backup.storageClass | quote }}
                                 uniformBucketLevelAccess: true
                             managementPolicies: {{ $managementPolicies }}
-                        {{- range $dataPlane := list "blue" "green" }}
+                        {{- range $dataPlane := $dataPlanes }}
                         ---
                         apiVersion: storage.gcp.m.upbound.io/v1beta1
                         kind: BucketIAMMember
@@ -3128,7 +3072,7 @@ data:
             managementPolicies: {{ $managementPolicies }}
         {{- end }}
         {{- end }}
-        {{- range $i, $dataPlane := list "blue" "green" }}
+        {{- range $i, $dataPlane := $dataPlanes }}
         {{- if $i }}
         ---
         {{- end }}
@@ -3147,7 +3091,7 @@ data:
                 encryption:
                     defaultKmsKeyName: {{ $cmkKeyName }}
                 {{- end }}
-                forceDestroy: {{ $forceDestroy }}
+                forceDestroy: {{ or $forceDestroy (ne $dataPlane $activeDataPlane) }}
                 labels:
                     {{- $backupTargetLabels | toYaml | nindent 12 }}
                     active: {{ printf "%t" (eq $dataPlane $activeDataPlane) | quote }}
@@ -3430,7 +3374,7 @@ data:
                 storageClass: {{ $backup.storageClass | quote }}
                 uniformBucketLevelAccess: true
             managementPolicies: {{ $managementPolicies }}
-        {{- range $dataPlane := list "blue" "green" }}
+        {{- range $dataPlane := $dataPlanes }}
         ---
         apiVersion: storage.gcp.m.upbound.io/v1beta1
         kind: BucketIAMMember

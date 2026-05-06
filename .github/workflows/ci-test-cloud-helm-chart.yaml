@@ -27,7 +27,7 @@ jobs:
                     helm template liferay . | kubeconform --strict --summary \
                         -schema-location default \
                         -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-                        -skip ClusterProviderConfig,LiferayInfrastructure
+                        -skip Bucket,ClusterProviderConfig,LiferayInfrastructure
                 working-directory: ./cloud/helm/${{matrix.chart}}
         strategy:
             fail-fast: false

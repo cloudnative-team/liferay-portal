@@ -10,7 +10,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -29,7 +29,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -163,7 +163,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -316,7 +316,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -340,7 +340,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -364,7 +364,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -395,7 +395,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default-headless
     namespace: liferay-sample-prd
@@ -433,7 +433,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default
     namespace: liferay-sample-prd
@@ -448,7 +448,7 @@ spec:
     template:
         metadata:
             annotations:
-                checksum/config: 1a4f16a5e368e37a19c0bf546eabc953b8f70d9ebcaaa09c8b9ecca1f4725a43
+                checksum/config: 3bb7d7bbfbb795e7dd2ecbb9f48a8fcf1e07adf5e9697da599f0b41e2ca595bd
                 checksum/init-scripts: 6b42ec71ad0bc21598e89d3c2eb777508b937d7dcacaa163641a0e922232aa41
                 instrumentation.opentelemetry.io/inject-dotnet: "false"
                 instrumentation.opentelemetry.io/inject-java: "false"
@@ -462,7 +462,7 @@ spec:
                 app.kubernetes.io/managed-by: Helm
                 app.kubernetes.io/version: "latest"
                 component: liferay
-                helm.sh/chart: liferay-default-0.5.0
+                helm.sh/chart: liferay-default-0.5.1
                 origin: liferay-gcp
         spec:
             containers:
@@ -905,7 +905,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default-hash-policy
     namespace: liferay-sample-prd
@@ -933,7 +933,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default-httproute
     namespace: liferay-sample-prd
@@ -969,7 +969,7 @@ metadata:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/version: "latest"
         component: liferay
-        helm.sh/chart: liferay-default-0.5.0
+        helm.sh/chart: liferay-default-0.5.1
         origin: liferay-gcp
     name: liferay-default-test-connection
     namespace: liferay-sample-prd
