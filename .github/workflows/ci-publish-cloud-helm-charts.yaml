@@ -306,6 +306,7 @@ on:
             -   synchronize
     push:
         branches:
+            -   brianchandotcom-master
             -   master
         paths:
             -   .github/workflows/ci-publish-cloud-helm-charts.yaml
