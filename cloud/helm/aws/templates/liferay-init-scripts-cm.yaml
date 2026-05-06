@@ -1,0 +1,13 @@
+{{- $liferayDefault := index .Values "liferay-default" | default dict -}}
+{{- $search := $liferayDefault.search | default dict -}}
+{{- $elasticsearch := $search.elasticsearch | default dict -}}
+{{- if $elasticsearch.enabled }}
+apiVersion: v1
+data:
+    wait-for-elasticsearch.sh: |
+{{ .Files.Get "scripts/wait-for-elasticsearch.sh" | nindent 8 }}
+kind: ConfigMap
+metadata:
+    name: liferay-init-scripts-aws
+    namespace: {{ .Release.Namespace }}
+{{- end }}
