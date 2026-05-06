@@ -118,6 +118,7 @@ jobs:
 on:
     push:
         branches:
+            -   brianchandotcom-master
             -   master
         paths:
             -   .github/workflows/ci-publish-cloud-scripts.yaml
