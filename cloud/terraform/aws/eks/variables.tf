@@ -2,6 +2,14 @@ variable "arn_partition" {
 	default="aws"
 	type=string
 }
+variable "cleanup_targets_log_retention_in_days" {
+	default=30
+	type=number
+	validation {
+		condition=contains([1, 7, 14, 30, 60, 90, 180, 365], var.cleanup_targets_log_retention_in_days)
+		error_message="The variable \"cleanup_targets_log_retention_in_days\" must be one of: 1, 7, 14, 30, 60, 90, 180, 365."
+	}
+}
 variable "deployment_name" {
 	type=string
 	validation {

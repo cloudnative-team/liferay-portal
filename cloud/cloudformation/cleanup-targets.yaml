@@ -1,0 +1,344 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  CNE per-deployment "cleanup targets" stack — Option A scope.
+
+  Owns ONLY resources that are not currently created by Terraform, so this
+  stack can be added without migrating any existing state. Deleting the
+  stack via delete-stack handles the dependency-tricky pieces (separate
+  SecurityGroupIngress resources, custom-resource sweeper for ENIs and
+  managed-service log groups) that orphan today.
+
+  Scope (Option A — additive):
+    - VPC interface endpoints + a dedicated endpoint SG.
+    - Standalone SecurityGroupIngress (NOT inline) demonstrating the
+      circular-reference fix between the new endpoint SG and the existing
+      EKS cluster SG passed in as a parameter.
+    - Predictable-name CloudWatch log groups with retention.
+    - Custom-resource Lambda that sweeps ENIs and managed-service log
+      groups on stack delete.
+
+  Out of scope (Option A defers to Terraform):
+    - VPC, NAT, subnets, route tables, route-table associations.
+    - The EKS cluster security group itself.
+    - EKS control plane log group (Terraform sets retention=90 days).
+
+  STATUS: DRAFT for LCD-51113 ideation. Validate with
+  `aws cloudformation validate-template` before wiring in.
+
+Parameters:
+
+  DeploymentName:
+    Type: String
+    Description: Matches Terraform var.deployment_name — drives tags and naming.
+    AllowedPattern: "^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$"
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: From module.vpc (Terraform-owned).
+
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: From module.vpc.private_subnets (Terraform-owned).
+
+  ClusterSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: >
+      From module.eks.cluster_primary_security_group_id (Terraform-owned).
+      Used as the source for the endpoint SG ingress. Not modified.
+
+  LogRetentionInDays:
+    Type: Number
+    Default: 30
+    AllowedValues: [1, 7, 14, 30, 60, 90, 180, 365]
+
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # Endpoint security group — new, owned by this stack.
+  #
+  # Defined with NO inline ingress so the standalone ingress resources
+  # below can be deleted independently. This is the pattern that breaks
+  # the SG circular-reference deadlock surfaced in LCD-50974.
+  # ---------------------------------------------------------------------------
+
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${DeploymentName} VPC interface endpoints"
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: DeploymentName
+          Value: !Ref DeploymentName
+        - Key: Name
+          Value: !Sub "${DeploymentName}-endpoint-sg"
+
+  # Cluster nodes -> endpoints (HTTPS to the AWS service VPCE).
+  EndpointFromClusterIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EndpointSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref ClusterSecurityGroupId
+      Description: HTTPS from EKS cluster nodes
+
+  # ---------------------------------------------------------------------------
+  # VPC interface endpoints — chronic orphans per LCD-50974.
+  #
+  # Listed explicitly (not via Fn::ForEach) for readability during review.
+  # Trim or extend as the actual CNE needs become clearer.
+  # ---------------------------------------------------------------------------
+
+  EndpointEc2:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  EndpointEcrApi:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  EndpointEcrDkr:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  EndpointElb:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.elasticloadbalancing"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  EndpointLogs:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  EndpointSecretsManager:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.secretsmanager"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  EndpointSts:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sts"
+      VpcEndpointType: Interface
+      SubnetIds: !Ref PrivateSubnetIds
+      SecurityGroupIds: [!Ref EndpointSecurityGroup]
+      PrivateDnsEnabled: true
+
+  # ---------------------------------------------------------------------------
+  # Predictable log groups — search-audit and search-index were called out
+  # in LCD-50974 as the recurring cost driver. By owning them here with
+  # explicit retention and tags, even a missed sweep stops billing within
+  # LogRetentionInDays.
+  #
+  # The Liferay search components must be configured to write to these
+  # exact names. If today they auto-create logs without retention, that
+  # configuration change is the matching code change in the search module.
+  # ---------------------------------------------------------------------------
+
+  SearchAuditLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/cne/${DeploymentName}/search-audit-logs"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: DeploymentName
+          Value: !Ref DeploymentName
+
+  SearchIndexLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/cne/${DeploymentName}/search-index-logs"
+      RetentionInDays: !Ref LogRetentionInDays
+      Tags:
+        - Key: DeploymentName
+          Value: !Ref DeploymentName
+
+  # ---------------------------------------------------------------------------
+  # Sweeper — for orphans CFN cannot natively own.
+  #
+  # Two known categories:
+  #   - ENIs left by VPC CNI / Lambda after parent compute is gone. AWS
+  #     creates them on our behalf and deletion only succeeds after a
+  #     propagation delay or with --force.
+  #   - Log groups auto-created by managed services that escape both
+  #     Terraform and this stack (e.g. EKS-managed addon logs that don't
+  #     respect the EKS module's create_cloudwatch_log_group setting).
+  #
+  # Runs only on Delete. Returns SUCCESS even on partial failure — the
+  # stack must not be blocked by best-effort residue cleanup. The
+  # post-teardown verification step is the source of truth for "are
+  # there orphans?"
+  # ---------------------------------------------------------------------------
+
+  SweeperRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: sweep
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DetachNetworkInterface
+                  - ec2:DeleteNetworkInterface
+                  - logs:DescribeLogGroups
+                  - logs:DeleteLogGroup
+                Resource: "*"
+
+  SweeperFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt SweeperRole.Arn
+      Timeout: 600
+      Environment:
+        Variables:
+          DEPLOYMENT_NAME: !Ref DeploymentName
+          VPC_ID: !Ref VpcId
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import time
+
+          import boto3
+          import urllib3
+
+          HTTP = urllib3.PoolManager()
+
+          def respond(event, context, status, reason=""):
+              body = {
+                  "Status": status,
+                  "Reason": reason or f"see CloudWatch /aws/lambda/{context.function_name}",
+                  "PhysicalResourceId": event.get("PhysicalResourceId", "sweeper"),
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+              }
+              HTTP.request("PUT", event["ResponseURL"], body=json.dumps(body).encode())
+
+          def sweep_enis(ec2, vpc_id):
+              paginator = ec2.get_paginator("describe_network_interfaces")
+              for page in paginator.paginate(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}]):
+                  for eni in page["NetworkInterfaces"]:
+                      eni_id = eni["NetworkInterfaceId"]
+                      if eni["Status"] == "in-use":
+                          attachment = eni.get("Attachment", {}).get("AttachmentId")
+                          if attachment:
+                              try:
+                                  ec2.detach_network_interface(AttachmentId=attachment, Force=True)
+                                  time.sleep(5)
+                              except Exception as e:
+                                  print(f"detach {eni_id} failed: {e}")
+                                  continue
+                      try:
+                          ec2.delete_network_interface(NetworkInterfaceId=eni_id)
+                          print(f"deleted ENI {eni_id}")
+                      except Exception as e:
+                          print(f"delete {eni_id} failed: {e}")
+
+          def sweep_log_groups(logs, deployment):
+              # Catches log groups auto-created by managed services that
+              # carry the deployment name as a prefix segment but were not
+              # declared in this stack or in Terraform.
+              prefixes = [
+                  f"/aws/eks/{deployment}-eks/",
+                  f"/aws/cne/{deployment}/",
+              ]
+              for prefix in prefixes:
+                  paginator = logs.get_paginator("describe_log_groups")
+                  for page in paginator.paginate(logGroupNamePrefix=prefix):
+                      for lg in page["logGroups"]:
+                          name = lg["logGroupName"]
+                          try:
+                              logs.delete_log_group(logGroupName=name)
+                              print(f"deleted log group {name}")
+                          except Exception as e:
+                              print(f"delete {name} failed: {e}")
+
+          def handler(event, context):
+              try:
+                  if event["RequestType"] == "Delete":
+                      sweep_enis(boto3.client("ec2"), os.environ["VPC_ID"])
+                      sweep_log_groups(boto3.client("logs"), os.environ["DEPLOYMENT_NAME"])
+                  respond(event, context, "SUCCESS")
+              except Exception as e:
+                  print(f"sweep failed: {e}")
+                  respond(event, context, "SUCCESS", reason=f"partial: {e}")
+
+  Sweeper:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt SweeperFunction.Arn
+    DependsOn:
+      - EndpointSecurityGroup
+      - SearchAuditLogGroup
+      - SearchIndexLogGroup
+
+Outputs:
+
+  EndpointSecurityGroupId:
+    Description: Reference for additional ingress rules from other modules.
+    Value: !Ref EndpointSecurityGroup
+    Export:
+      Name: !Sub "${DeploymentName}-endpoint-sg-id"
+
+  SearchAuditLogGroupArn:
+    Value: !GetAtt SearchAuditLogGroup.Arn
+    Export:
+      Name: !Sub "${DeploymentName}-search-audit-log-group-arn"
+
+  SearchIndexLogGroupArn:
+    Value: !GetAtt SearchIndexLogGroup.Arn
+    Export:
+      Name: !Sub "${DeploymentName}-search-index-log-group-arn"
