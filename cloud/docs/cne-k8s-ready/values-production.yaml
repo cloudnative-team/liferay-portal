@@ -1,0 +1,117 @@
+# =============================================================================
+# values-production.yaml — Production overlay for the liferay-default Helm
+# chart. Sized for the "Medium" tier (3 replicas, ~5,000 concurrent users).
+#
+#   Chart schema (full reference):
+#     liferay-portal/cloud/helm/default/values.yaml
+#
+#   Cloud-specific overlays (canonical examples of dependency wiring,
+#   workload-identity bindings, and KEDA triggers):
+#     liferay-portal/cloud/helm/aws/values.yaml
+#     liferay-portal/cloud/helm/gcp/values.yaml
+#
+#   Tier rationale:
+#     architecture-and-sizing.md — "Medium" row, plus the JVM-heap-vs-pod-
+#     memory ratio guidance
+#
+#   Dependency Secret contract (DB, search, object storage, license):
+#     cne-kubernetes-ready-onboarding.md — §"Wire External Dependencies"
+#
+#   Networking patterns (Gateway API, NGINX Ingress, Istio, OpenShift Route,
+#   Cloudflare/CDN):
+#     cne-kubernetes-ready-onboarding.md — §"Networking"
+#
+# Replace every <PLACEHOLDER> before applying.
+# =============================================================================
+
+image:
+    tag: "<dxp-image-tag>"   # pin to a specific tag — never `latest` in prod
+    # pullSecrets:
+    #   - name: registry-credentials   # uncomment for private-registry pulls
+
+replicaCount: 3
+
+# Spread replicas across availability zones (preferred). Tighten to
+# requiredDuringSchedulingIgnoredDuringExecution if your cluster has
+# capacity in every zone and you want strict zonal isolation.
+affinity:
+    podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+            -   weight: 100
+                podAffinityTerm:
+                    labelSelector:
+                        matchLabels:
+                            app.kubernetes.io/name: liferay-default
+                    topologyKey: topology.kubernetes.io/zone
+            -   weight: 50
+                podAffinityTerm:
+                    labelSelector:
+                        matchLabels:
+                            app.kubernetes.io/name: liferay-default
+                    topologyKey: kubernetes.io/hostname
+
+resources:
+    requests:
+        cpu: 4000m
+        memory: 16Gi
+    limits:
+        cpu: 8000m
+        memory: 24Gi
+
+volumeClaimTemplates:
+    -   metadata:
+            name: liferay-persistent-volume
+        spec:
+            accessModes: [ReadWriteOnce]
+            storageClassName: <storage-class>   # SSD-backed, multi-AZ
+            resources:
+                requests:
+                    storage: 50Gi
+
+# Bind the chart's ServiceAccount to a cloud IAM identity for keyless access
+# to object storage. See cloud overlays for vendor-specific annotation form:
+#   AWS IRSA:        liferay-portal/cloud/helm/aws/values.yaml
+#   GCP Workload ID: liferay-portal/cloud/helm/gcp/values.yaml
+global:
+    liferayServiceAccount:
+        annotations: {}
+            # eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/liferay-s3-access
+            # iam.gke.io/gcp-service-account: liferay@<project>.iam.gserviceaccount.com
+            # azure.workload.identity/client-id: <client-id>
+
+network:
+    enabled: true
+    gatewayName: <gateway-name>
+    forceHttpsRedirect: true
+    hostnames:
+        -   "<liferay-hostname>"
+    timeouts:
+        backendRequest: 300s
+        request: 300s
+
+networkPolicy:
+    enabled: true
+    allowGatewayIngress: true
+    gatewayNamespace: <gateway-namespace>
+    gatewayPodLabel: <gateway-pod-label>
+
+# HPA on CPU is the simplest production-safe policy. Switch type to `keda`
+# to scale on Hikari active connections or JVM thread count — the chart
+# ships those triggers (see liferay-default values.yaml §autoscaling.keda).
+autoscaling:
+    enabled: true
+    type: hpa
+    hpa:
+        minReplicas: 3
+        maxReplicas: 10
+        metrics:
+            -   type: Resource
+                resource:
+                    name: cpu
+                    target:
+                        type: Utilization
+                        averageUtilization: 70
+
+customLabels:
+    environment: production
+    tier: medium

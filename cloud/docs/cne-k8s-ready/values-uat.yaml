@@ -1,0 +1,85 @@
+# =============================================================================
+# values-uat.yaml — UAT / staging overlay for the liferay-default Helm chart.
+#
+# UAT mirrors production *posture* (security, NetworkPolicy, pinned image,
+# real license). Only sizing differs. Keep this file diffable against
+# values-production.yaml — the differences should be confined to replicas,
+# resources, storage, autoscaling, and hostname.
+#
+#   Chart schema (full reference):
+#     liferay-portal/cloud/helm/default/values.yaml
+#
+#   Cloud-specific overlays (canonical examples of dependency wiring):
+#     liferay-portal/cloud/helm/aws/values.yaml
+#     liferay-portal/cloud/helm/gcp/values.yaml
+#
+#   Tier rationale:
+#     architecture-and-sizing.md — "Small" row
+#
+#   Dependency Secret contract (DB, search, object storage, license):
+#     cne-kubernetes-ready-onboarding.md — §"Wire External Dependencies"
+#
+# Replace every <PLACEHOLDER> before applying.
+# =============================================================================
+
+image:
+    tag: "<dxp-image-tag>"   # pin — must match the tag promoted to production
+
+replicaCount: 2
+
+# Spread replicas across zones (preferred, not required, so small clusters
+# can still schedule).
+affinity:
+    podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+            -   weight: 100
+                podAffinityTerm:
+                    labelSelector:
+                        matchLabels:
+                            app.kubernetes.io/name: liferay-default
+                    topologyKey: topology.kubernetes.io/zone
+
+resources:
+    requests:
+        cpu: 2000m
+        memory: 12Gi
+    limits:
+        cpu: 4000m
+        memory: 16Gi
+
+volumeClaimTemplates:
+    -   metadata:
+            name: liferay-persistent-volume
+        spec:
+            accessModes: [ReadWriteOnce]
+            storageClassName: <storage-class>   # match production's class
+            resources:
+                requests:
+                    storage: 20Gi
+
+network:
+    enabled: true
+    gatewayName: <gateway-name>
+    forceHttpsRedirect: true
+    hostnames:
+        -   "<liferay-uat-hostname>"
+    timeouts:
+        backendRequest: 300s
+        request: 300s
+
+# Match production's NetworkPolicy posture so policy gaps fail in UAT, not
+# prod. See onboarding guide §"Networking".
+networkPolicy:
+    enabled: true
+    allowGatewayIngress: true
+    gatewayNamespace: <gateway-namespace>
+    gatewayPodLabel: <gateway-pod-label>
+
+# Off in UAT — fixed sizing keeps load-test runs comparable. Validate
+# autoscaling behavior in a separate values-uat-autoscale.yaml when needed.
+autoscaling:
+    enabled: false
+
+customLabels:
+    environment: uat
+    tier: small

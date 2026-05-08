@@ -1,0 +1,64 @@
+# =============================================================================
+# values-dev.yaml — Dev / sandbox overlay for the liferay-default Helm chart.
+#
+# This file is a *thin overlay* — it carries only the values that the Dev
+# tier differs on. Everything else inherits from the chart defaults.
+#
+#   Chart schema (full reference):
+#     liferay-portal/cloud/helm/default/values.yaml
+#
+#   Cloud-specific overlays (canonical examples of dependency wiring):
+#     liferay-portal/cloud/helm/aws/values.yaml
+#     liferay-portal/cloud/helm/gcp/values.yaml
+#
+#   Tier rationale:
+#     architecture-and-sizing.md — "Dev / Sandbox" row
+#
+#   Dependency Secret contract (DB, search, object storage, license):
+#     cne-kubernetes-ready-onboarding.md — §"Wire External Dependencies"
+#
+# Replace every <PLACEHOLDER> before applying.
+# =============================================================================
+
+image:
+    tag: "<dxp-image-tag>"
+
+replicaCount: 1
+
+resources:
+    requests:
+        cpu: 2000m
+        memory: 8Gi
+    limits:
+        cpu: 4000m
+        memory: 12Gi
+
+volumeClaimTemplates:
+    -   metadata:
+            name: liferay-persistent-volume
+        spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+                requests:
+                    storage: 5Gi
+
+# Trial license is fine in dev — omit LIFERAY_DISABLE_TRIAL_LICENSE.
+# JDBC driver/URL and dependency Secret refs are deployment-shape concerns,
+# not tier concerns — define them once in your environment's base values
+# (see onboarding guide §"Wire External Dependencies").
+
+network:
+    enabled: true
+    gatewayName: <dev-gateway-name>
+    hostnames:
+        -   "<service-or-branch>.dev.example.com"
+
+networkPolicy:
+    enabled: false   # relaxed in dev; UAT and prod enable
+
+autoscaling:
+    enabled: false
+
+customLabels:
+    environment: development
+    tier: dev
