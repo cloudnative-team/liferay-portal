@@ -42,7 +42,9 @@ spec:
                     drop:
                         -   ALL
                 runAsNonRoot: true
+                {{- if not (and .Values.openshift .Values.openshift.enabled) }}
                 runAsUser: 1000
+                {{- end }}
                 seccompProfile:
                     type: RuntimeDefault
     restartPolicy: Never

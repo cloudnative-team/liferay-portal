@@ -1,0 +1,33 @@
+{{- if .Values.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+    {{- with .Values.route.annotations }}
+    annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    labels:
+        app: {{ include "liferay.name" . }}
+        {{- include "liferay.labels" . | nindent 8 }}
+        {{- with .Values.route.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    name: {{ include "liferay.name" . }}
+    namespace: {{ include "liferay.namespace" . }}
+spec:
+    {{- with .Values.route.host }}
+    host: {{ . | quote }}
+    {{- end }}
+    port:
+        targetPort: {{ .Values.route.port.targetPort }}
+    to:
+        kind: Service
+        name: {{ include "liferay.name" . }}
+        weight: 100
+    {{- if .Values.route.tls.enabled }}
+    tls:
+        insecureEdgeTerminationPolicy: {{ .Values.route.tls.insecureEdgeTerminationPolicy }}
+        termination: {{ .Values.route.tls.termination }}
+    {{- end }}
+    wildcardPolicy: None
+{{- end }}

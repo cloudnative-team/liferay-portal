@@ -62,7 +62,9 @@ customInitContainers:
                             drop:
                                 -   ALL
                         runAsNonRoot: true
+                        {{- if not (and .openshift .openshift.enabled) }}
                         runAsUser: 1000
+                        {{- end }}
                         seccompProfile:
                             type: RuntimeDefault
                     volumeMounts:
@@ -304,6 +306,13 @@ networkPolicy:
     gatewayNamespace: envoy-gateway-system
     gatewayPodLabel: envoy
 nodeSelector: {}
+openshift:
+    # When enabled, the chart renders in a way that is compatible with OpenShift's default
+    # `restricted-v2` SCC: pinned `runAsUser` is omitted from container `securityContext` and
+    # pinned `fsGroup` / `runAsUser` are omitted from pod `podSecurityContext`, so OpenShift
+    # can assign UIDs from the namespace's annotated range. Also required if you intend to
+    # use `route.enabled: true` (OpenShift Route) for ingress.
+    enabled: false
 overlay:
     copy: []
     enabled: false
@@ -352,6 +361,22 @@ resources:
     requests:
         cpu: 2000m
         memory: 6Gi
+route:
+    # OpenShift Route exposing the chart's main Service. Use this as an alternative to
+    # `network.enabled` (Gateway API HTTPRoute). Requires the `route.openshift.io/v1` CRD,
+    # i.e. an OpenShift cluster.
+    annotations: {}
+    enabled: false
+    # Optional explicit hostname. Leave empty to let OpenShift auto-generate one of the form
+    # `<name>-<namespace>.<apps-domain>`.
+    host: ""
+    labels: {}
+    port:
+        targetPort: http
+    tls:
+        enabled: true
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
 schedulingGates: []
 securityContext:
     allowPrivilegeEscalation: false

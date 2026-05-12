@@ -87,7 +87,11 @@ spec:
                     resources:
                         {{- toYaml . | nindent 22 }}
                     {{- end }}
-                    {{- with .statefulset.securityContext }}
+                    {{- $containerSecurityContext := .statefulset.securityContext }}
+                    {{- if and .statefulset.openshift .statefulset.openshift.enabled }}
+                    {{- $containerSecurityContext = omit $containerSecurityContext "runAsUser" }}
+                    {{- end }}
+                    {{- with $containerSecurityContext }}
                     securityContext:
                         {{- toYaml . | nindent 22 }}
                     {{- end }}
@@ -145,7 +149,11 @@ spec:
             schedulingGates:
                 {{- toYaml . | nindent 16 }}
             {{- end }}
-            {{- with .statefulset.podSecurityContext }}
+            {{- $podSecurityContext := .statefulset.podSecurityContext }}
+            {{- if and .statefulset.openshift .statefulset.openshift.enabled }}
+            {{- $podSecurityContext = omit $podSecurityContext "fsGroup" "runAsUser" }}
+            {{- end }}
+            {{- with $podSecurityContext }}
             securityContext:
                 {{- toYaml . | nindent 16 }}
             {{- end }}
