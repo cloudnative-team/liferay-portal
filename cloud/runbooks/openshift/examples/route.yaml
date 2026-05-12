@@ -1,0 +1,30 @@
+# OpenShift Route exposing the liferay-default Service.
+#
+# Usage:
+#   oc -n <namespace> apply -f route.yaml
+#
+# Apply this after `helm install liferay liferay-default -f values-openshift.yaml`.
+# Assumes the default Service name `liferay-default`; if you set
+# `nameOverride` in your values, update `to.name` and the labels to match.
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+    labels:
+        app.kubernetes.io/instance: liferay
+        app.kubernetes.io/name: liferay-default
+    name: liferay
+spec:
+    # Optional: explicit hostname. Leave commented to let OpenShift auto-generate
+    # `<name>-<namespace>.<apps-domain>`.
+    # host: liferay.apps.example.com
+    port:
+        targetPort: http
+    to:
+        kind: Service
+        name: liferay-default
+        weight: 100
+    tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+    wildcardPolicy: None

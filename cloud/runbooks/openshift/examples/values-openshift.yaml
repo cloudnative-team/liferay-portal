@@ -1,0 +1,36 @@
+# Values overlay for deploying liferay-default on OpenShift.
+#
+# Usage:
+#   helm install liferay liferay-default -f values-openshift.yaml
+#
+# Why this file exists:
+#
+# The liferay-default chart ships with a secure-by-default security context that
+# pins `runAsUser: 1000` and `fsGroup: 1000` via its `defaultSecurityContext` /
+# `defaultPodSecurityContext` fallbacks. That works on plain Kubernetes but is
+# rejected by OpenShift's `restricted-v2` SCC, which requires the cluster to
+# inject `runAsUser` / `fsGroup` from the namespace's annotated UID range at
+# admission time.
+#
+# This overlay supplies a non-empty `securityContext` / `podSecurityContext` —
+# which disables the chart's pinned-UID fallbacks — and deliberately OMITS
+# `runAsUser` and `fsGroup` so OpenShift's SCC has room to inject them.
+# Everything else stays strict-PSS-clean (runAsNonRoot, drop ALL capabilities,
+# disallow privilege escalation, RuntimeDefault seccomp profile).
+#
+# Note: this overlay does NOT include the OpenShift `Route` resource. The
+# `Route` is OpenShift-only and the chart is platform-neutral, so it's shipped
+# as a separate manifest. See `examples/route.yaml` next to this file.
+
+podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+        type: RuntimeDefault
+securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+        drop:
+            -   ALL
+    runAsNonRoot: true
+    seccompProfile:
+        type: RuntimeDefault
