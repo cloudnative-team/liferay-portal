@@ -1,6 +1,11 @@
+labels: {}
+managementPolicies:
+    - "*"
 overlay:
     bucketName: ""
     enabled: false
+    encryption:
+        kmsKeyName: ""
     forceDestroy: false
     region: ""
     storageClass: STANDARD
