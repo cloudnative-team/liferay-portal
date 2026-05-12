@@ -8,11 +8,11 @@ metadata:
         app.kubernetes.io/component: gcp-resources
         app.kubernetes.io/managed-by: liferay-gcp-resources
         app.kubernetes.io/name: overlay-bucket
-    name: {{ .Values.overlay.bucketName | quote }}
+    name: {{ required "overlay.bucketName is required." .Values.overlay.bucketName | quote }}
 spec:
     forProvider:
         forceDestroy: {{ .Values.overlay.forceDestroy }}
-        location: {{ .Values.overlay.region | quote }}
+        location: {{ required "overlay.region is required." .Values.overlay.region | quote }}
         storageClass: {{ .Values.overlay.storageClass | quote }}
         uniformBucketLevelAccess: true
         versioning:
