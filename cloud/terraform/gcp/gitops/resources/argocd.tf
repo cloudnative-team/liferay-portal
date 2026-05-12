@@ -380,7 +380,7 @@ resource "kubernetes_manifest" "resources_application" {
 									value=var.deployment_name
 								},
 								{
-									name="region"
+									name="overlay.region"
 									value=var.region
 								},
 							]
