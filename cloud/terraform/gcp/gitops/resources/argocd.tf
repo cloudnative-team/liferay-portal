@@ -376,10 +376,6 @@ resource "kubernetes_manifest" "resources_application" {
 						helm={
 							parameters=[
 								{
-									name="deploymentName"
-									value=var.deployment_name
-								},
-								{
 									name="overlay.bucketName"
 									value=local.overlay_bucket_name
 								},
