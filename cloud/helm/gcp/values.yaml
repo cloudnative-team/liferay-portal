@@ -147,11 +147,6 @@ liferay-default:
         copy: []
         enabled: false
         type: gcs
-    podSecurityContext:
-        fsGroup: 1000
-        runAsNonRoot: true
-        seccompProfile:
-            type: RuntimeDefault
     resources:
         limits:
             cpu: 4000m
@@ -159,15 +154,6 @@ liferay-default:
         requests:
             cpu: 2000m
             memory: 4Gi
-    securityContext:
-        allowPrivilegeEscalation: false
-        capabilities:
-            drop:
-                -   ALL
-        runAsNonRoot: true
-        runAsUser: 1000
-        seccompProfile:
-            type: RuntimeDefault
     startupProbe:
         exec:
             command:
