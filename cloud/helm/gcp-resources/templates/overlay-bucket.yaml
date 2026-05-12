@@ -8,13 +8,25 @@ metadata:
         app.kubernetes.io/component: gcp-resources
         app.kubernetes.io/managed-by: liferay-gcp-resources
         app.kubernetes.io/name: overlay-bucket
+        {{- with .Values.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     name: {{ required "overlay.bucketName is required." .Values.overlay.bucketName | quote }}
 spec:
     forProvider:
+        {{- with .Values.overlay.encryption.kmsKeyName }}
+        encryption:
+            defaultKmsKeyName: {{ . | quote }}
+        {{- end }}
         forceDestroy: {{ .Values.overlay.forceDestroy }}
+        {{- with .Values.labels }}
+        labels:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
         location: {{ required "overlay.region is required." .Values.overlay.region | quote }}
         storageClass: {{ .Values.overlay.storageClass | quote }}
         uniformBucketLevelAccess: true
         versioning:
             enabled: {{ .Values.overlay.versioning }}
+    managementPolicies: {{ .Values.managementPolicies | toJson }}
 {{- end }}
