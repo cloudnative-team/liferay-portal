@@ -1,4 +1,4 @@
-{{- if and $overlay.enabled $overlay.bucketName }}
+{{- if $overlay.enabled }}
 apiVersion: storage.gcp.m.upbound.io/v1beta1
 kind: BucketIAMMember
 metadata:
@@ -8,7 +8,7 @@ metadata:
         {{- $labels | toYaml | nindent 8 }}
 spec:
     forProvider:
-        bucket: {{ $overlay.bucketName }}
+        bucket: {{ required "overlay.bucketName is required when overlay.enabled is true" $overlay.bucketName | quote }}
         member: serviceAccount:{{ $gsaEmail }}
         role: roles/storage.objectViewer
     managementPolicies: {{ $managementPolicies }}

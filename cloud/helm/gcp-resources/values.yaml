@@ -1,6 +1,6 @@
-deploymentName: ""
 overlay:
-    enabled: true
+    bucketName: ""
+    enabled: false
     forceDestroy: false
     region: ""
     storageClass: STANDARD
