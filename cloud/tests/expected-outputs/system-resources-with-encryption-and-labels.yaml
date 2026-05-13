@@ -1,0 +1,28 @@
+---
+# Source: liferay-gcp-resources/templates/overlay-bucket.yaml
+apiVersion: storage.gcp.m.upbound.io/v1beta1
+kind: Bucket
+metadata:
+    annotations:
+        argocd.argoproj.io/sync-wave: "-30"
+    labels:
+        app.kubernetes.io/component: gcp-resources
+        app.kubernetes.io/managed-by: liferay-gcp-resources
+        app.kubernetes.io/name: overlay-bucket
+        cost-center: liferay-platform
+        environment: shared
+    name: "able-liferay-overlay"
+spec:
+    forProvider:
+        encryption:
+            defaultKmsKeyName: "projects/example-project/locations/us-south1/keyRings/liferay-keyring/cryptoKeys/overlay-bucket-key"
+        forceDestroy: false
+        labels:
+            cost-center: liferay-platform
+            environment: shared
+        location: "us-south1"
+        storageClass: "STANDARD"
+        uniformBucketLevelAccess: true
+        versioning:
+            enabled: true
+    managementPolicies: ["Create","Observe"]

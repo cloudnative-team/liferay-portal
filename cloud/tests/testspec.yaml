@@ -1,0 +1,223 @@
+# Gitops golden-path test cases.
+#
+# `redactions`: sed -E expressions applied to every rendered manifest before
+# the golden is written or diffed. Use these to scrub fields the chart
+# generates non-deterministically (e.g. randAlphaNum secrets). Prefer pinning
+# the value via --set when the chart exposes one; reach for a redaction only
+# when it does not.
+
+redactions:
+    # liferay-default/templates/secret.yaml generates admin password via
+    # randAlphaNum 32 -- no chart values key to pin it. Mask the rendered
+    # value so the golden stays stable across runs.
+    - 's|(LIFERAY_DEFAULT_PERIOD_ADMIN_PERIOD_PASSWORD: ")[A-Za-z0-9+/=]+"|\1<REDACTED>"|'
+
+# Gitops golden-path test cases.
+#
+# Each case mirrors one ArgoCD Application / ApplicationSet defined in
+# cloud/terraform/gcp/gitops/resources/argocd.tf. The driver emulates the
+# source-merge ArgoCD would perform at sync time:
+#
+#   helm template <releaseName> <chart> \
+#       --namespace <namespace> \
+#       <--values <each valueFiles entry, in order>> \
+#       <--set <each parameters entry>>
+#
+# `namespace` mirrors the destination.namespace argocd.tf writes for the
+# Application/ApplicationSet so .Release.Namespace renders predictably; do
+# not let it default to whatever kubectl context is active.
+#
+# - chart: path under cloud/helm/, relative to repo root.
+# - valueFiles: paths under cloud/tests/, in the order ArgoCD would apply them
+#   (typically base then environment overlay, matching the gitops repo layout
+#   under liferay/projects/<name>/{base,environments/<env>}/).
+# - parameters: hard-coded representations of the helm.parameters that
+#   terraform would inject at deploy time (gateway names, deployment name,
+#   overlay bucket name, project id, etc.). Match the keys terraform writes
+#   in cloud/terraform/gcp/gitops/resources/argocd.tf.
+
+tests:
+    -   name: able-dev-liferay
+        chart: cloud/helm/gcp
+        releaseName: liferay-able-dev
+        namespace: liferay-able-dev
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/able/base/liferay.yaml
+            - sample-gitops-repository/liferay/projects/able/environments/dev/liferay.yaml
+        parameters:
+            liferay-default.environmentId: dev
+            liferay-default.network.gatewayName: liferay-gateway
+            liferay-default.overlay.bucketName: able-liferay-overlay
+            global.deploymentName: able
+            global.liferayServiceAccount.create: "true"
+            global.liferayServiceAccount.name: able-liferay-sa
+            global.projectId: my-project-id
+
+    -   name: able-dev-infrastructure
+        chart: cloud/helm/gcp-infrastructure
+        releaseName: liferay-able-dev-infrastructure
+        namespace: liferay-able-dev
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/able/base/infrastructure.yaml
+            - sample-gitops-repository/liferay/projects/able/environments/dev/infrastructure.yaml
+        parameters:
+            environmentId: dev
+            gateway.className: gke-l7-gxlb
+            gateway.name: liferay-gateway
+            overlay.bucketName: able-liferay-overlay
+            projectId: my-project-id
+            region: us-south1
+            secretStoreName: liferay-secret-store
+
+    -   name: able-prd-liferay
+        chart: cloud/helm/gcp
+        releaseName: liferay-able-prd
+        namespace: liferay-able-prd
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/able/base/liferay.yaml
+            - sample-gitops-repository/liferay/projects/able/environments/prd/liferay.yaml
+        parameters:
+            liferay-default.environmentId: prd
+            liferay-default.network.gatewayName: liferay-gateway
+            liferay-default.overlay.bucketName: able-liferay-overlay
+            global.deploymentName: able
+            global.liferayServiceAccount.create: "true"
+            global.liferayServiceAccount.name: able-liferay-sa
+            global.projectId: my-project-id
+
+    -   name: able-prd-infrastructure
+        chart: cloud/helm/gcp-infrastructure
+        releaseName: liferay-able-prd-infrastructure
+        namespace: liferay-able-prd
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/able/base/infrastructure.yaml
+            - sample-gitops-repository/liferay/projects/able/environments/prd/infrastructure.yaml
+        parameters:
+            environmentId: prd
+            gateway.className: gke-l7-gxlb
+            gateway.name: liferay-gateway
+            overlay.bucketName: able-liferay-overlay
+            projectId: my-project-id
+            region: us-south1
+            secretStoreName: liferay-secret-store
+
+    -   name: baker-dev-liferay
+        chart: cloud/helm/gcp
+        releaseName: liferay-baker-dev
+        namespace: liferay-baker-dev
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/baker/base/liferay.yaml
+            - sample-gitops-repository/liferay/projects/baker/environments/dev/liferay.yaml
+        parameters:
+            liferay-default.environmentId: dev
+            liferay-default.network.gatewayName: liferay-gateway
+            liferay-default.overlay.bucketName: baker-liferay-overlay
+            global.deploymentName: baker
+            global.liferayServiceAccount.create: "true"
+            global.liferayServiceAccount.name: baker-liferay-sa
+            global.projectId: my-project-id
+
+    -   name: baker-dev-infrastructure
+        chart: cloud/helm/gcp-infrastructure
+        releaseName: liferay-baker-dev-infrastructure
+        namespace: liferay-baker-dev
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/baker/base/infrastructure.yaml
+            - sample-gitops-repository/liferay/projects/baker/environments/dev/infrastructure.yaml
+        parameters:
+            environmentId: dev
+            gateway.className: gke-l7-gxlb
+            gateway.name: liferay-gateway
+            overlay.bucketName: baker-liferay-overlay
+            projectId: my-project-id
+            region: us-south1
+            secretStoreName: liferay-secret-store
+
+    -   name: baker-prd-liferay
+        chart: cloud/helm/gcp
+        releaseName: liferay-baker-prd
+        namespace: liferay-baker-prd
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/baker/base/liferay.yaml
+            - sample-gitops-repository/liferay/projects/baker/environments/prd/liferay.yaml
+        parameters:
+            liferay-default.environmentId: prd
+            liferay-default.network.gatewayName: liferay-gateway
+            liferay-default.overlay.bucketName: baker-liferay-overlay
+            global.deploymentName: baker
+            global.liferayServiceAccount.create: "true"
+            global.liferayServiceAccount.name: baker-liferay-sa
+            global.projectId: my-project-id
+
+    -   name: baker-prd-infrastructure
+        chart: cloud/helm/gcp-infrastructure
+        releaseName: liferay-baker-prd-infrastructure
+        namespace: liferay-baker-prd
+        valueFiles:
+            - sample-gitops-repository/liferay/projects/baker/base/infrastructure.yaml
+            - sample-gitops-repository/liferay/projects/baker/environments/prd/infrastructure.yaml
+        parameters:
+            environmentId: prd
+            gateway.className: gke-l7-gxlb
+            gateway.name: liferay-gateway
+            overlay.bucketName: baker-liferay-overlay
+            projectId: my-project-id
+            region: us-south1
+            secretStoreName: liferay-secret-store
+
+    -   name: system-infrastructure-provider
+        chart: cloud/helm/gcp-infrastructure-provider
+        releaseName: liferay-infrastructure-provider
+        namespace: liferay-infrastructure-provider
+        valueFiles:
+            - sample-gitops-repository/liferay/system/infrastructure-provider.yaml
+        parameters:
+            crossplaneGsaEmail: crossplane-sa@my-project-id.iam.gserviceaccount.com
+            crossplaneNamespace: crossplane
+            deploymentName: able
+            gateway.className: gke-l7-gxlb
+            gateway.namespace: liferay-gateway
+            global.gcp.projectId: my-project-id
+            global.gcp.projectNumber: "123456789012"
+            global.gcp.vpcName: my-vpc
+
+    # Default flow: customer's liferay/system/resources.yaml leaves region
+    # unset; ArgoCD's helm.parameters injection (terraform-driven) is the only
+    # source of region. Asserts that bucket location reflects the injected
+    # `region` parameter.
+    -   name: system-resources
+        chart: cloud/helm/gcp-resources
+        releaseName: liferay-resources
+        namespace: liferay-gcp-resources
+        valueFiles:
+            - sample-gitops-repository/liferay/system/resources.yaml
+        parameters:
+            overlay.bucketName: able-liferay-overlay
+            overlay.region: us-south1
+
+    # Override flow: customer sets `overlay.region` in resources.yaml. Should
+    # take precedence over the terraform-injected `region` parameter (here
+    # still set to us-south1 to simulate the real deploy-time injection).
+    -   name: system-resources-customer-region-override
+        chart: cloud/helm/gcp-resources
+        releaseName: liferay-resources
+        namespace: liferay-gcp-resources
+        valueFiles:
+            - sample-gitops-repository/liferay/system/resources.with-customer-region.yaml
+        parameters:
+            overlay.bucketName: able-liferay-overlay
+            overlay.region: us-south1
+
+    # Restored-features flow: customer turns on CMEK encryption, sets GCP
+    # bucket labels for cost tracking, and constrains managementPolicies to
+    # Observe-only (Crossplane will not actively reconcile drift). Asserts
+    # that all three fields land in the rendered Bucket manifest.
+    -   name: system-resources-with-encryption-and-labels
+        chart: cloud/helm/gcp-resources
+        releaseName: liferay-resources
+        namespace: liferay-gcp-resources
+        valueFiles:
+            - sample-gitops-repository/liferay/system/resources.with-encryption-and-labels.yaml
+        parameters:
+            overlay.bucketName: able-liferay-overlay
+            overlay.region: us-south1
