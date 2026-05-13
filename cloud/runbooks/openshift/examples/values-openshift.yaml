@@ -62,6 +62,38 @@ volumeClaimTemplates:
                 requests:
                     storage: 10Gi
 
+# --- Virtual hosts: load via a side-channel ConfigMap ---
+#
+# Without this, Liferay's PortalInstancesFilter logs a
+# `NoSuchVirtualHostException` on every hit through the OpenShift Route,
+# because the default company has no virtual host record for the Route's
+# auto-generated hostname.
+#
+# The properties that fix it (see portal-impl/src/portal.properties):
+#   * company.default.virtual.host.name  — virtual host for the default company
+#   * company.default.web.id             — web ID of the default company
+#   * virtual.hosts.valid.hosts          — host allowlist (Tomcat-level)
+#
+# The chart already sets `LIFERAY_VIRTUAL_..._IGNORE_HOSTS` in its built-in
+# `env:` list. We can't override that entry cleanly from an overlay (duplicate
+# env-var names give the chart's value priority via POSIX `getenv()`), so we
+# use three *different* Liferay properties instead. They're loaded via a
+# ConfigMap referenced through `customEnvFrom` — the same pattern the
+# `helm/gcp` wrapper uses (see `helm/gcp/templates/liferay-network-cm.yaml`
+# and `helm/gcp/values.yaml`'s `customEnvFrom.x-liferay-gcp`).
+#
+# Apply the ConfigMap manifest before `helm install/upgrade`:
+#   oc apply -f examples/liferay-network-cm.yaml
+#
+# To customize the hostname, edit liferay-network-cm.yaml and substitute the
+# Route host from:
+#   oc get route liferay-default -o jsonpath='{.spec.host}{"\n"}'
+
+customEnvFrom:
+    x-liferay-openshift:
+        -   configMapRef:
+                name: liferay-network
+
 # --- Resource tuning ---
 #
 # Chart defaults: 2 vCPU / 6 GiB request, 4 vCPU / 8 GiB limit. That fits a
