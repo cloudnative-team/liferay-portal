@@ -109,7 +109,7 @@ Edit `cloud/runbooks/openshift/examples/liferay-network-cm.yaml` and replace the
 placeholder hostname with the one in `$ROUTE_HOST`.
 
 ```
-oc apply -f cloud/runbooks/openshift/examples/liferay-network-cm.yaml sed
+oc apply -f cloud/runbooks/openshift/examples/liferay-network-cm.yaml
 ```
 
 Verify it landed:
@@ -128,7 +128,7 @@ oc get configmap liferay-network -o yaml
 ## 5. Install the Liferay preview chart
 
 The chart is published as an OCI artifact at the cloudnative-team's GHCR
-regsitry:
+registry:
 
 ```
 oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551
@@ -179,7 +179,7 @@ oc get pod -w
 `liferay-default-0` cycles through `Pending` → `Init:…/N` → `PodInitializing` →
 `Running 0/1` → `Running 1/1`. First boot takes 5–15 minutes on the sandbox
 (sidecar Elasticsearch download + OSGi bundle activation + schema init). The
-startup probe budget is 32 min is  well past that.
+startup probe budget of 32 min is well past that.
 
 Tail Liferay's own log to see boot progress in real time:
 
@@ -197,7 +197,8 @@ Look for the Liferay banner followed by `Server startup in [...] milliseconds`.
 2. The default welcome page should render. Click **Sign In** (top-right).
 3. Default credentials for a fresh DXP install:
    - **Email:** `test@liferay.com`
-   - **Password:** `kubectl get secret liferay-default -ojsonpath='{.data.LIFERAY_DEFAULT_PERIOD_ADMIN_PERIOD_PASSWORD}' | base64 -d`
+   - **Password:**
+     `kubectl get secret liferay-default -ojsonpath='{.data.LIFERAY_DEFAULT_PERIOD_ADMIN_PERIOD_PASSWORD}' | base64 -d`
 4. Liferay forces a password reset on first login. Set a new password, then
    accept the terms of use and answer the password reminder prompt.
 5. You should land in the Liferay control panel as the default admin. Done.
@@ -213,6 +214,6 @@ oc delete -f cloud/runbooks/openshift/examples/route.yaml
 oc delete pvc liferay-persistent-volume-liferay-default-0
 ```
 
-The PVC has to be deleted explicitly asHelm leaves it behind on purpose so data
+The PVC has to be deleted explicitly as Helm leaves it behind on purpose so data
 survives an accidental `helm uninstall`. On the sandbox, leaving it behind also
 eats into your 5 GiB storage quota.
