@@ -1,0 +1,172 @@
+# Values overlay for deploying liferay-default on OpenShift.
+#
+# Usage:
+#   helm install liferay <path-to>/cloud/helm/default -f values-openshift.yaml
+#
+# What this file does:
+#
+# 1. Replaces the chart's pinned-UID `defaultSecurityContext` /
+#    `defaultPodSecurityContext` fallbacks with non-pinned blocks so OpenShift's
+#    `restricted-v2` SCC can inject `runAsUser` / `fsGroup` from the namespace's
+#    annotated UID range at admission time.
+# 2. Forces kubelet to re-apply fsGroup recursively on every pod start, so a
+#    mid-write crash (OOMKill, etc.) can't leave PVC contents with broken
+#    perms across restarts.
+# 3. Bumps the PVC from the chart default (1 GiB, fills up before Liferay
+#    finishes booting) to 10 GiB.
+# 4. Raises memory limits enough to fit Liferay's JVM + sidecar Elasticsearch
+#    without OOMKill on the Red Hat Developer Sandbox.
+# 5. Relaxes startup / readiness / liveness probes to tolerate the longer
+#    cold-start that constrained clusters produce.
+#
+# Note: this overlay does NOT include the OpenShift `Route` resource. The
+# `Route` is OpenShift-only and the chart is platform-neutral, so it's shipped
+# as a separate manifest. See `examples/route.yaml` next to this file.
+
+# --- Virtual hosts: load via a side-channel ConfigMap ---
+#
+# Without this, Liferay's PortalInstancesFilter logs a
+# `NoSuchVirtualHostException` on every hit through the OpenShift Route,
+# because the default company has no virtual host record for the Route's
+# auto-generated hostname.
+#
+# The properties that fix it (see portal-impl/src/portal.properties):
+#   * company.default.virtual.host.name  — virtual host for the default company
+#   * company.default.web.id             — web ID of the default company
+#   * virtual.hosts.valid.hosts          — host allowlist (Tomcat-level)
+#
+# The chart already sets `LIFERAY_VIRTUAL_..._IGNORE_HOSTS` in its built-in
+# `env:` list. We can't override that entry cleanly from an overlay (duplicate
+# env-var names give the chart's value priority via POSIX `getenv()`), so we
+# use three *different* Liferay properties instead. They're loaded via a
+# ConfigMap referenced through `customEnvFrom` — the same pattern the
+# `helm/gcp` wrapper uses (see `helm/gcp/templates/liferay-network-cm.yaml`
+# and `helm/gcp/values.yaml`'s `customEnvFrom.x-liferay-gcp`).
+#
+# Apply the ConfigMap manifest before `helm install/upgrade`:
+#   oc apply -f examples/liferay-network-cm.yaml
+#
+# To customize the hostname, edit liferay-network-cm.yaml and substitute the
+# Route host from:
+#   oc get route liferay-default -o jsonpath='{.spec.host}{"\n"}'
+customEnvFrom:
+    x-liferay-openshift:
+        -   configMapRef:
+                name: liferay-network
+
+
+# --- Security contexts: let OpenShift's SCC inject runAsUser / fsGroup ---
+podSecurityContext:
+    # Force kubelet to recursively re-apply fsGroup on every pod start. The
+    # default (`OnRootMismatch`) only checks the volume root, so if an
+    # OOMKill or other mid-write crash leaves partial files inside a subPath
+    # with broken perms, those files stay broken across restarts. `Always`
+    # makes kubelet heal the volume contents each time the pod comes up.
+    fsGroupChangePolicy: Always
+    runAsNonRoot: true
+    seccompProfile:
+        type: RuntimeDefault
+securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+        drop:
+            -   ALL
+    runAsNonRoot: true
+    seccompProfile:
+        type: RuntimeDefault
+
+# --- Resource tuning ---
+#
+# Chart defaults: 2 vCPU / 6 GiB request, 4 vCPU / 8 GiB limit. That fits a
+# normal OpenShift cluster but is too large for the Red Hat Developer Sandbox
+# (~7 GiB per project) and for some local CRC setups.
+#
+# Memory budget reasoning:
+#   * Liferay JVM: -Xmx2560m + -XX:MaxMetaspaceSize=768m + stacks/code/direct
+#                  ≈ 3.8–4.0 GiB
+#   * Sidecar Elasticsearch (separate JVM, started for dev/demo by default):
+#                  ≈ 1.0–1.5 GiB
+#   * Linux page cache, init container working set:
+#                  ≈ 0.5 GiB
+#   Total: ~5.5 GiB realistic, ~6 GiB safe. Anything tighter and you'll
+#   OOMKill mid-boot, which on this chart cascades into a corrupted
+#   `/opt/liferay/osgi/war` subPath on the next restart.
+#
+# On the Developer Sandbox (7 GiB quota) leave a little headroom under the
+# quota; on CRC or a real cluster you can move closer to the chart default.
+resources:
+    requests:
+        cpu: 500m
+        memory: 4Gi
+    limits:
+        cpu: 2000m
+        memory: 6Gi
+
+
+# --- Persistent storage: 1 GiB is not enough; Liferay fills it on first boot ---
+#
+# This whole list REPLACES the chart default (Helm doesn't merge lists). Keep
+# `metadata.name: liferay-persistent-volume` exactly as-is or the StatefulSet's
+# volumeMounts won't bind. Bump `storage` based on your project's quota:
+#   * 10Gi   — comfortable for a smoke / dev install
+#   * 20Gi+  — recommended for real workloads (deploy directory + data + logs)
+volumeClaimTemplates:
+    -   metadata:
+            name: liferay-persistent-volume
+        spec:
+            accessModes:
+                -   ReadWriteOnce
+            resources:
+                requests:
+                    storage: 10Gi
+
+# --- Probes: give Liferay headroom to boot on a constrained cluster ---
+#
+# The chart defaults assume a generously-provisioned cluster. On the Red Hat
+# Developer Sandbox (or any CPU-throttled environment) first boot can stack
+# several slow phases: sidecar Elasticsearch download + start, OSGi bundle
+# activation, schema initialization, theme auto-deploy. Stacked together they
+# regularly exceed the chart's 16-minute startup budget and the pod gets
+# killed mid-boot.
+#
+# Each block REPLACES the chart's probe (Helm doesn't merge nested maps the
+# way you'd hope when a key is set). Numbers below are deliberately generous;
+# tighten once you know your cluster's actual cold-start time.
+#
+# Budget math:
+#   startupProbe: initialDelaySeconds + (failureThreshold × periodSeconds)
+#                 = 120 + (120 × 15) = 1920s ≈ 32 min before the pod is killed
+#   While startupProbe runs, livenessProbe and readinessProbe are paused.
+#   Once startupProbe succeeds once, it stops; the other two take over.
+
+startupProbe:
+    failureThreshold: 120
+    httpGet:
+        path: /c/portal/robots
+        port: http
+    initialDelaySeconds: 120
+    periodSeconds: 15
+    timeoutSeconds: 10
+
+# Tolerant once Liferay is up — /c/portal/robots can briefly stall under
+# load (GC, deploy events). 5 × 15s = 75s of unreadiness before the pod is
+# pulled from Service endpoints.
+readinessProbe:
+    failureThreshold: 5
+    httpGet:
+        path: /c/portal/robots
+        port: http
+    initialDelaySeconds: 0
+    periodSeconds: 15
+    timeoutSeconds: 10
+
+# Most lenient of the three — a false-positive liveness kill cascades into a
+# full restart cycle. 5 × 30s = 150s of consecutive failures before kill.
+livenessProbe:
+    failureThreshold: 5
+    httpGet:
+        path: /c/portal/robots
+        port: http
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10

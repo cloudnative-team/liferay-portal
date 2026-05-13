@@ -1,0 +1,51 @@
+# OpenShift Route for exposing liferay-default outside the cluster.
+#
+# Usage:
+#   oc apply -f route.yaml
+#   oc get route liferay-default -o jsonpath='{.spec.host}{"\n"}'
+#
+# Then open https://<that-host>/ in a browser.
+#
+# Why this is shipped separately from the Helm chart:
+#   `Route` is an OpenShift-only API (route.openshift.io/v1). The Liferay
+#   default chart is platform-neutral, so it doesn't render Routes. Apply
+#   this manifest after `helm install` to publish the StatefulSet's HTTP
+#   service through the OpenShift router.
+#
+# What this manifest does:
+#   1. Forwards external traffic to the chart's `liferay-default` ClusterIP
+#      Service on its `http` port (8080 → pod port 8080).
+#   2. Omits `spec.host` so the OpenShift router auto-generates a hostname
+#      under the cluster's apps domain (e.g. on the Red Hat Developer
+#      Sandbox: `liferay-default-<namespace>.apps.rm3.7wse.p1.openshiftapps.com`).
+#      The Developer Sandbox does NOT allow custom hostnames for free users,
+#      so this is the path to take. On a paid/self-managed cluster you can
+#      set `spec.host: liferay.example.com` and point DNS at the router.
+#   3. Uses `edge` TLS termination — the router terminates HTTPS with the
+#      cluster's wildcard cert for the apps domain (so the browser sees a
+#      valid cert) and proxies plain HTTP to the pod on 8080. Liferay
+#      doesn't need to be configured for TLS.
+#   4. Redirects bare HTTP requests to HTTPS via
+#      `insecureEdgeTerminationPolicy: Redirect`.
+#
+# Service name assumption:
+#   This file assumes the Helm release was installed as `liferay` (so the
+#   Service is named `liferay-default`). If you installed under a different
+#   release name, rename both `metadata.name` and `spec.to.name` to match
+#   the rendered Service.
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+    name: liferay-default
+spec:
+    port:
+        targetPort: http
+    tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+    to:
+        kind: Service
+        name: liferay-default
+        weight: 100
+    wildcardPolicy: None

@@ -1,0 +1,57 @@
+# ConfigMap that registers the OpenShift Route hostname as the default
+# company's virtual host, so PortalInstances stops throwing
+# `NoSuchVirtualHostException` on every request.
+#
+# Apply this BEFORE `helm install/upgrade` so the StatefulSet picks it up
+# via the overlay's `customEnvFrom: x-liferay-openshift` reference (see
+# `values-openshift.yaml`):
+#
+#   oc apply -f liferay-network-cm.yaml
+#
+# Why this works (see portal-impl/src/portal.properties):
+#
+#   * company.default.virtual.host.name (line 1886)
+#       The hostname Liferay will associate with the default company. By
+#       default this is `localhost`, which is why a Route hostname doesn't
+#       match.
+#
+#   * company.default.virtual.host.sync.on.startup (line 1899)
+#       Defaults to `false`. When `false`, `virtual.host.name` only applies
+#       when the default company is *first created* — it's ignored on every
+#       subsequent boot. Setting `true` re-applies on every startup, which
+#       is what retrofits an existing install with a new hostname.
+#
+# Combined effect:
+#   On the next pod start, Liferay updates the default company's virtual
+#   host record in the DB to the Route hostname. Subsequent requests find
+#   the company by hostname and the exception goes away.
+#
+# Customize for your sandbox:
+#   1. Get your Route hostname:
+#        oc get route liferay-default -o jsonpath='{.spec.host}{"\n"}'
+#   2. Replace the hostname in `..._VIRTUAL_PERIOD_HOST_PERIOD_NAME` below.
+#
+# Two more env vars from the gcp wrapper's pattern (intentionally NOT
+# included here):
+#
+#   LIFERAY_COMPANY_PERIOD_DEFAULT_PERIOD_WEB_PERIOD_ID
+#       Sets the default company's web ID. Default is `liferay.com`. On an
+#       existing install, changing this would *re-key* the default company
+#       lookup — Liferay would look for a company with the new web ID,
+#       not find one, and effectively orphan the existing data. Only safe
+#       on a fresh install (delete the PVC first).
+#
+#   LIFERAY_VIRTUAL_PERIOD_HOSTS_PERIOD_VALID_PERIOD_HOSTS
+#       Tomcat-level host allowlist. The chart's `portal-cloud.properties`
+#       already sets this to `*`, accepting all hosts. Narrowing it here
+#       would override that and could block service-internal traffic
+#       (e.g. `liferay-default.<namespace>.svc.cluster.local`). Leave it
+#       unset unless you have a specific reason.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: liferay-network
+data:
+    LIFERAY_COMPANY_PERIOD_DEFAULT_PERIOD_VIRTUAL_PERIOD_HOST_PERIOD_NAME: "[REPLACE_ME_WITH_YOUR_ROUTE_HOSTNAME]"
+    LIFERAY_COMPANY_PERIOD_DEFAULT_PERIOD_VIRTUAL_PERIOD_HOST_PERIOD_SYNC_PERIOD_ON_PERIOD_STARTUP: "true"
