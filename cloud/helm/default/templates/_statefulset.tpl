@@ -89,8 +89,7 @@ spec:
                     resources:
                         {{- toYaml . | nindent 22 }}
                     {{- end }}
-                    {{- $containerSecurityContext := .statefulset.securityContext}}
-                    {{- with $containerSecurityContext }}
+                    {{- with .statefulset.securityContext }}
                     securityContext:
                         {{- toYaml . | nindent 22 }}
                     {{- end }}
@@ -148,8 +147,7 @@ spec:
             schedulingGates:
                 {{- toYaml . | nindent 16 }}
             {{- end }}
-            {{- $podSecurityContext := .statefulset.podSecurityContext}}
-            {{- with $podSecurityContext }}
+            {{- with .statefulset.podSecurityContext}}
             securityContext:
                 {{- toYaml . | nindent 16 }}
             {{- end }}

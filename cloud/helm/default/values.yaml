@@ -66,8 +66,7 @@ customInitContainers:
                                 name: managed-service-details
                     image: {{ printf "%s:%s" .overlay.image.repository (.overlay.image.tag | toString) }}
                     name: liferay-overlay
-                    {{- $containerSecurityContext := .securityContext}}
-                    {{- with $containerSecurityContext }}
+                    {{- with .securityContext}}
                     securityContext:
                         {{- toYaml . | nindent 24 }}
                     {{- end }}
