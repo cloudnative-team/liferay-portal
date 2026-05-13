@@ -1,0 +1,8 @@
+liferay-default:
+    replicaCount: 3
+    network:
+        enabled: true
+        endpointRef: runray.xyz
+        forceHttpsRedirect: true
+        hostnames:
+            - able-prd.runray.xyz

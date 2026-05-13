@@ -1,0 +1,14 @@
+# Variant of liferay/system/resources.yaml demonstrating the security and
+# operational features the new gcp-resources chart restored: customer-managed
+# encryption (CMEK), GCP-side labels for cost tracking, and a restricted
+# managementPolicies value that limits Crossplane to Create + Observe.
+labels:
+    cost-center: liferay-platform
+    environment: shared
+managementPolicies:
+    - Create
+    - Observe
+overlay:
+    enabled: true
+    encryption:
+        kmsKeyName: projects/example-project/locations/us-south1/keyRings/liferay-keyring/cryptoKeys/overlay-bucket-key

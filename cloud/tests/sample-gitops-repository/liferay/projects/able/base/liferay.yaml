@@ -1,0 +1,19 @@
+liferay-default:
+    customEnv:
+        x-license:
+            - name: LIFERAY_DISABLE_TRIAL_LICENSE
+              value: "true"
+    customVolumeMounts:
+        x-license:
+            - mountPath: /etc/liferay/mount/files/deploy
+              name: developer-clustered
+    customVolumes:
+        x-license:
+            - name: developer-clustered
+              secret:
+                  items:
+                      - key: license.xml
+                        path: license.xml
+                  secretName: developer-clustered
+    image:
+        tag: 2026.q1.6-lts
