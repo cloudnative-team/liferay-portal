@@ -325,9 +325,7 @@ jobs:
             -   name: Checkout
                 uses: actions/checkout@v4
                 with:
-                    fetch-depth: 1
-                    sparse-checkout: |
-                        cloud/helm
+                    fetch-depth: 0
             -   name: Configure Git
                 run: |
                     set -o errexit
