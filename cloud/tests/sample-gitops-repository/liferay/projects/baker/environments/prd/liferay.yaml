@@ -1,8 +1,8 @@
 liferay-default:
-    replicaCount: 3
     network:
         enabled: true
         endpointRef: runray.xyz
         forceHttpsRedirect: true
         hostnames:
-            - baker-prd.runray.xyz
+            -   baker-prd.runray.xyz
+    replicaCount: 3

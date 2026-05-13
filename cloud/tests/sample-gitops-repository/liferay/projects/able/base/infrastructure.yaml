@@ -5,7 +5,7 @@ endpoints:
         protocol: HTTPS
         tls:
             externalSecretNames:
-                - runrayxyz
+                -   runrayxyz
 license:
     externalSecretName: developer-clustered
     targetSecretName: developer-clustered

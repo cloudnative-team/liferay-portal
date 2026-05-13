@@ -1,4 +1,3 @@
----
 # Source: liferay-gcp-infrastructure/templates/elasticsearch.yaml
 apiVersion: v1
 kind: Namespace
@@ -72,8 +71,8 @@ spec:
                             securityContext:
                                 allowPrivilegeEscalation: false
                                 capabilities:
-                                  drop:
-                                  - ALL
+                                    drop:
+                                    -   ALL
                                 privileged: false
                                 readOnlyRootFilesystem: false
                     initContainers:
@@ -92,8 +91,8 @@ spec:
                             securityContext:
                                 allowPrivilegeEscalation: false
                                 capabilities:
-                                  drop:
-                                  - ALL
+                                    drop:
+                                    -   ALL
                                 privileged: false
                                 readOnlyRootFilesystem: false
                     securityContext:
@@ -102,7 +101,7 @@ spec:
                         runAsNonRoot: true
                         runAsUser: 1000
                         seccompProfile:
-                          type: RuntimeDefault
+                            type: RuntimeDefault
             volumeClaimTemplates:
                 -   metadata:
                         name: elasticsearch-data
@@ -240,8 +239,8 @@ spec:
         enabled: false
         region: ""
         retentionDays: 30
-        storageClass: "NEARLINE"
-    cmk: 
+        storageClass: NEARLINE
+    cmk:
         enabled: false
     commonTags:
         environment_id: prd
@@ -256,13 +255,13 @@ spec:
     environmentId: prd
     forceDestroy: false
     orphanOnDelete: false
-    overlay: 
+    overlay:
         bucketName: able-liferay-overlay
         enabled: false
         githubRepo: ""
     projectId: my-project-id
     region: us-south1
-    storage: 
+    storage:
         enableVersioning: true
         region: ""
 ---
@@ -294,14 +293,14 @@ spec:
         -   interval: 1m
             metricRelabeling:
                 -   action: keep
-                    regex: "^envoy_(http_downstream_(rq_(total|xx|time_(bucket|sum|count))|cx_[rt]x_bytes_total)|cluster_upstream_rq_(total|time_(bucket|sum|count)))$"
+                    regex: ^envoy_(http_downstream_(rq_(total|xx|time_(bucket|sum|count))|cx_[rt]x_bytes_total)|cluster_upstream_rq_(total|time_(bucket|sum|count)))$
                     sourceLabels:
                         -   __name__
             path: /stats/prometheus
             port: 19001
     selector:
         matchLabels:
-            app.kubernetes.io/name: "envoy"
+            app.kubernetes.io/name: envoy
 ---
 # Source: liferay-gcp-infrastructure/templates/pod-monitoring.yaml
 apiVersion: monitoring.googleapis.com/v1
@@ -314,12 +313,12 @@ spec:
         -   interval: 1m
             metricRelabeling:
                 -   action: keep
-                    regex: "^(?:Catalina_(?:GlobalRequestProcessor_(?:.*_)?(?:errorCount|processingTime|requestCount)|ThreadPool_(?:.*_)?(?:currentThreadCount|currentThreadsBusy))|com_zaxxer_hikari_Pool_(?:.*_)?(?:ActiveConnections|IdleConnections|ThreadsAwaitingConnection|TotalConnections)|java_lang_Threading_ThreadCount|jvm_(?:(?:buffer_pool|memory(?:_pool)?)_used_bytes|classes_currently_loaded|gc_collection_seconds_(?:count|sum)|threads_(?:current|peak|state))|process_(?:cpu_seconds_total|open_fds|resident_memory_bytes))$"
+                    regex: ^(?:Catalina_(?:GlobalRequestProcessor_(?:.*_)?(?:errorCount|processingTime|requestCount)|ThreadPool_(?:.*_)?(?:currentThreadCount|currentThreadsBusy))|com_zaxxer_hikari_Pool_(?:.*_)?(?:ActiveConnections|IdleConnections|ThreadsAwaitingConnection|TotalConnections)|java_lang_Threading_ThreadCount|jvm_(?:(?:buffer_pool|memory(?:_pool)?)_used_bytes|classes_currently_loaded|gc_collection_seconds_(?:count|sum)|threads_(?:current|peak|state))|process_(?:cpu_seconds_total|open_fds|resident_memory_bytes))$
                     sourceLabels:
                         -   __name__
             path: /metrics
             port: 12345
     selector:
         matchLabels:
-            app: "liferay-default"
-            app.kubernetes.io/name: "liferay-default"
+            app: liferay-default
+            app.kubernetes.io/name: liferay-default

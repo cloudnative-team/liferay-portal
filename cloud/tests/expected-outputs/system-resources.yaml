@@ -1,4 +1,3 @@
----
 # Source: liferay-gcp-resources/templates/overlay-bucket.yaml
 apiVersion: storage.gcp.m.upbound.io/v1beta1
 kind: Bucket
@@ -9,12 +8,12 @@ metadata:
         app.kubernetes.io/component: gcp-resources
         app.kubernetes.io/managed-by: liferay-gcp-resources
         app.kubernetes.io/name: overlay-bucket
-    name: "able-liferay-overlay"
+    name: able-liferay-overlay
 spec:
     forProvider:
         forceDestroy: false
-        location: "us-south1"
-        storageClass: "STANDARD"
+        location: us-south1
+        storageClass: STANDARD
         uniformBucketLevelAccess: true
         versioning:
             enabled: true

@@ -6,8 +6,8 @@ labels:
     cost-center: liferay-platform
     environment: shared
 managementPolicies:
-    - Create
-    - Observe
+    -   Create
+    -   Observe
 overlay:
     enabled: true
     encryption:

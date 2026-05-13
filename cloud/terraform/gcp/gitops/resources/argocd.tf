@@ -298,124 +298,6 @@ resource "kubernetes_manifest" "infrastructure_provider_application" {
 		}
 	}
 }
-resource "kubernetes_manifest" "resources_appproject" {
-	depends_on=[kubernetes_manifest.infrastructure_appproject]
-	field_manager {
-		force_conflicts=true
-		name=local.terraform_manager_name
-	}
-	manifest={
-		apiVersion="argoproj.io/v1alpha1"
-		kind="AppProject"
-		metadata={
-			labels=merge(
-				local.common_labels,
-				{
-					"app.kubernetes.io/name"="resources-appproject"
-				})
-			name=local.resources_appproject_name
-			namespace=var.argocd_namespace
-		}
-		spec={
-			clusterResourceWhitelist=[
-				{
-					group="storage.gcp.m.upbound.io"
-					kind="Bucket"
-				},
-			]
-			description="ArgoCD project for Liferay deployment-scoped cloud resources."
-			destinations=[
-				{
-					namespace=var.resources_namespace
-					server="https://kubernetes.default.svc"
-				},
-			]
-			sourceRepos=[
-				var.resources_helm_chart_config.chart_url,
-				"${var.resources_helm_chart_config.chart_url}/*",
-				local.infrastructure_git_repo_url,
-			]
-		}
-	}
-}
-resource "kubernetes_manifest" "resources_application" {
-	depends_on=[
-		kubernetes_manifest.git_repo_credentials_external_secret,
-		kubernetes_manifest.resources_appproject,
-	]
-	field_manager {
-		force_conflicts=true
-		name=local.terraform_manager_name
-	}
-	manifest={
-		apiVersion="argoproj.io/v1alpha1"
-		kind="Application"
-		metadata={
-			annotations={
-				"argocd.argoproj.io/compare-options"="IgnoreExtraneous"
-				"argocd.argoproj.io/sync-wave"="-40"
-			}
-			finalizers=["resources-finalizer.argocd.argoproj.io"]
-			labels=merge(
-				local.common_labels,
-				{
-					"app.kubernetes.io/name"="liferay-resources"
-				})
-			name="liferay-resources"
-			namespace=var.argocd_namespace
-		}
-		spec={
-			destination={
-				namespace=var.resources_namespace
-				server="https://kubernetes.default.svc"
-			}
-			project=local.resources_appproject_name
-			sources=[
-				merge(
-					{
-						helm={
-							parameters=[
-								{
-									name="overlay.bucketName"
-									value=local.overlay_bucket_name
-								},
-								{
-									name="overlay.region"
-									value=var.region
-								},
-							]
-							valueFiles=[
-								"$values/${var.infrastructure_git_repo_config.source_paths.system}/${var.infrastructure_git_repo_config.source_paths.resources_values_filename}",
-							]
-						}
-						repoURL=var.resources_helm_chart_config.chart_url
-						targetRevision=var.resources_helm_chart_version
-					},
-					var.resources_helm_chart_config.path == null ? {
-						chart=var.resources_helm_chart_config.chart_name
-					} : {
-						path=var.resources_helm_chart_config.path
-					}
-				),
-				{
-					ref="values"
-					repoURL=local.infrastructure_git_repo_url
-					targetRevision=var.infrastructure_git_repo_config.revision
-				},
-			]
-			syncPolicy={
-				automated={
-					prune=true
-					selfHeal=true
-				}
-				syncOptions=[
-					"CreateNamespace=true",
-					"SkipDryRunOnMissingResource=true",
-				]
-			}
-		}
-	}
-}
 resource "kubernetes_manifest" "liferay_applicationset" {
 	depends_on=[
 		kubernetes_manifest.git_repo_credentials_external_secret,
@@ -591,6 +473,124 @@ resource "kubernetes_manifest" "liferay_appproject" {
 				local.liferay_helm_chart_config.chart_url,
 				"${local.liferay_helm_chart_config.chart_url}/*",
 				var.liferay_git_repo_url,
+			]
+		}
+	}
+}
+resource "kubernetes_manifest" "resources_application" {
+	depends_on=[
+		kubernetes_manifest.git_repo_credentials_external_secret,
+		kubernetes_manifest.resources_appproject,
+	]
+	field_manager {
+		force_conflicts=true
+		name=local.terraform_manager_name
+	}
+	manifest={
+		apiVersion="argoproj.io/v1alpha1"
+		kind="Application"
+		metadata={
+			annotations={
+				"argocd.argoproj.io/compare-options"="IgnoreExtraneous"
+				"argocd.argoproj.io/sync-wave"="-40"
+			}
+			finalizers=["resources-finalizer.argocd.argoproj.io"]
+			labels=merge(
+				local.common_labels,
+				{
+					"app.kubernetes.io/name"="liferay-resources"
+				})
+			name="liferay-resources"
+			namespace=var.argocd_namespace
+		}
+		spec={
+			destination={
+				namespace=var.resources_namespace
+				server="https://kubernetes.default.svc"
+			}
+			project=local.resources_appproject_name
+			sources=[
+				merge(
+					{
+						helm={
+							parameters=[
+								{
+									name="overlay.bucketName"
+									value=local.overlay_bucket_name
+								},
+								{
+									name="overlay.region"
+									value=var.region
+								},
+							]
+							valueFiles=[
+								"$values/${var.infrastructure_git_repo_config.source_paths.system}/${var.infrastructure_git_repo_config.source_paths.resources_values_filename}",
+							]
+						}
+						repoURL=var.resources_helm_chart_config.chart_url
+						targetRevision=var.resources_helm_chart_version
+					},
+					var.resources_helm_chart_config.path == null ? {
+						chart=var.resources_helm_chart_config.chart_name
+					} : {
+						path=var.resources_helm_chart_config.path
+					}
+				),
+				{
+					ref="values"
+					repoURL=local.infrastructure_git_repo_url
+					targetRevision=var.infrastructure_git_repo_config.revision
+				},
+			]
+			syncPolicy={
+				automated={
+					prune=true
+					selfHeal=true
+				}
+				syncOptions=[
+					"CreateNamespace=true",
+					"SkipDryRunOnMissingResource=true",
+				]
+			}
+		}
+	}
+}
+resource "kubernetes_manifest" "resources_appproject" {
+	depends_on=[kubernetes_manifest.infrastructure_appproject]
+	field_manager {
+		force_conflicts=true
+		name=local.terraform_manager_name
+	}
+	manifest={
+		apiVersion="argoproj.io/v1alpha1"
+		kind="AppProject"
+		metadata={
+			labels=merge(
+				local.common_labels,
+				{
+					"app.kubernetes.io/name"="resources-appproject"
+				})
+			name=local.resources_appproject_name
+			namespace=var.argocd_namespace
+		}
+		spec={
+			clusterResourceWhitelist=[
+				{
+					group="storage.gcp.m.upbound.io"
+					kind="Bucket"
+				},
+			]
+			description="ArgoCD project for Liferay deployment-scoped cloud resources."
+			destinations=[
+				{
+					namespace=var.resources_namespace
+					server="https://kubernetes.default.svc"
+				},
+			]
+			sourceRepos=[
+				var.resources_helm_chart_config.chart_url,
+				"${var.resources_helm_chart_config.chart_url}/*",
+				local.infrastructure_git_repo_url,
 			]
 		}
 	}
