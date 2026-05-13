@@ -8,6 +8,14 @@ browser. The whole thing takes about 15 minutes plus boot time.
 > Sandbox is free, doesn't expire (you re-up it monthly), and runs on the
 > same OpenShift bits as the paid product.
 
+> **Order matters.** This guide creates the Route and the
+> `liferay-network` ConfigMap *before* running `helm install`. The
+> ConfigMap injects `company.default.virtual.host.name` so that when
+> Liferay initializes its database on first boot, the default company is
+> written with the right Route hostname from the start. If you install
+> Liferay first and add the ConfigMap later, the DB is already populated
+> with the old (default) virtual host and you'll fight the data forever.
+
 ## Prerequisites on your machine
 
 - `oc` — the OpenShift CLI. Arch:
@@ -54,7 +62,72 @@ inside this 7 GiB ceiling.
    ```
    It should print `Using project "<your-username>-dev" ...`.
 
-## 3. Install the Liferay default chart
+## 3. Create the Route first to claim the hostname
+
+The OpenShift router assigns a hostname the moment the Route resource is
+created — even before there's a backing Service to forward traffic to. We
+use that to read the hostname now, write it into the ConfigMap in step 4,
+and have Liferay come up with the right virtual host on first boot.
+
+Apply the Route manifest:
+
+```
+oc apply -f /home/greg/repos/liferay/liferay-portal/cloud/runbooks/openshift/examples/route.yaml
+```
+
+See `examples/route.yaml` for inline reasoning. In short: edge TLS
+termination using the cluster's wildcard cert, auto-generated hostname
+(Developer Sandbox doesn't allow custom domains on the free tier), HTTP →
+HTTPS redirect.
+
+Read the assigned hostname into a shell variable — you'll use it twice:
+
+```
+ROUTE_HOST="$(oc get route liferay-default -o jsonpath='{.spec.host}')"
+echo "$ROUTE_HOST"
+```
+
+You'll see something like
+`liferay-default-your-username-dev.apps.rm3.7wse.p1.openshiftapps.com`.
+
+> The Route will return 503 until step 5 finishes — that's expected, the
+> backing Service doesn't exist yet.
+
+## 4. Create the `liferay-network` ConfigMap with that hostname
+
+The default chart treats `localhost` as the default company's virtual host.
+Hitting Liferay through the Route hostname instead would log
+`NoSuchVirtualHostException` on every request. The `liferay-network`
+ConfigMap supplies two env vars that fix it:
+
+- `company.default.virtual.host.name` → the Route hostname
+- `company.default.virtual.host.sync.on.startup=true` → re-apply on every
+  boot (without this, the hostname only takes effect when the default
+  company is *first created*)
+
+Edit `examples/liferay-network-cm.yaml` and replace the placeholder
+hostname with the one in `$ROUTE_HOST`. Or apply with a one-liner:
+
+```
+sed "s|liferay-default-gregoryamerson-dev.apps.rm3.7wse.p1.openshiftapps.com|${ROUTE_HOST}|" \
+    /home/greg/repos/liferay/liferay-portal/cloud/runbooks/openshift/examples/liferay-network-cm.yaml \
+    | oc apply -f -
+```
+
+Verify it landed:
+
+```
+oc get configmap liferay-network -o yaml
+```
+
+> **Why this ordering matters.** Liferay's `CompanyLocalServiceImpl` writes
+> the default company row to the DB during initial bundle activation,
+> using whatever value of `company.default.virtual.host.name` is set at
+> that moment. If the ConfigMap isn't in place before that first boot, the
+> DB ends up with `localhost` and only a retroactive sync (or admin-UI
+> edit) will fix it. Doing it now means the data is right from day one.
+
+## 5. Install the Liferay default chart
 
 The chart is published as an OCI artifact at:
 
@@ -85,11 +158,13 @@ reasoning in inline comments — read that file for the *why*):
    inject `runAsUser` / `fsGroup`.
 2. Forces `fsGroupChangePolicy: Always` so a mid-write crash can't corrupt
    the PVC across restarts.
-3. Bumps the PVC from 1 GiB → 10 GiB (1 GiB fills up before Liferay
+3. References the `liferay-network` ConfigMap from step 4 via
+   `customEnvFrom`, so the virtual-host env vars flow into the pod.
+4. Bumps the PVC from 1 GiB → 10 GiB (1 GiB fills up before Liferay
    finishes booting).
-4. Raises memory limits to 6 GiB to fit Liferay JVM + sidecar Elasticsearch
+5. Raises memory limits to 6 GiB to fit Liferay JVM + sidecar Elasticsearch
    without OOMKill.
-5. Relaxes startup / readiness / liveness probes to tolerate slower
+6. Relaxes startup / readiness / liveness probes to tolerate slower
    cold-start on a constrained cluster.
 
 ### Updating values later
@@ -122,34 +197,11 @@ oc logs -f liferay-default-0
 
 Look for the Liferay banner followed by `Server startup in [...] milliseconds`.
 
-## 4. Publish the HTTP service via a Route
+## 6. Verify by logging into Liferay
 
-The chart doesn't render OpenShift `Route` objects (Routes are
-OpenShift-only and the chart is platform-neutral), so apply the example
-manifest:
-
-```
-oc apply -f /home/greg/repos/liferay/liferay-portal/cloud/runbooks/openshift/examples/route.yaml
-```
-
-See `examples/route.yaml` for the manifest and inline reasoning. In short:
-edge TLS termination using the cluster's wildcard cert, auto-generated
-hostname (Developer Sandbox doesn't allow custom domains on the free tier),
-HTTP → HTTPS redirect.
-
-Pull the assigned hostname:
-
-```
-oc get route liferay-default -o jsonpath='{.spec.host}{"\n"}'
-```
-
-You'll get something like
-`liferay-default-your-username-dev.apps.rm3.7wse.p1.openshiftapps.com`.
-
-## 5. Verify by logging into Liferay
-
-1. Open `https://<that-host>/` in a browser. The first request will be
-   slow — Liferay populates its virtual-host cache on cold hit.
+1. Open `https://$ROUTE_HOST/` in a browser (substitute the actual host).
+   The first request will be slow — Liferay populates its virtual-host
+   cache on cold hit.
 2. The default welcome page should render. Click **Sign In** (top-right).
 3. Default credentials for a fresh DXP install:
    - **Email:** `test@liferay.com`
@@ -157,14 +209,17 @@ You'll get something like
 4. Liferay forces a password reset on first login. Set a new password, then
    accept the terms of use and answer the password reminder prompt.
 5. You should land in the Liferay control panel as the default admin. Done.
+6. Sanity check: there should be no `NoSuchVirtualHostException` in the pod
+   logs (`oc logs liferay-default-0 | grep -i NoSuchVirtualHost`).
 
 ## Cleanup
 
-Uninstall everything you applied:
+Uninstall everything you applied, in reverse order:
 
 ```
-oc delete -f /home/greg/repos/liferay/liferay-portal/cloud/runbooks/openshift/examples/route.yaml
 helm uninstall liferay
+oc delete configmap liferay-network
+oc delete -f /home/greg/repos/liferay/liferay-portal/cloud/runbooks/openshift/examples/route.yaml
 oc delete pvc liferay-persistent-volume-liferay-default-0
 ```
 
@@ -179,5 +234,6 @@ behind also eats into your 5 GiB storage quota.
 | Pod stuck in `Init:0/N` for >2 min | Image pull from `liferay/dxp:latest` | `oc describe pod liferay-default-0` → `Events` |
 | Pod hits `CrashLoopBackOff` early | OOMKill | `oc describe pod liferay-default-0` → look for `Reason: OOMKilled` and `Exit Code: 137`. Bump `resources.limits.memory` in the overlay, but keep it under 7 GiB total project quota. |
 | Pod runs but `AccessDeniedException: /opt/liferay/osgi/war` in logs | Chart version predates the `osgi/war` PVC mount | Upgrade to chart ≥ 0.6.0, or install from the local chart path. |
-| Route returns 503 | Liferay still booting | `oc logs liferay-default-0` and wait for `Server startup in [...]`. |
+| `NoSuchVirtualHostException` on every request | ConfigMap missing or has the wrong hostname | `oc get configmap liferay-network -o yaml` — confirm the value matches the Route host. If it's wrong, fix the ConfigMap, then `oc delete pod liferay-default-0` to force a re-read on restart. If Liferay was *already* booted with the wrong value, `company.default.virtual.host.sync.on.startup=true` will heal it on the next restart. |
+| Route returns 503 | Liferay still booting (or no Service yet) | `oc logs liferay-default-0` and wait for `Server startup in [...]`. |
 | Route returns 200 but blank page | Liferay still indexing/initializing modules after the welcome page | Wait another minute and refresh. |
