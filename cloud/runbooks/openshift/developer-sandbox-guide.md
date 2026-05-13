@@ -131,14 +131,14 @@ The chart is published as an OCI artifact at the cloudnative-team's GHCR
 registry:
 
 ```
-oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551
+ghcr.io/cloudnative-team/charts-pr/91/liferay-default:0.6.0-pr-91-gaa8311e88
 ```
 
 Install it with the OpenShift overlay:
 
 ```
 helm upgrade -i liferay-preview \
- oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551 \
+ oci://ghcr.io/cloudnative-team/charts-pr/91/liferay-default:0.6.0-pr-91-gaa8311e88 \
     -f cloud/runbooks/openshift/examples/values-openshift.yaml
 ```
 
@@ -166,8 +166,8 @@ If you tweak the overlay, re-render with `helm upgrade`:
 
 ```
 helm upgrade -i liferay-preview \
- oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551 \
-    -f cloud/runbooks/openshift/examples/values-openshift.yaml
+  oci://ghcr.io/cloudnative-team/charts-pr/91/liferay-default:0.6.0-pr-91-gaa8311e88 \
+  	-f cloud/runbooks/openshift/examples/values-openshift.yaml
 ```
 
 ### Watch the boot
