@@ -167,7 +167,7 @@ If you tweak the overlay, re-render with `helm upgrade`:
 ```
 helm upgrade -i liferay-preview \
   oci://ghcr.io/cloudnative-team/charts-pr/91/liferay-default:0.6.0-pr-91-gaa8311e88 \
-  	-f cloud/runbooks/openshift/examples/values-openshift.yaml
+   -f cloud/runbooks/openshift/examples/values-openshift.yaml
 ```
 
 ### Watch the boot
@@ -203,17 +203,42 @@ Look for the Liferay banner followed by `Server startup in [...] milliseconds`.
    accept the terms of use and answer the password reminder prompt.
 5. You should land in the Liferay control panel as the default admin. Done.
 
-## Cleanup
+## Pause when you're not using it
 
-Uninstall everything you applied, in reverse order:
+The sandbox itself is always-on and free, so there's nothing to "power down" at
+the cluster level. But the running pod keeps consuming your 7 GiB memory quota
+the whole time it's up, which blocks anything else you might want to run in the
+project.
+
+If you're stepping away for a while, scale the StatefulSet to zero. The pod
+stops; the PVC, ConfigMap, Route, and Helm release all stay in place, so coming
+back is just a matter of scaling back up.
+
+```
+oc scale statefulset liferay-default --replicas=0
+```
+
+Bring it back later (allow 5–15 min for the cold start):
+
+```
+oc scale statefulset liferay-default --replicas=1
+```
+
+No need to fully tear things down — the sandbox handles reset on its own when
+the project expires.
+
+## Cleanup the data
+
+If you want to start over from scratch (fresh DB, fresh OSGi state, etc.)
+without waiting for the sandbox to reset, uninstall the Helm release and then
+delete the PVC explicitly:
 
 ```
 helm uninstall liferay-preview
-oc delete configmap liferay-network
-oc delete -f cloud/runbooks/openshift/examples/route.yaml
 oc delete pvc liferay-persistent-volume-liferay-default-0
 ```
 
-The PVC has to be deleted explicitly as Helm leaves it behind on purpose so data
-survives an accidental `helm uninstall`. On the sandbox, leaving it behind also
-eats into your 5 GiB storage quota.
+The PVC has to come out as a separate step as Helm leaves it behind on purpose
+so an accidental `helm uninstall` doesn't wipe your data. Until that
+`oc delete pvc` runs, the 5 GiB storage quota stays consumed and the next
+install will inherit the old data.
