@@ -138,7 +138,7 @@ Install it with the OpenShift overlay:
 
 ```
 helm upgrade -i liferay-preview \
- oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551
+ oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551 \
     -f cloud/runbooks/openshift/examples/values-openshift.yaml
 ```
 
@@ -166,7 +166,7 @@ If you tweak the overlay, re-render with `helm upgrade`:
 
 ```
 helm upgrade -i liferay-preview \
- oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551
+ oci://ghcr.io/cloudnative-team/charts-pr/88/liferay-default:0.6.0-pr-88-g07c033551 \
     -f cloud/runbooks/openshift/examples/values-openshift.yaml
 ```
 
@@ -198,7 +198,7 @@ Look for the Liferay banner followed by `Server startup in [...] milliseconds`.
 3. Default credentials for a fresh DXP install:
    - **Email:** `test@liferay.com`
    - **Password:**
-     `kubectl get secret liferay-default -ojsonpath='{.data.LIFERAY_DEFAULT_PERIOD_ADMIN_PERIOD_PASSWORD}' | base64 -d`
+     `oc extract secret/liferay-default --keys=LIFERAY_DEFAULT_PERIOD_ADMIN_PERIOD_PASSWORD --to=-`
 4. Liferay forces a password reset on first login. Set a new password, then
    accept the terms of use and answer the password reminder prompt.
 5. You should land in the Liferay control panel as the default admin. Done.
