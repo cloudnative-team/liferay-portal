@@ -1,4 +1,3 @@
----
 # Source: liferay-gcp-infrastructure-provider/templates/cluster-bootstrap.yaml
 apiVersion: v1
 kind: Namespace
@@ -40,7 +39,7 @@ metadata:
 # Source: liferay-gcp-infrastructure-provider/charts/liferay-subchart-backup-controller/templates/configmap.yaml
 apiVersion: v1
 data:
-    GOMEMLIMIT: "819MiB"
+    GOMEMLIMIT: 819MiB
     LCP_ENABLE_DATABASE_DUMPS: "false"
     LCP_ENABLE_DEPLOYMENT_MUTATION: "false"
     LCP_ENABLE_SANDBOX_FILTER: "false"
@@ -301,27 +300,26 @@ spec:
                     name: pause
                     resources:
                         limits:
-                          cpu: 3m
-                          memory: 16Mi
+                            cpu: 3m
+                            memory: 16Mi
                         requests:
-                          cpu: 1m
-                          memory: 8Mi
+                            cpu: 1m
+                            memory: 8Mi
             initContainers:
                 -   command:
                         -   sh
                         -   -c
                         -   |
                             sysctl -w vm.max_map_count=1048576
-                            
                     image: alpine:3
                     name: init-bootstraper
                     resources:
                         limits:
-                          cpu: 3m
-                          memory: 16Mi
+                            cpu: 3m
+                            memory: 16Mi
                         requests:
-                          cpu: 1m
-                          memory: 8Mi
+                            cpu: 1m
+                            memory: 8Mi
                     securityContext:
                         privileged: true
                         runAsUser: 0
@@ -356,7 +354,7 @@ spec:
                         -   configMapRef:
                                 name: backup-controller-configmap
                                 optional: false
-                    image: "liferaycloud/backup-controller:1.7.0"
+                    image: liferaycloud/backup-controller:1.7.0
                     livenessProbe:
                         httpGet:
                             path: /healthz
@@ -373,10 +371,10 @@ spec:
                     resources:
                         limits:
                             cpu: "1"
-                            memory: "1Gi"
+                            memory: 1Gi
                         requests:
                             cpu: "1"
-                            memory: "1Gi"
+                            memory: 1Gi
                     securityContext:
                         allowPrivilegeEscalation: false
                         capabilities:
@@ -487,34 +485,34 @@ spec:
                             path: /tmp/project-id.txt
             script:
                 command: [sh]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
                 source: |-
                     #!/bin/sh
-                    
+
                     set -o errexit
                     set -o nounset
-                    
+
                     function main {
                     	local liferay_infrastructure_json
-                    
+
                     	liferay_infrastructure_json=$( \
                     		kubectl \
                     			get \
                     			liferayinfrastructure \
                     			--output json \
                     			| jq ".items[0]")
-                    
+
                     	echo "${liferay_infrastructure_json}" | jq --raw-output ".spec.environmentId" > /tmp/environment-id.txt
                     	echo "${liferay_infrastructure_json}" | jq --raw-output ".spec.projectId" > /tmp/project-id.txt
                     }
-                    
+
                     main
         -   name: main
             steps:
@@ -540,62 +538,62 @@ spec:
             name: wait-for-backup
             script:
                 command: [sh]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
                 source: |-
                     #!/bin/sh
-                    
+
                     set -o errexit
                     set -o nounset
-                    
+
                     function main {
                     	local backup_name="{{inputs.parameters.backup-name}}"
-                    
+
                     	local timeout
-                    
+
                     	timeout=$(($(date +%s) + 7200))
-                    
+
                     	while [ $(date +%s) -lt ${timeout} ]
                     	do
                     		local succeeded_condition
-                    
+
                     		succeeded_condition=$( \
                     			kubectl \
                     				get \
                     				liferaybackup \
                     				"${backup_name}" \
                     				--output jsonpath="{.status.conditions[?(@.type==\"Succeeded\")]}" 2>/dev/null || echo "{}")
-                    
+
                     		local status
-                    
+
                     		status=$(echo "${succeeded_condition}" | jq --raw-output ".status")
-                    
+
                     		if [ "${status}" = "True" ]
                     		then
                     			exit 0
                     		fi
-                    
+
                     		if [ "${status}" = "False" ]
                     		then
                     			echo "LiferayBackup ${backup_name} failed: $(echo "${succeeded_condition}" | jq --raw-output ".reason")" >&2
-                    
+
                     			exit 1
                     		fi
-                    
+
                     		sleep 30
                     	done
-                    
+
                     	echo "The system timed out waiting for LiferayBackup ${backup_name} to succeed." >&2
-                    
+
                     	exit 1
                     }
-                    
+
                     main
     ttlStrategy:
         secondsAfterCompletion: 86400
@@ -693,26 +691,26 @@ spec:
                             path: /tmp/vault-path.txt
             script:
                 command: [sh]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
                 source: |-
                     #!/bin/sh
-                    
+
                     set -o errexit
                     set -o nounset
-                    
+
                     function main {
                     	local liferay_backup_name="{{workflow.parameters.liferay-backup-name}}"
                     	local liferay_backup_namespace="{{inputs.parameters.liferay-backup-namespace}}"
-                    
+
                     	local liferay_backup_json
-                    
+
                     	liferay_backup_json=$( \
                     		kubectl \
                     			get \
@@ -720,94 +718,94 @@ spec:
                     			"${liferay_backup_name}" \
                     			--namespace "${liferay_backup_namespace}" \
                     			--output json)
-                    
+
                     	local database_snapshot_uuid
-                    
+
                     	database_snapshot_uuid=$(echo "${liferay_backup_json}" | jq --raw-output ".status.databaseSnapshot.uuid // \"\"")
-                    
+
                     	if [ -z "${database_snapshot_uuid}" ]
                     	then
                     		echo "The LiferayBackup \"${liferay_backup_name}\" has no status.databaseSnapshot.uuid." >&2
-                    
+
                     		exit 1
                     	fi
-                    
+
                     	echo "${database_snapshot_uuid}" > /tmp/database-snapshot-uuid.txt
-                    
+
                     	local vault_bucket
-                    
+
                     	vault_bucket=$(echo "${liferay_backup_json}" | jq --raw-output ".status.documentLibrary.destinationBucket // \"\"")
-                    
+
                     	if [ -z "${vault_bucket}" ]
                     	then
                     		echo "The LiferayBackup \"${liferay_backup_name}\" has no status.documentLibrary.destinationBucket." >&2
-                    
+
                     		exit 1
                     	fi
-                    
+
                     	echo "${vault_bucket}" > /tmp/vault-bucket.txt
-                    
+
                     	local vault_path
-                    
+
                     	vault_path=$(echo "${liferay_backup_json}" | jq --raw-output ".status.documentLibrary.destinationPath // \"\"")
-                    
+
                     	echo "${vault_path}" > /tmp/vault-path.txt
-                    
+
                     	local liferay_infrastructure_json
-                    
+
                     	liferay_infrastructure_json=$( \
                     		kubectl \
                     			get \
                     			liferayinfrastructure \
                     			--output json \
                     			| jq ".items[0]")
-                    
+
                     	local restore_phase
-                    
+
                     	restore_phase=$(echo "${liferay_infrastructure_json}" | jq --raw-output ".spec.restorePhase // \"none\"")
-                    
+
                     	if [ "${restore_phase}" = "promoting" ] || [ "${restore_phase}" = "provisioning" ]
                     	then
                     		echo "The LiferayInfrastructure spec.restorePhase is set to ${restore_phase}. A restore is in progress." >&2
-                    
+
                     		exit 1
                     	fi
-                    
+
                     	local data_plane_active
-                    
+
                     	data_plane_active=$(echo "${liferay_infrastructure_json}" | jq --raw-output ".spec.targetActiveDataPlane // \"blue\"")
-                    
+
                     	echo "${data_plane_active}" > /tmp/data-plane-active.txt
-                    
+
                     	local data_plane_inactive
-                    
+
                     	if [ "${data_plane_active}" = "blue" ]
                     	then
                     		data_plane_inactive="green"
                     	else
                     		data_plane_inactive="blue"
                     	fi
-                    
+
                     	echo "${data_plane_inactive}" > /tmp/data-plane-inactive.txt
-                    
+
                     	local liferay_infrastructure_name
-                    
+
                     	liferay_infrastructure_name=$(echo "${liferay_infrastructure_json}" | jq --raw-output ".metadata.name")
-                    
+
                     	echo "${liferay_infrastructure_name}" > /tmp/liferay-infrastructure-name.txt
-                    
+
                     	local liferay_workload_name
-                    
+
                     	liferay_workload_name=$( \
                     		kubectl \
                     			get \
                     			statefulset \
                     			--output jsonpath="{.items[0].metadata.name}" \
                     			--selector "component=liferay")
-                    
+
                     	echo "${liferay_workload_name}" > /tmp/liferay-workload-name.txt
                     }
-                    
+
                     main
         -   container:
                 args:
@@ -818,14 +816,14 @@ spec:
                     -   --selector
                     -   dataPlane={{inputs.parameters.data-inactive}}
                 command: [kubectl]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
             inputs:
                 parameters:
                     -   name: data-inactive
@@ -838,14 +836,14 @@ spec:
                     -   statefulset
                     -   "{{inputs.parameters.liferay-workload-name}}"
                 command: [kubectl]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
             inputs:
                 parameters:
                     -   name: liferay-workload-name
@@ -858,14 +856,14 @@ spec:
                     -   "{{inputs.parameters.liferay-workload-name}}"
                     -   --timeout=15m
                 command: [kubectl]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
             inputs:
                 parameters:
                     -   name: liferay-workload-name
@@ -1010,14 +1008,14 @@ spec:
                 env:
                     -   name: CLOUDSDK_CONFIG
                         value: /tmp/gcloud
-                image: "google/cloud-sdk:565.0.0-stable"
+                image: google/cloud-sdk:565.0.0-stable
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
             inputs:
                 parameters:
                     -   name: database-snapshot-uuid
@@ -1037,14 +1035,14 @@ spec:
                 env:
                     -   name: CLOUDSDK_CONFIG
                         value: /tmp/gcloud
-                image: "google/cloud-sdk:565.0.0-stable"
+                image: google/cloud-sdk:565.0.0-stable
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
             inputs:
                 parameters:
                     -   name: dl-bucket-inactive
@@ -1090,58 +1088,58 @@ spec:
             name: wait-for-infrastructure
             script:
                 command: [sh]
-                image: "dtzar/helm-kubectl:4.1.1"
+                image: dtzar/helm-kubectl:4.1.1
                 resources:
                     limits:
-                      cpu: 250m
-                      memory: 256Mi
+                        cpu: 250m
+                        memory: 256Mi
                     requests:
-                      cpu: 100m
-                      memory: 128Mi
+                        cpu: 100m
+                        memory: 128Mi
                 source: |-
                     #!/bin/sh
-                    
+
                     set -o errexit
                     set -o nounset
-                    
+
                     function main {
                     	local expected_generation="{{inputs.parameters.expected-generation}}"
-                    
+
                     	local timeout
-                    
+
                     	timeout=$(($(date +%s) + 3600))
-                    
+
                     	while [ $(date +%s) -lt ${timeout} ]
                     	do
                     		local ready_condition
-                    
+
                     		ready_condition=$( \
                     			kubectl \
                     				get \
                     				liferayinfrastructure \
                     				--output jsonpath="{.items[0].status.conditions[?(@.type==\"Ready\")]}" 2>/dev/null || echo "{}")
-                    
+
                     		local observed_generation
-                    
+
                     		observed_generation=$(echo "${ready_condition}" | jq --raw-output ".observedGeneration // 0")
-                    
+
                     		local status
-                    
+
                     		status=$(echo "${ready_condition}" | jq --raw-output ".status // \"False\"")
-                    
+
                     		if [ "${observed_generation}" -ge "${expected_generation}" ] && [ "${status}" = "True" ]
                     		then
                     			exit 0
                     		fi
-                    
+
                     		sleep 30
                     	done
-                    
+
                     	echo "The system timed out waiting for the LiferayInfrastructure to be ready." >&2
-                    
+
                     	exit 1
                     }
-                    
+
                     main
     ttlStrategy:
         secondsAfterCompletion: 86400
@@ -1275,9 +1273,9 @@ kind: Composition
 metadata:
     annotations:
         argocd.argoproj.io/sync-wave: "-50"
-        liferay.com/template-hash: "943e3e247272dc6f2de055a41908faafb37cc179028a868e47e5886cd495985b"
+        liferay.com/template-hash: 943e3e247272dc6f2de055a41908faafb37cc179028a868e47e5886cd495985b
     labels:
-        liferay.com/template-hash: "h-943e3e247272dc6f2de055a41908faafb37cc179028a868e47e5886cd4959"
+        liferay.com/template-hash: h-943e3e247272dc6f2de055a41908faafb37cc179028a868e47e5886cd4959
     name: liferay-gcp-infrastructure-provider.gcp.liferay.com
 spec:
     compositeTypeRef:
@@ -1312,7 +1310,7 @@ spec:
                         {{- $isSearchReady := false -}}
                         {{- $managementPoliciesOnce := (list "Create" "Observe" "Delete") | toJson -}}
                         {{- $xr := .observed.composite.resource -}}
-                        
+
                         {{- $backup := $xr.spec.backup | default dict -}}
                         {{- $cmkEnabled := $xr.spec.cmk.enabled | default false -}}
                         {{- $databaseName := $xr.spec.database.name | default "lportal" -}}
@@ -1329,7 +1327,7 @@ spec:
                         {{- $searchName := printf "%s-es" $xr.metadata.name -}}
                         {{- $storage := $xr.spec.storage | default dict -}}
                         {{- $targetActiveDataPlane := $xr.spec.targetActiveDataPlane | default "blue" -}}
-                        
+
                         {{- $activeDataPlane := $targetActiveDataPlane -}}
                         {{- $databaseIamUser := printf "%s@%s.iam" $gsaName $env.projectId -}}
                         {{- $databaseInstanceManagementPolicies := $backup.enabled | ternary ((list "*") | toJson) $managementPolicies -}}
@@ -1342,22 +1340,22 @@ spec:
                         {{- $searchNamespace := printf "%s-elasticsearch" $namespace -}}
                         {{- $searchSecretName := printf "%s-es-elastic-user" $searchName -}}
                         {{- $targetInactiveDataPlane := (eq $targetActiveDataPlane "blue") | ternary "green" "blue" -}}
-                        
+
                         {{- if (eq $restorePhase "promoting") -}}
                             {{- $dataPlanes = list "blue" "green" -}}
                         {{- else if (eq $restorePhase "provisioning") -}}
                             {{- $activeDataPlane = $targetInactiveDataPlane -}}
                             {{- $dataPlanes = list "blue" "green" -}}
                         {{- end }}
-                        
+
                         {{- $backupTargetLabels := merge (dict) $labels (dict "should-back-up" "true") -}}
                         {{- $uidHash := printf "%s-%s" $env.projectNumber $projectIdFull | sha256sum | trunc 6 -}}
-                        
+
                         {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
-                        
+
                         {{- $cmkKeyName := printf "projects/%s/locations/%s/keyRings/%s-keyring/cryptoKeys/%s-key" $env.projectId $region $baseName $baseName -}}
                         ---
-                        
+
                         apiVersion: cloudplatform.gcp.m.upbound.io/v1beta1
                         kind: ServiceAccount
                         metadata:
@@ -1410,7 +1408,7 @@ spec:
                                 project: {{ $env.projectId }}
                                 role: roles/cloudsql.client
                         ---
-                        
+
                         {{- range $i, $dataPlane := $dataPlanes }}
                         {{- $databaseInstanceName := printf "%s-db-instance-%s" $xr.metadata.name $dataPlane }}
                         {{- if $i }}
@@ -1541,7 +1539,7 @@ spec:
                         {{- end }}
                         {{- end }}
                         ---
-                        
+
                         apiVersion: kubernetes.m.crossplane.io/v1alpha1
                         kind: Object
                         metadata:
@@ -1731,7 +1729,7 @@ spec:
                         status:
                             managedServiceDetailsReady: {{ $isReady }}
                         ---
-                        
+
                         apiVersion: kubernetes.m.crossplane.io/v1alpha1
                         kind: Object
                         metadata:
@@ -1769,16 +1767,16 @@ spec:
                         {{- $elasticsearchObjectAtProvider := ($elasticsearchObject.status | default dict).atProvider | default dict -}}
                         {{- $elasticsearchObjectAtProviderManifest := (index $elasticsearchObjectAtProvider "manifest" | default dict) -}}
                         {{- $elasticsearchObjectAtProviderManifestStatus := (index $elasticsearchObjectAtProviderManifest "status" | default dict) -}}
-                        
+
                         {{- $elasticsearchHealth = (index $elasticsearchObjectAtProviderManifestStatus "health" | default "") -}}
                         {{- $isSearchReady = or (eq $elasticsearchHealth "green") (eq $elasticsearchHealth "yellow") -}}
-                        
+
                         {{- $secretObject := (index .observed.resources "elasticsearch-secret-observer" | default dict).resource | default dict -}}
                         {{- $secretObjectAtProvider := ($secretObject.status | default dict).atProvider | default dict -}}
                         {{- $secretObjectAtProviderManifest := (index $secretObjectAtProvider "manifest" | default dict) -}}
                         {{- $secretObjectAtProviderManifestData := (index $secretObjectAtProviderManifest "data" | default dict) -}}
                         {{- $secretObjectAtProviderManifestDataPassword := (index $secretObjectAtProviderManifestData "elastic" | default "") -}}
-                        
+
                         {{- if and $isSearchReady $secretObjectAtProviderManifestDataPassword }}
                         apiVersion: kubernetes.m.crossplane.io/v1alpha1
                         kind: Object
@@ -1809,7 +1807,7 @@ spec:
                         {{- end }}
                         {{- end }}
                         ---
-                        
+
                         {{- range $i, $dataPlane := $dataPlanes }}
                         {{- if $i }}
                         ---
@@ -1858,7 +1856,7 @@ spec:
                             managementPolicies: {{ $managementPolicies }}
                         {{- end }}
                         ---
-                        
+
                         {{- if $overlay.enabled }}
                         apiVersion: storage.gcp.m.upbound.io/v1beta1
                         kind: BucketIAMMember
@@ -1874,9 +1872,9 @@ spec:
                                 role: roles/storage.objectViewer
                             managementPolicies: {{ $managementPolicies }}
                         {{- end }}
-                        
+
                         ---
-                        
+
                         {{- if $cmkEnabled }}
                         apiVersion: kms.gcp.m.upbound.io/v1beta1
                         kind: KeyRing
@@ -1938,7 +1936,7 @@ spec:
                             managementPolicies: {{ $managementPolicies }}
                         {{- end }}
                         ---
-                        
+
                         {{- if $backup.enabled }}
                         {{- $backupRestorePrincipal := printf "principal://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s.svc.id.goog/subject/ns/%s/sa/backup-restore-service-account" $env.projectNumber $env.projectId $namespace }}
                         {{- $backupVaultLabels := merge (dict) $labels (dict "is-backup-vault" "true") }}
@@ -2140,7 +2138,7 @@ spec:
                         {{- end }}
                         {{- end }}
                         ---
-                        
+
                         apiVersion: kubernetes.m.crossplane.io/v1alpha1
                         kind: Object
                         metadata:
@@ -2188,7 +2186,6 @@ spec:
                                             storage: {{ $storage | toJson }}
                                             uidHash: {{ $uidHash | toJson }}
                             managementPolicies: {{ $managementPolicies }}
-                        
                 kind: Input
                 source: Inline
             step: go-templating
@@ -2247,7 +2244,7 @@ spec:
     serviceAccountTemplate:
         metadata:
             annotations:
-                iam.gke.io/gcp-service-account: "crossplane-sa@my-project-id.iam.gserviceaccount.com"
+                iam.gke.io/gcp-service-account: crossplane-sa@my-project-id.iam.gserviceaccount.com
             name: provider-gcp-cloudplatform
 ---
 # Source: liferay-gcp-infrastructure-provider/templates/runtime-configs.yaml
@@ -2565,10 +2562,10 @@ spec:
 # Source: liferay-gcp-infrastructure-provider/templates/environment-config.yaml
 apiVersion: apiextensions.crossplane.io/v1beta1
 data:
-    deploymentName: "able"
-    projectId: "my-project-id"
+    deploymentName: able
+    projectId: my-project-id
     projectNumber: "123456789012"
-    vpcName: "my-vpc"
+    vpcName: my-vpc
 kind: EnvironmentConfig
 metadata:
     name: environment-config
@@ -2584,7 +2581,7 @@ data:
         {{- $isSearchReady := false -}}
         {{- $managementPoliciesOnce := (list "Create" "Observe" "Delete") | toJson -}}
         {{- $xr := .observed.composite.resource -}}
-        
+
         {{- $backup := $xr.spec.backup | default dict -}}
         {{- $cmkEnabled := $xr.spec.cmk.enabled | default false -}}
         {{- $databaseName := $xr.spec.database.name | default "lportal" -}}
@@ -2601,7 +2598,7 @@ data:
         {{- $searchName := printf "%s-es" $xr.metadata.name -}}
         {{- $storage := $xr.spec.storage | default dict -}}
         {{- $targetActiveDataPlane := $xr.spec.targetActiveDataPlane | default "blue" -}}
-        
+
         {{- $activeDataPlane := $targetActiveDataPlane -}}
         {{- $databaseIamUser := printf "%s@%s.iam" $gsaName $env.projectId -}}
         {{- $databaseInstanceManagementPolicies := $backup.enabled | ternary ((list "*") | toJson) $managementPolicies -}}
@@ -2614,19 +2611,19 @@ data:
         {{- $searchNamespace := printf "%s-elasticsearch" $namespace -}}
         {{- $searchSecretName := printf "%s-es-elastic-user" $searchName -}}
         {{- $targetInactiveDataPlane := (eq $targetActiveDataPlane "blue") | ternary "green" "blue" -}}
-        
+
         {{- if (eq $restorePhase "promoting") -}}
             {{- $dataPlanes = list "blue" "green" -}}
         {{- else if (eq $restorePhase "provisioning") -}}
             {{- $activeDataPlane = $targetInactiveDataPlane -}}
             {{- $dataPlanes = list "blue" "green" -}}
         {{- end }}
-        
+
         {{- $backupTargetLabels := merge (dict) $labels (dict "should-back-up" "true") -}}
         {{- $uidHash := printf "%s-%s" $env.projectNumber $projectIdFull | sha256sum | trunc 6 -}}
-        
+
         {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
-        
+
         {{- $cmkKeyName := printf "projects/%s/locations/%s/keyRings/%s-keyring/cryptoKeys/%s-key" $env.projectId $region $baseName $baseName -}}
         apiVersion: cloudplatform.gcp.m.upbound.io/v1beta1
         kind: ServiceAccount
@@ -3033,16 +3030,16 @@ data:
         {{- $elasticsearchObjectAtProvider := ($elasticsearchObject.status | default dict).atProvider | default dict -}}
         {{- $elasticsearchObjectAtProviderManifest := (index $elasticsearchObjectAtProvider "manifest" | default dict) -}}
         {{- $elasticsearchObjectAtProviderManifestStatus := (index $elasticsearchObjectAtProviderManifest "status" | default dict) -}}
-        
+
         {{- $elasticsearchHealth = (index $elasticsearchObjectAtProviderManifestStatus "health" | default "") -}}
         {{- $isSearchReady = or (eq $elasticsearchHealth "green") (eq $elasticsearchHealth "yellow") -}}
-        
+
         {{- $secretObject := (index .observed.resources "elasticsearch-secret-observer" | default dict).resource | default dict -}}
         {{- $secretObjectAtProvider := ($secretObject.status | default dict).atProvider | default dict -}}
         {{- $secretObjectAtProviderManifest := (index $secretObjectAtProvider "manifest" | default dict) -}}
         {{- $secretObjectAtProviderManifestData := (index $secretObjectAtProviderManifest "data" | default dict) -}}
         {{- $secretObjectAtProviderManifestDataPassword := (index $secretObjectAtProviderManifestData "elastic" | default "") -}}
-        
+
         {{- if and $isSearchReady $secretObjectAtProviderManifestDataPassword }}
         apiVersion: kubernetes.m.crossplane.io/v1alpha1
         kind: Object
@@ -3462,7 +3459,7 @@ spec:
             envoyDeployment:
                 pod:
                     annotations:
-                        iam.gke.io/gcp-service-account: "able-envoy-proxy@my-project-id.iam.gserviceaccount.com"
+                        iam.gke.io/gcp-service-account: able-envoy-proxy@my-project-id.iam.gserviceaccount.com
                     topologySpreadConstraints:
                         -   labelSelector:
                                 matchLabels:
