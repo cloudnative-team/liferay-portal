@@ -1,0 +1,35 @@
+{
+    "options": {
+        "auto_approve": false,
+        "parallelism": 10,
+        "provider": "gcp",
+        "version": "1.0.2-pr-95-g5385cd103"
+    },
+    "variables": {
+        "deployment_name": "gma-lcd-51351",
+        "infrastructure_helm_chart_config": {
+            "chart_url": "oci://ghcr.io/cloudnative-team/charts-pr/95/liferay-gcp-infrastructure"
+        },
+        "infrastructure_helm_chart_version": "0.0.16-pr-95-g5385cd103",
+        "infrastructure_provider_helm_chart_config": {
+            "chart_url": "oci://ghcr.io/cloudnative-team/charts-pr/95/liferay-gcp-infrastructure-provider"
+        },
+        "infrastructure_provider_helm_chart_version": "0.2.4-pr-95-g5385cd103",
+        "resources_helm_chart_config": {
+            "chart_url": "oci://ghcr.io/cloudnative-team/charts-pr/95/liferay-gcp-resources"
+        },
+        "resources_helm_chart_version": "0.0.2-pr-95-g5385cd103",
+        "liferay_helm_chart_config": {
+            "chart_url": "oci://ghcr.io/cloudnative-team/charts-pr/95/liferay-gcp"
+        },
+        "liferay_helm_chart_version": "0.0.11-pr-95-g5385cd103",
+        "liferay_git_repo_url": "https://github.com/gamerson/cloud-native-gitops-boilerplate",
+        "liferay_git_repo_config": {
+            "auth": {
+                "internal_secret_name": "gma-github"
+            }
+        },
+        "project_id": "cne-development",
+        "region": "us-south1"
+    }
+}
