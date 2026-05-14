@@ -30,8 +30,7 @@ function main {
 }
 
 function _run_test {
-	local description="${1#_test_}"
-	description="${description//_/ }"
+	local description=$(echo "${1}" | sed "s/^_test_//; s/_/ /g")
 
 	if "${1}"
 	then
@@ -55,7 +54,9 @@ function _test_init_container_absent_when_overlay_is_disabled {
 }
 
 function _test_init_container_present_when_overlay_is_enabled {
-	if helm template test "${chart_directory}" \
+	if helm template \
+			test \
+			"${chart_directory}" \
 			--set 'overlay.copy[0].into=/dest' \
 			--set 'overlay.enabled=true' \
 			| grep --quiet "name: liferay-overlay"
@@ -69,7 +70,9 @@ function _test_init_container_present_when_overlay_is_enabled {
 function _test_multiple_copy_blocks_each_generate_a_sync_command {
 	local output
 
-	output=$(helm template test "${chart_directory}" \
+	output=$(helm template \
+		test \
+		"${chart_directory}" \
 		--set 'overlay.copy[0].from=overlay-build-1/osgi/*' \
 		--set 'overlay.copy[0].into=osgi/' \
 		--set 'overlay.copy[1].from=overlay-build-1/configs/*.config' \
@@ -85,7 +88,9 @@ function _test_multiple_copy_blocks_each_generate_a_sync_command {
 }
 
 function _test_uses_overridden_aws_cli_image {
-	if helm template test "${chart_directory}" \
+	if helm template \
+			test \
+			"${chart_directory}" \
 			--set 'overlay.copy[0].into=/dest' \
 			--set 'overlay.enabled=true' \
 			--set 'overlay.image.repository=amazon/aws-cli' \
@@ -99,7 +104,9 @@ function _test_uses_overridden_aws_cli_image {
 }
 
 function _test_uses_rclone_image_by_default {
-	if helm template test "${chart_directory}" \
+	if helm template \
+			test \
+			"${chart_directory}" \
 			--set 'overlay.copy[0].into=/dest' \
 			--set 'overlay.enabled=true' \
 			| grep --quiet "image: rclone/rclone:1.66"
@@ -111,7 +118,9 @@ function _test_uses_rclone_image_by_default {
 }
 
 function _test_volume_mount_name_tracks_overlay_init_scripts_volume_name {
-	if helm template test "${chart_directory}" \
+	if helm template \
+			test \
+			"${chart_directory}" \
 			--set 'overlay.copy[0].into=/dest' \
 			--set 'overlay.enabled=true' \
 			--set 'overlay.initScriptsVolumeName=custom-init-scripts' \
