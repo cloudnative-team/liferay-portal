@@ -65,6 +65,7 @@ spec:
                                             until pg_isready -h 127.0.0.1 -p {{ $databasePort }} -U postgres; do sleep 2; done
                                             psql -h 127.0.0.1 -v "ON_ERROR_STOP=1" -U postgres -d {{ $databaseName }} <<EOF
                                             GRANT ALL PRIVILEGES ON DATABASE "{{ $databaseName }}" TO "{{ $databaseIamUser }}";
+                                            GRANT USAGE, CREATE ON SCHEMA public TO "{{ $databaseIamUser }}";
                                             GRANT ALL ON ALL TABLES IN SCHEMA public TO "{{ $databaseIamUser }}";
                                             GRANT cloudsqlsuperuser TO "{{ $databaseIamUser }}";
                                             GRANT "{{ $databaseIamUser }}" to postgres;
