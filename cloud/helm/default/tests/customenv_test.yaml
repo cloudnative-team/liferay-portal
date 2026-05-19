@@ -1,0 +1,30 @@
+suite: customEnv merge ordering
+templates:
+    -   templates/configmap.yaml
+    -   templates/liferay-init-scripts-cm.yaml
+    -   templates/workloads.yaml
+tests:
+    -   asserts:
+            -   contains:
+                    path: spec.template.spec.containers[0].env
+                    content:
+                        name: LIFERAY_FOO
+                        value: from-a-group
+            -   contains:
+                    path: spec.template.spec.containers[0].env
+                    content:
+                        name: LIFERAY_FOO
+                        value: from-z-group
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: emits all customEnv duplicates with alphabetical group ordering
+        set:
+            customEnv:
+                a-group:
+                    -   name: LIFERAY_FOO
+                        value: from-a-group
+                z-group:
+                    -   name: LIFERAY_FOO
+                        value: from-z-group
