@@ -64,10 +64,23 @@ spec:
                                             set -o errexit
                                             until pg_isready --host 127.0.0.1 --port {{ $databasePort }} --username postgres; do sleep 2; done
                                             psql --host 127.0.0.1 --set ON_ERROR_STOP=1 --username postgres --dbname {{ $databaseName }} <<EOF
-                                            GRANT ALL PRIVILEGES ON DATABASE "{{ $databaseName }}" TO "{{ $databaseIamUser }}";
-                                            GRANT ALL ON ALL TABLES IN SCHEMA public TO "{{ $databaseIamUser }}";
+                                            DO \$\$
+                                            DECLARE
+                                                source_role text;
+                                            BEGIN
+                                                FOR source_role IN
+                                                    SELECT rolname FROM pg_roles
+                                                    WHERE rolname LIKE '%@%.iam'
+                                                      AND rolname <> '{{ $databaseIamUser }}'
+                                                LOOP
+                                                    EXECUTE format('GRANT %I TO postgres', source_role);
+                                                    EXECUTE format('REASSIGN OWNED BY %I TO cloudsqlsuperuser', source_role);
+                                                    EXECUTE format('DROP OWNED BY %I', source_role);
+                                                END LOOP;
+                                            END \$\$;
+                                            GRANT CONNECT, TEMPORARY ON DATABASE "{{ $databaseName }}" TO "{{ $databaseIamUser }}";
                                             GRANT cloudsqlsuperuser TO "{{ $databaseIamUser }}";
-                                            GRANT "{{ $databaseIamUser }}" to postgres;
+                                            ALTER ROLE "{{ $databaseIamUser }}" SET ROLE cloudsqlsuperuser;
                                             EOF
                                             timeout=$(($(date +%s) + 600))
                                             until PGCONNECT_TIMEOUT=10 PGPASSWORD=iam psql --host 127.0.0.1 --port {{ $databasePort }} --username "{{ $databaseIamUser }}" --dbname {{ $databaseName }} --command "SELECT 1" >/dev/null 2>&1
