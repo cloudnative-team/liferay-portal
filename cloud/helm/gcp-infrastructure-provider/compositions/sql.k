@@ -52,7 +52,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
                         }
                         retainBackupsOnDelete = True
                         tier = str(_db_spec?.instanceType or "db-custom-1-3840")
-                        userLabels = _labels | {"should-back-up": "true", "active": "{}".format(_dataPlane == _activeDataPlane)}
+                        userLabels = _labels | {"should-back-up": "true", "active": "true" if _dataPlane == _activeDataPlane else "false"}
                     }
                 }
                 if _cmkEnabled:

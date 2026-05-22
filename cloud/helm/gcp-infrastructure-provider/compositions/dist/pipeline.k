@@ -4177,7 +4177,7 @@ schema sql_layer:
                             }
                             retainBackupsOnDelete = True
                             tier = str(_db_spec?.instanceType or "db-custom-1-3840")
-                            userLabels = _labels | {"should-back-up": "true", "active": "{}".format(_dataPlane == _activeDataPlane)}
+                            userLabels = _labels | {"should-back-up": "true", "active": "true" if _dataPlane == _activeDataPlane else "false"}
                         }
                     }
                     if _cmkEnabled:
@@ -4332,7 +4332,7 @@ schema storage_layer:
                 spec = {
                     forProvider = {
                         forceDestroy = _forceDestroy
-                        labels = _labels | {"should-back-up": "true", "active": "{}".format(_dataPlane == _activeDataPlane)}
+                        labels = _labels | {"should-back-up": "true", "active": "true" if _dataPlane == _activeDataPlane else "false"}
                         location = str(_storage_spec?.region or _region)
                         storageClass = "STANDARD"
                         uniformBucketLevelAccess = True

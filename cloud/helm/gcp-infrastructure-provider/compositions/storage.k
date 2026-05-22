@@ -26,7 +26,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
             spec = {
                 forProvider = {
                     forceDestroy = _forceDestroy
-                    labels = _labels | {"should-back-up": "true", "active": "{}".format(_dataPlane == _activeDataPlane)}
+                    labels = _labels | {"should-back-up": "true", "active": "true" if _dataPlane == _activeDataPlane else "false"}
                     location = str(_storage_spec?.region or _region)
                     storageClass = "STANDARD"
                     uniformBucketLevelAccess = True
