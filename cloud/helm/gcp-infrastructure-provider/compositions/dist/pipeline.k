@@ -3308,8 +3308,9 @@ schema KubernetesmCrossplaneIoV1alpha1ObjectStatusConditionsItems0:
 
 params = option("params") or {}
 ctx = params?.ctx or {}
-obs = params?.obs or {
-    "resources": {}
+ocds = params?.ocds or {}
+obs = {
+    "resources": {name: {"resource": v.Resource} for name, v in ocds}
 }
 oxr = params?.oxr or {}
 
