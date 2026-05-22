@@ -15,8 +15,8 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
     _namespace = str(vars?.namespace or "")
     _obs_resources = obs?.resources or {}
 
-    _blue_conds = _obs_resources?["database-primary-blue"]?.resource?.status?.conditions or []
-    _green_conds = _obs_resources?["database-primary-green"]?.resource?.status?.conditions or []
+    _blue_conds = _obs_resources?["{}-db-instance-blue".format(_meta_name)]?.resource?.status?.conditions or []
+    _green_conds = _obs_resources?["{}-db-instance-green".format(_meta_name)]?.resource?.status?.conditions or []
     _plane_ready = {
         "blue": any c in _blue_conds {c.type == "Ready" and c.status == "True"}
         "green": any c in _green_conds {c.type == "Ready" and c.status == "True"}

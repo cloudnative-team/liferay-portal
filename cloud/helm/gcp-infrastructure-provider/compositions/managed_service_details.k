@@ -5,7 +5,7 @@ import models.v1alpha1.kubernetesm_crossplane_io_v1alpha1_object as kubernetes
 get_items = lambda obs: any, vars: {str:any} -> [any] {
     _activeDataPlane = str(vars?.activeDataPlane or "blue")
     _res = obs?.resources or {}
-    _grant_conditions = _res?["liferay-db-grant-job-{}".format(_activeDataPlane)]?.resource?.status?.conditions or []
+    _grant_conditions = _res?["{}-db-grant-{}".format(_meta_name, _activeDataPlane)]?.resource?.status?.conditions or []
     _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
 
     _externalName = str(vars?.managedServiceDetailsExternalName or "")

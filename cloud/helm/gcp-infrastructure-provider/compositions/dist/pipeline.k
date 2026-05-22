@@ -3660,8 +3660,8 @@ schema k8s_resources_layer:
         _namespace = str(vars?.namespace or "")
         _obs_resources = obs?.resources or {}
 
-        _blue_conds = _obs_resources?["database-primary-blue"]?.resource?.status?.conditions or []
-        _green_conds = _obs_resources?["database-primary-green"]?.resource?.status?.conditions or []
+        _blue_conds = _obs_resources?["{}-db-instance-blue".format(_meta_name)]?.resource?.status?.conditions or []
+        _green_conds = _obs_resources?["{}-db-instance-green".format(_meta_name)]?.resource?.status?.conditions or []
         _plane_ready = {
             "blue": any c in _blue_conds {c.type == "Ready" and c.status == "True"}
             "green": any c in _green_conds {c.type == "Ready" and c.status == "True"}
@@ -3821,7 +3821,7 @@ schema managed_service_details_layer:
     get_items = lambda obs: any, vars: {str:any} -> [any] {
         _activeDataPlane = str(vars?.activeDataPlane or "blue")
         _res = obs?.resources or {}
-        _grant_conditions = _res?["liferay-db-grant-job-{}".format(_activeDataPlane)]?.resource?.status?.conditions or []
+        _grant_conditions = _res?["{}-db-grant-{}".format(_meta_name, _activeDataPlane)]?.resource?.status?.conditions or []
         _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
 
         _externalName = str(vars?.managedServiceDetailsExternalName or "")
