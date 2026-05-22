@@ -3629,7 +3629,7 @@ schema init_layer:
 
     get_items = lambda obs: any, vars: {str:any} -> [any] {
         _grant_conditions = obs?.resources?["liferay-db-grant-job"]?.resource?.status?.conditions or []
-        _is_ready = any c in _grant_conditions {c.type == "Ready" and c.status == "True"}
+        _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
         [
             {
                 apiVersion = "gcp.liferay.com/v1alpha1"
@@ -3822,7 +3822,7 @@ schema managed_service_details_layer:
         _activeDataPlane = str(vars?.activeDataPlane or "blue")
         _res = obs?.resources or {}
         _grant_conditions = _res?["liferay-db-grant-job-{}".format(_activeDataPlane)]?.resource?.status?.conditions or []
-        _is_ready = any c in _grant_conditions {c.type == "Ready" and c.status == "True"}
+        _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
 
         _externalName = str(vars?.managedServiceDetailsExternalName or "")
         _hashedName = str(vars?.hashedName or "")
