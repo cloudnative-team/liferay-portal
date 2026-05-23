@@ -45,16 +45,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
                             spec = {
                                 containers = [{
                                     args = [
-                                        """\
-set -e
-until pg_isready -h 127.0.0.1 -p {port} -U postgres; do sleep 2; done
-psql -h 127.0.0.1 -v "ON_ERROR_STOP=1" -U postgres -d {db} <<EOF
-GRANT ALL PRIVILEGES ON DATABASE "{db}" TO "{user}";
-GRANT ALL ON ALL TABLES IN SCHEMA public TO "{user}";
-GRANT cloudsqlsuperuser TO "{user}";
-GRANT "{user}" to postgres;
-EOF
-""".format(port=str(vars?.databasePort or ""), db=str(vars?.databaseName or ""), user=str(vars?.databaseIamUser or ""))
+                                        "set -e; until pg_isready -h 127.0.0.1 -p {port} -U postgres; do sleep 2; done; psql -h 127.0.0.1 -v ON_ERROR_STOP=1 -U postgres -d {db} -c 'GRANT ALL PRIVILEGES ON DATABASE \"{db}\" TO \"{user}\";' -c 'GRANT ALL ON ALL TABLES IN SCHEMA public TO \"{user}\";' -c 'GRANT cloudsqlsuperuser TO \"{user}\";' -c 'GRANT \"{user}\" to postgres;'".format(port=str(vars?.databasePort or ""), db=str(vars?.databaseName or ""), user=str(vars?.databaseIamUser or ""))
                                     ]
                                     command = ["/bin/sh", "-c"]
                                     env = [{
