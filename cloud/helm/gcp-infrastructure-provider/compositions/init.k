@@ -1,7 +1,11 @@
 import context_variables as cv
 
 get_items = lambda obs: any, vars: {str:any} -> [any] {
-    _grant_conditions = obs?.resources?["liferay-db-grant-job"]?.resource?.status?.conditions or []
+    _activeDataPlane = str(vars?.activeDataPlane or "blue")
+    _meta_name = str(vars?.baseName or "")
+
+    _res = obs?.resources or {}
+    _grant_conditions = _res?["{}-db-grant-{}".format(_meta_name, _activeDataPlane)]?.resource?.status?.conditions or []
     _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
     [
         {
@@ -12,6 +16,9 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
     ]
 }
 
-_vars = {}
+_vars = {
+    "activeDataPlane": cv.activeDataPlane
+    "baseName": cv.baseName
+}
 
 items = {"items": get_items(cv.obs, _vars)}
