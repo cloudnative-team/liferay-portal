@@ -43,6 +43,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
             metadata = {
                 annotations = {"crossplane.io/composition-resource-name": "liferay-gcs-iam-{}".format(_dataPlane)}
                 labels = _labels | {"dataPlane": _dataPlane}
+                name = "{}-dl-{}-iam".format(_hashedName, _dataPlane)
             }
             spec = {
                 forProvider = {

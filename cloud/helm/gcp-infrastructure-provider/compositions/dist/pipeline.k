@@ -4007,6 +4007,7 @@ schema security_layer:
                 metadata = {
                     annotations = {"crossplane.io/composition-resource-name": "liferay-wi-binding"}
                     labels = _labels
+                    name = "{}-wi-binding".format(_gsaName)
                 }
                 spec = {
                     forProvider = {
@@ -4023,6 +4024,7 @@ schema security_layer:
                 metadata = {
                     annotations = {"crossplane.io/composition-resource-name": "liferay-sql-instance-user-role"}
                     labels = _labels
+                    name = "{}-sql-instance-user".format(_gsaName)
                 }
                 spec = {
                     forProvider = {
@@ -4039,6 +4041,7 @@ schema security_layer:
                 metadata = {
                     annotations = {"crossplane.io/composition-resource-name": "liferay-sql-client-role"}
                     labels = _labels
+                    name = "{}-sql-client".format(_gsaName)
                 }
                 spec = {
                     forProvider = {
@@ -4095,6 +4098,7 @@ schema security_layer:
                 metadata = {
                     annotations = {"crossplane.io/composition-resource-name": "liferay-{}-kms-binding".format(t.name)}
                     labels = _labels
+                    name = "{}-{}-kms-binding".format(_kmsName, t.name)
                 }
                 spec = {
                     forProvider = {
@@ -4350,6 +4354,7 @@ schema storage_layer:
                 metadata = {
                     annotations = {"crossplane.io/composition-resource-name": "liferay-gcs-iam-{}".format(_dataPlane)}
                     labels = _labels | {"dataPlane": _dataPlane}
+                    name = "{}-dl-{}-iam".format(_hashedName, _dataPlane)
                 }
                 spec = {
                     forProvider = {

@@ -39,6 +39,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
             metadata = {
                 annotations = {"crossplane.io/composition-resource-name": "liferay-wi-binding"}
                 labels = _labels
+                name = "{}-wi-binding".format(_gsaName)
             }
             spec = {
                 forProvider = {
@@ -55,6 +56,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
             metadata = {
                 annotations = {"crossplane.io/composition-resource-name": "liferay-sql-instance-user-role"}
                 labels = _labels
+                name = "{}-sql-instance-user".format(_gsaName)
             }
             spec = {
                 forProvider = {
@@ -71,6 +73,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
             metadata = {
                 annotations = {"crossplane.io/composition-resource-name": "liferay-sql-client-role"}
                 labels = _labels
+                name = "{}-sql-client".format(_gsaName)
             }
             spec = {
                 forProvider = {
@@ -127,6 +130,7 @@ get_items = lambda obs: any, vars: {str:any} -> [any] {
             metadata = {
                 annotations = {"crossplane.io/composition-resource-name": "liferay-{}-kms-binding".format(t.name)}
                 labels = _labels
+                name = "{}-{}-kms-binding".format(_kmsName, t.name)
             }
             spec = {
                 forProvider = {
