@@ -3812,18 +3812,18 @@ schema managed_service_details_layer:
 
     get_items = lambda obs: any, vars: {str:any} -> [any] {
         _activeDataPlane = str(vars?.activeDataPlane or "blue")
-        _res = obs?.resources or {}
-        _grant_conditions = _res?["{}-db-grant-{}".format(_meta_name, _activeDataPlane)]?.resource?.status?.conditions or []
-        _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
-
         _externalName = str(vars?.managedServiceDetailsExternalName or "")
         _hashedName = str(vars?.hashedName or "")
         _labels = vars?.labels or {}
         _managementPolicies = vars?.managementPolicies or ["*"]
-        _namespace = str(vars?.namespace or "")
         _meta_name = str(vars?.baseName or "")
-        _region = str(vars?.region or "")
+        _namespace = str(vars?.namespace or "")
         _projectId = str(vars?.projectId or "")
+        _region = str(vars?.region or "")
+
+        _res = obs?.resources or {}
+        _grant_conditions = _res?["{}-db-grant-{}".format(_meta_name, _activeDataPlane)]?.resource?.status?.conditions or []
+        _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
 
         _items: [any] = []
         if _is_ready:
