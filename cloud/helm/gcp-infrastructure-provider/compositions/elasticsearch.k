@@ -3,21 +3,21 @@ import k8s.api.core.v1 as k8s_core
 import models.v1alpha1.kubernetesm_crossplane_io_v1alpha1_object as kubernetes
 
 get_items = lambda obs: any, vars: {str:any} -> [any] {
-    _res = obs?.resources or {}
-    _es_status = _res?["elasticsearch-observer"]?.resource?.status?.atProvider?.manifest?.status or {}
-    _sec_data = _res?["elasticsearch-secret-observer"]?.resource?.status?.atProvider?.manifest?.data or {}
-
-    _health = _es_status?.health or ""
-    _password = _sec_data?.elastic or ""
-    _is_ready = _health in ["green", "yellow"] and _password
-
     _labels = vars?.labels or {}
+    _managementPolicies = vars?.managementPolicies or ["*"]
     _name = str(vars?.metadata?.name or "")
     _namespace = str(vars?.namespace or "")
     _searchName = str(vars?.searchName or "")
     _searchNamespace = str(vars?.searchNamespace or "")
     _searchSecretName = str(vars?.searchSecretName or "")
-    _managementPolicies = vars?.managementPolicies or ["Default"]
+
+    _res = obs?.resources or {}
+    _es_status = _res?["{}-es-observer".format(_name)]?.resource?.status?.atProvider?.manifest?.status or {}
+    _sec_data = _res?["{}-es-es-elastic-user-observer".format(_name)]?.resource?.status?.atProvider?.manifest?.data or {}
+
+    _health = _es_status?.health or ""
+    _password = _sec_data?.elastic or ""
+    _is_ready = _health in ["green", "yellow"] and _password
 
     _items = [
         kubernetes.Object {
