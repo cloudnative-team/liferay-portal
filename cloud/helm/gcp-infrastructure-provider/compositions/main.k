@@ -8,4 +8,4 @@ import .security
 import .sql
 import .storage
 
-items = backup.items.items + elasticsearch.items.items + init.items.items + k8s_resources.items.items + managed_service_details.items.items + overlay.items.items + security.items.items + sql.items.items + storage.items.items
+items = backup.items + elasticsearch.items + init.items + k8s_resources.items + managed_service_details.items + overlay.items + security.items + sql.items + storage.items

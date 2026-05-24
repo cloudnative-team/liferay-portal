@@ -72,4 +72,4 @@ _vars = {
     "region": cv.region
 }
 
-items = {"items": get_items(cv.obs, _vars)}
+items = get_items(cv.obs, _vars)

@@ -71,13 +71,5 @@ import k8s.apimachinery.pkg.apis.meta.v1 as v1
 {{- range $aliases -}}
 {{- $body = regexReplaceAll (printf "\\b%s\\.([A-Z])" .) $body "${1}" -}}
 {{- end }}
-{{- /*
-function-kcl expects top-level `items` to be a list of resources.
-Each layer file ends with `items = {"items": get_items(...)}` so it can
-slot into the bundler's aggregator. With the multi-step pipeline there is
-no aggregator, so unwrap the `{"items": ... }` envelope and emit the list
-directly.
-*/ -}}
-{{- $body = regexReplaceAll "(?m)^items = \\{\"items\": (.+)\\}\\s*$" $body "items = ${1}" }}
 {{ $body }}
 {{- end -}}

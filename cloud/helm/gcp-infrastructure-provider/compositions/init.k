@@ -21,4 +21,4 @@ _vars = {
     "baseName": cv.baseName
 }
 
-items = {"items": get_items(cv.obs, _vars)}
+items = get_items(cv.obs, _vars)

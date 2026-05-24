@@ -105,4 +105,4 @@ _vars = {
     "searchSecretName": cv.searchSecretName
 }
 
-items = {"items": get_items(cv.obs, _vars)}
+items = get_items(cv.obs, _vars)

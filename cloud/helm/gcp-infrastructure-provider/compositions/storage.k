@@ -70,4 +70,4 @@ _vars = {
     "storage_spec": cv.storage_spec
 }
 
-items = {"items": get_items(cv.obs, _vars)}
+items = get_items(cv.obs, _vars)
