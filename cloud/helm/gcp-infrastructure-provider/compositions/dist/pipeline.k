@@ -3626,34 +3626,6 @@ schema elasticsearch_layer:
 _elasticsearch = elasticsearch_layer {}
 items_elasticsearch = _elasticsearch.items
 
-schema init_layer:
-
-    get_items = lambda obs: any, vars: {str:any} -> [any] {
-        _activeDataPlane = str(vars?.activeDataPlane or "blue")
-        _meta_name = str(vars?.baseName or "")
-
-        _res = obs?.resources or {}
-        _grant_conditions = _res?["{}-db-grant-{}".format(_meta_name, _activeDataPlane)]?.resource?.status?.conditions or []
-        _is_ready = any c in _grant_conditions {(c.type == "Ready" or c.type == "Complete") and c.status == "True"}
-        [
-            {
-                apiVersion = "gcp.liferay.com/v1alpha1"
-                kind = "LiferayInfrastructure"
-                status = {managedServiceDetailsReady = _is_ready}
-            }
-        ]
-    }
-
-    _vars = {
-        "activeDataPlane": activeDataPlane
-        "baseName": baseName
-    }
-
-    items: {str:any} = {"items": get_items(obs, _vars)}
-
-_init = init_layer {}
-items_init = _init.items
-
 schema k8s_resources_layer:
 
     get_items = lambda obs: any, vars: {str:any} -> [any] {
@@ -4392,4 +4364,4 @@ _layer_items = lambda layer {
         _items = layer.items
     _items
 }
-items = [item for layer in [items_backup,items_elasticsearch,items_init,items_k8s_resources,items_managed_service_details,items_overlay,items_security,items_sql,items_storage] for item in _layer_items(layer)]
+items = [item for layer in [items_backup,items_elasticsearch,items_k8s_resources,items_managed_service_details,items_overlay,items_security,items_sql,items_storage] for item in _layer_items(layer)]

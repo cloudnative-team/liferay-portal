@@ -44,6 +44,30 @@ spec:
                     source: |
                         {{- .Files.Get "compositions/dist/pipeline.k" | nindent 24 }}
             step: composite-logic
+        # Multi-step pipeline prototype: init.k runs as its own function-kcl step
+        # instead of inside the bundle. Helm concatenates context_variables.k + the
+        # layer body and rewrites `import context_variables as cv` and `cv.` away,
+        # so the source arrives at function-kcl as flat KCL with no bundler indent
+        # step (eliminates the indent-into-strings bug class). See
+        # https://liferay.atlassian.net/wiki/spaces/LC/pages/4871225751.
+        -   functionRef:
+                name: function-kcl
+            input:
+                apiVersion: template.fn.crossplane.io/v1beta1
+                kind: KCLInput
+                spec:
+                    dependencies: |
+                        k8s = "1.32.4"
+                    source: |
+                        {{- $context := .Files.Get "compositions/context_variables.k" -}}
+                        {{- $layer := .Files.Get "compositions/init.k" -}}
+                        {{- $merged := printf "%s\n\n%s" $context $layer -}}
+                        {{- /* Drop only `import context_variables as cv` -- keep other imports (crypto, etc.). */ -}}
+                        {{- $stripped := regexReplaceAll "(?m)^import context_variables as cv\\s*$" $merged "" -}}
+                        {{- /* Rewrite cv.xxx -> xxx so the layer code resolves against the inlined context above. */ -}}
+                        {{- $flat := regexReplaceAll "\\bcv\\." $stripped "" -}}
+                        {{- $flat | nindent 24 }}
+            step: init-status
         -   functionRef:
                 name: function-auto-ready
             step: auto-detect-ready-composed-resources

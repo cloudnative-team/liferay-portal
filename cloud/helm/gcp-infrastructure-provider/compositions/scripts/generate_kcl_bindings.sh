@@ -75,7 +75,6 @@ for line in merged_models.split('\n'):
 layers = [
 	"backup",
 	"elasticsearch",
-	"init",
 	"k8s_resources",
 	"managed_service_details",
 	"overlay",
@@ -83,6 +82,10 @@ layers = [
 	"sql",
 	"storage",
 ]
+# NOTE: init.k is intentionally excluded from the bundle and runs as its own
+# pipeline step (see templates/compositions.yaml). This is the first layer
+# in the multi-step pipeline prototype evaluated under
+# https://liferay.atlassian.net/wiki/spaces/LC/pages/4871225751.
 shared_imports = [
 	"import crypto",
 	"import json",
