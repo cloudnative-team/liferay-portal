@@ -27,7 +27,9 @@
         "liferay_git_repo_config": {
             "auth": {
                 "internal_secret_name": "gma-github"
-            }
+            },
+            "source_paths": {},
+            "target": {}
         },
         "project_id": "cne-development",
         "region": "us-south1"
