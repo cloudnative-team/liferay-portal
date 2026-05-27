@@ -1,0 +1,94 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: liferayextensions.lxc.liferay.com
+spec:
+    group: lxc.liferay.com
+    names:
+        kind: LiferayExtension
+        listKind: LiferayExtensionList
+        plural: liferayextensions
+        shortNames:
+            -   cx
+        singular: liferayextension
+    scope: Namespaced
+    versions:
+        -   name: v1
+            served: true
+            storage: true
+            subresources:
+                status: {}
+            additionalPrinterColumns:
+                -   jsonPath: .status.phase
+                    name: Phase
+                    type: string
+                -   jsonPath: .spec.image
+                    name: Image
+                    type: string
+                -   jsonPath: .status.url
+                    name: URL
+                    type: string
+            schema:
+                openAPIV3Schema:
+                    description: LiferayExtension is the Schema for the liferayextensions API.
+                    type: object
+                    properties:
+                        apiVersion:
+                            type: string
+                        kind:
+                            type: string
+                        metadata:
+                            type: object
+                        spec:
+                            type: object
+                            required:
+                                -   image
+                                -   serviceId
+                                -   virtualInstanceId
+                            properties:
+                                image:
+                                    description: Pre-built OCI image reference for the CX.
+                                    type: string
+                                virtualInstanceId:
+                                    description: Liferay virtual instance ID this extension is registered against.
+                                    type: string
+                                serviceId:
+                                    description: CX service ID within the virtual instance.
+                                    type: string
+                                lcp:
+                                    description: Workload-level configuration mirroring lcp.json.
+                                    type: object
+                                    properties:
+                                        kind:
+                                            description: '"Service" (default) or "Job".'
+                                            type: string
+                                            enum:
+                                                -   Service
+                                                -   Job
+                                        env:
+                                            description: Environment variables to expose to the workload.
+                                            type: object
+                                            additionalProperties:
+                                                type: string
+                                        targetPort:
+                                            description: Container port the workload listens on.
+                                            type: integer
+                                            format: int32
+                                        memory:
+                                            description: Memory request/limit hint.
+                                            type: string
+                                        cpu:
+                                            description: CPU request/limit hint.
+                                            type: string
+                        status:
+                            type: object
+                            properties:
+                                phase:
+                                    type: string
+                                url:
+                                    type: string
+                                message:
+                                    type: string
+                                observedGeneration:
+                                    type: integer
+                                    format: int64

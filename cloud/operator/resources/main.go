@@ -14,11 +14,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	lxcv1 "github.com/liferay/liferay-portal/cloud/operator/api/v1"
 	"github.com/liferay/liferay-portal/cloud/operator/internal/controller"
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(lxcv1.AddToScheme(scheme))
 }
 
 func main() {
@@ -66,6 +68,14 @@ func main() {
 
 	if err := reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Unable to create controller.")
+
+		os.Exit(1)
+	}
+
+	cxReconciler := &controller.LiferayExtensionReconciler{Client: mgr.GetClient()}
+
+	if err := cxReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Unable to create LiferayExtension controller.")
 
 		os.Exit(1)
 	}

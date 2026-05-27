@@ -1,0 +1,23 @@
+# Sample LiferayExtension CR.
+#
+# The operator's cache filters resources by the "controller-watched: yes"
+# label (see main.go's cache.Options.DefaultLabelSelector). CRs without
+# this label will not be reconciled.
+apiVersion: lxc.liferay.com/v1
+kind: LiferayExtension
+metadata:
+    name: sample-ticket-batch
+    namespace: default
+    labels:
+        controller-watched: "yes"
+spec:
+    image: us-central1-docker.pkg.dev/liferay-artifact-registry/liferay-client-extensions/sample-ticket-batch:latest
+    virtualInstanceId: dxp.local
+    serviceId: sample-ticket-batch
+    lcp:
+        kind: Service
+        targetPort: 8080
+        memory: 256Mi
+        cpu: 100m
+        env:
+            LIFERAY_ROUTES_DXP: http://liferay:8080
