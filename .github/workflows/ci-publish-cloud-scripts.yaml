@@ -46,7 +46,7 @@ jobs:
 
                         short_sha=$(git rev-parse --short HEAD)
 
-                        local current_version="${base_version}-${sanitized_branch}-g${short_sha}"
+                        local current_version="${base_version}-${sanitized_branch}-${short_sha}"
 
                         echo "CURRENT_VERSION=${current_version}" >> ${GITHUB_ENV}
 
@@ -124,7 +124,7 @@ jobs:
 
                         short_sha=$(git rev-parse --short HEAD)
 
-                        local current_version="${base_version}-${sanitized_branch}-g${short_sha}"
+                        local current_version="${base_version}-${sanitized_branch}-${short_sha}"
 
                         echo "CURRENT_VERSION=${current_version}" >> ${GITHUB_ENV}
 
