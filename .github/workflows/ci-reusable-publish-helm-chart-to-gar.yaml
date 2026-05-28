@@ -3,13 +3,6 @@ defaults:
         shell: bash
 jobs:
     publish:
-        env:
-            GITHUB_TOKEN: ${{github.token}}
-            IS_PR: ${{inputs.pr_number != ''}}
-        permissions:
-            contents: read
-            id-token: write
-            packages: write
         runs-on: ubuntu-latest
         steps:
             -   name: Checkout code
@@ -18,8 +11,7 @@ jobs:
                     fetch-depth: 1
                     filter: blob:none
                     show-progress: false
-            -   if: ${{env.IS_PR == 'true'}}
-                name: Modify version for pull request
+            -   name: Compute environment variables
                 run: |
                     set -o errexit
                     set -o nounset
@@ -28,153 +20,107 @@ jobs:
                     function main {
                         local chart_version
 
-                        chart_version=$(cat ./Chart.yaml | yq .version)
+                        chart_version=$(yq .version Chart.yaml)
 
-                        local short_sha
+                        local registry="${{inputs.registry}}"
 
-                        short_sha=$(git rev-parse --short HEAD)
-
-                        local new_version="${chart_version}-pr-${{inputs.pr_number}}-g${short_sha}"
-
-                        echo "Modifying chart version from ${chart_version} to ${new_version}."
-
-                        yq -i ".version = \"${new_version}\"" Chart.yaml
-                    }
-
-                    main "${@}"
-                working-directory: ${{inputs.working_directory}}
-            -   id: verify_version
-                name: Verify Helm chart version
-                run: |
-                    set -o errexit
-                    set -o nounset
-                    set -o pipefail
-
-                    function main {
-                        CHART_VERSION=$(cat ./Chart.yaml | yq .version)
-
-                        local registry
-
-                        if [[ "${{env.IS_PR}}" == "true" ]]
+                        if [[ -n "${{inputs.path_prefix}}" ]]
                         then
-                            registry="ghcr.io/${{github.repository_owner}}/charts-pr/${{inputs.pr_number}}"
-                        else
-                            registry="${{inputs.registry}}"
+                            registry="${registry}/${{inputs.path_prefix}}"
                         fi
 
-                        echo "Verifying Helm chart version ${CHART_VERSION} in ${registry}."
+                        local target_ref="${registry}/${{inputs.chart_name}}:${chart_version}${{inputs.version_suffix}}"
 
-                        if [[ "${{env.IS_PR}}" == "true" ]]
-                        then
-                            echo "Overwriting version ${CHART_VERSION} in GHCR if it exists."
+                        echo "Will push chart to ${target_ref}"
 
-                            echo "CHART_VERSION=${CHART_VERSION}" >> ${GITHUB_ENV}
-
-                            echo "registry=${registry}" >> ${GITHUB_OUTPUT}
-
-                            echo "should_publish=true" >> ${GITHUB_OUTPUT}
-                        elif ! helm show readme "oci://${registry}/${{inputs.chart_name}}:${CHART_VERSION}" >/dev/null 2>&1
-                        then
-                            echo "Verified Helm Chart version ${CHART_VERSION}."
-
-                            echo "CHART_VERSION=${CHART_VERSION}" >> ${GITHUB_ENV}
-
-                            echo "registry=${registry}" >> ${GITHUB_OUTPUT}
-
-                            echo "should_publish=true" >> ${GITHUB_OUTPUT}
-                        else
-                            echo "Chart ${{inputs.chart_name}}@${CHART_VERSION} already exists."
-
-                            echo "${{inputs.chart_name}}: \`${CHART_VERSION}\` already published." >> ${GITHUB_STEP_SUMMARY}
-                        fi
+                        echo "CHART_VERSION=${chart_version}" >> ${GITHUB_ENV}
+                        echo "DIST_DIR=${{runner.temp}}/${{inputs.chart_name}}/dist" >> ${GITHUB_ENV}
+                        echo "TARGET_REF=${target_ref}" >> ${GITHUB_ENV}
                     }
 
                     main "${@}"
                 working-directory: ${{inputs.working_directory}}
             -   id: auth
-                if: ${{env.IS_PR == 'false' && steps.verify_version.outputs.should_publish == 'true'}}
                 name: Authenticate to Google Cloud
                 uses: google-github-actions/auth@v3
                 with:
                     project_id: ${{secrets.project_id}}
                     workload_identity_provider: ${{secrets.workload_identity_provider}}
-            -   if: ${{env.IS_PR == 'false' && steps.verify_version.outputs.should_publish == 'true'}}
-                name: Log in to GAR
-                run: |
-                    set -o errexit
-                    set -o nounset
-                    set -o pipefail
-
-                    echo "${{steps.auth.outputs.auth_token}}" \
-                        | helm registry login "${{inputs.registry}}" \
-                            --password-stdin \
-                            --username oauth2accesstoken
-            -   if: ${{env.IS_PR == 'true' && steps.verify_version.outputs.should_publish == 'true'}}
-                name: Log in to GHCR
-                run: |
-                    set -o errexit
-                    set -o nounset
-                    set -o pipefail
-
-                    echo "${{github.token}}" \
-                        | helm registry login ghcr.io \
-                            --password-stdin \
-                            --username "${{github.actor}}"
-            -   if: ${{steps.verify_version.outputs.should_publish == 'true'}}
-                name: Package Helm chart
+            -   name: Install oras
+                uses: oras-project/setup-oras@v1
+            -   name: Log in to GAR
                 run: |
                     set -o errexit
                     set -o nounset
                     set -o pipefail
 
                     function main {
-                        local dist_dir="${{runner.temp}}/${{inputs.chart_name}}/dist"
+                        echo "${{steps.auth.outputs.auth_token}}" \
+                            | oras login \
+                                --password-stdin \
+                                --username oauth2accesstoken \
+                                us-central1-docker.pkg.dev
+                    }
 
-                        rm --force --recursive "${dist_dir}"
+                    main "${@}"
+            -   name: Package Helm chart
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
 
-                        mkdir --parents "${dist_dir}"
+                    function main {
+                        rm --force --recursive "${DIST_DIR}"
+
+                        mkdir --parents "${DIST_DIR}"
 
                         helm dependency update
 
                         helm package . \
-                            --destination "${dist_dir}" \
+                            --destination "${DIST_DIR}" \
                             --version "${CHART_VERSION}"
                     }
 
                     main "${@}"
                 working-directory: ${{inputs.working_directory}}
-            -   if: ${{steps.verify_version.outputs.should_publish == 'true'}}
-                name: Publish Helm chart
+            -   name: Push to OCI with custom tag
                 run: |
                     set -o errexit
                     set -o nounset
                     set -o pipefail
 
                     function main {
-                        local dist_dir="${{runner.temp}}/${{inputs.chart_name}}/dist"
+                        local config_file="${DIST_DIR}/helm-oci-config.json"
+                        local tgz="${DIST_DIR}/${{inputs.chart_name}}-${CHART_VERSION}.tgz"
 
-                        for file_name in "${dist_dir}"/*.tgz
-                        do
-                            echo "Pushing ${file_name} to oci://${{steps.verify_version.outputs.registry}}."
+                        printf '{"name":"%s","version":"%s"}' \
+                            "${{inputs.chart_name}}" \
+                            "${CHART_VERSION}" \
+                            > "${config_file}"
 
-                            helm push "${file_name}" "oci://${{steps.verify_version.outputs.registry}}"
-                        done
+                        oras push \
+                            "${TARGET_REF}" \
+                            --config "${config_file}:application/vnd.cncf.helm.config.v1+json" \
+                            "${tgz}:application/vnd.cncf.helm.chart.content.v1.tar+gzip"
                     }
 
                     main "${@}"
-                working-directory: ${{inputs.working_directory}}
 on:
     workflow_call:
         inputs:
             chart_name:
                 required: true
                 type: string
-            pr_number:
+            path_prefix:
                 default: ""
                 required: false
                 type: string
             registry:
                 required: true
+                type: string
+            version_suffix:
+                default: ""
+                required: false
                 type: string
             working_directory:
                 required: true
@@ -187,4 +133,3 @@ on:
 permissions:
     contents: read
     id-token: write
-    packages: write
