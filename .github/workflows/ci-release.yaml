@@ -1,0 +1,528 @@
+concurrency:
+    cancel-in-progress: true
+    group: release-${{github.ref_name}}
+defaults:
+    run:
+        shell: bash
+jobs:
+    setup:
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        outputs:
+            version_suffix: ${{steps.vars.outputs.version_suffix}}
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    filter: blob:none
+                    show-progress: false
+            -   id: vars
+                name: Compute version suffix
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local short_sha
+
+                        short_sha=$(git rev-parse --short HEAD)
+
+                        echo "version_suffix=-g${short_sha}" >> ${GITHUB_OUTPUT}
+                    }
+
+                    main "${@}"
+    build-rc-default:
+        needs: setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-default
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/default
+    build-rc-aws:
+        needs:
+            -   build-rc-default
+            -   setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-aws
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/aws
+    build-rc-aws-infrastructure:
+        needs: setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-aws-infrastructure
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/aws-infrastructure
+    build-rc-aws-infrastructure-provider:
+        needs: setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-aws-infrastructure-provider
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/aws-infrastructure-provider
+    build-rc-gcp:
+        needs:
+            -   build-rc-default
+            -   setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-gcp
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/gcp
+    build-rc-gcp-infrastructure:
+        needs: setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-gcp-infrastructure
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/gcp-infrastructure
+    build-rc-gcp-infrastructure-provider:
+        needs: setup
+        secrets:
+            project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+        uses: ./.github/workflows/ci-reusable-publish-helm-chart-to-gar.yaml
+        with:
+            chart_name: liferay-gcp-infrastructure-provider
+            path_prefix: ${{github.ref_name}}
+            registry: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+            version_suffix: ${{needs.setup.outputs.version_suffix}}
+            working_directory: ./cloud/helm/gcp-infrastructure-provider
+    build-rc-bootstrap-aws:
+        env:
+            BOOTSTRAP_STORAGE_PATH: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    sparse-checkout: |
+                        cloud/scripts
+                        cloud/terraform/aws
+            -   name: Authenticate to Google Cloud (nonprd)
+                uses: google-github-actions/auth@v3
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+                    workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+            -   name: Set up Google Cloud CLI
+                uses: google-github-actions/setup-gcloud@v2
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            -   name: Package and push AWS bootstrap RC
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local version
+
+                        version=$(jq --raw-output '."liferay-aws-bootstrap"' ./cloud/scripts/versions.json)
+
+                        local file_name="liferay-aws-bootstrap-${version}.tar.gz"
+
+                        local sanitized_branch
+
+                        sanitized_branch=$(echo "${GITHUB_REF_NAME}" | sed 's|/|-|g')
+
+                        local nonprd_path="${BOOTSTRAP_STORAGE_PATH}/${sanitized_branch}/liferay-aws-bootstrap/${file_name}"
+
+                        echo "Packaging ${file_name} for branch ${GITHUB_REF_NAME}."
+
+                        tar \
+                            --create \
+                            --file "/tmp/${file_name}" \
+                            --gzip \
+                            --verbose \
+                            cloud/scripts/setup_aws.sh \
+                            cloud/scripts/versions_aws.tfvars \
+                            cloud/terraform/aws/eks/* \
+                            cloud/terraform/aws/gitops/platform/* \
+                            cloud/terraform/aws/gitops/resources/* \
+                            cloud/terraform/aws/grafana/*
+
+                        echo "Uploading to ${nonprd_path}."
+
+                        gcloud storage cp "/tmp/${file_name}" "${nonprd_path}"
+                    }
+
+                    main "${@}"
+    build-rc-bootstrap-gcp:
+        env:
+            BOOTSTRAP_STORAGE_PATH: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    sparse-checkout: |
+                        cloud/scripts
+                        cloud/terraform/gcp
+            -   name: Authenticate to Google Cloud (nonprd)
+                uses: google-github-actions/auth@v3
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+                    workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+            -   name: Set up Google Cloud CLI
+                uses: google-github-actions/setup-gcloud@v2
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+            -   name: Package and push GCP bootstrap RC
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local version
+
+                        version=$(jq --raw-output '."liferay-gcp-bootstrap"' ./cloud/scripts/versions.json)
+
+                        local file_name="liferay-gcp-bootstrap-${version}.tar.gz"
+
+                        local sanitized_branch
+
+                        sanitized_branch=$(echo "${GITHUB_REF_NAME}" | sed 's|/|-|g')
+
+                        local nonprd_path="${BOOTSTRAP_STORAGE_PATH}/${sanitized_branch}/liferay-gcp-bootstrap/${file_name}"
+
+                        echo "Packaging ${file_name} for branch ${GITHUB_REF_NAME}."
+
+                        tar \
+                            --create \
+                            --file "/tmp/${file_name}" \
+                            --gzip \
+                            --verbose \
+                            cloud/scripts/setup_gcp.sh \
+                            cloud/scripts/versions_gcp.tfvars \
+                            cloud/terraform/gcp/gitops/platform/* \
+                            cloud/terraform/gcp/gitops/resources/* \
+                            cloud/terraform/gcp/gke/*
+
+                        echo "Uploading to ${nonprd_path}."
+
+                        gcloud storage cp "/tmp/${file_name}" "${nonprd_path}"
+                    }
+
+                    main "${@}"
+    test-rc:
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        needs:
+            -   build-rc-aws
+            -   build-rc-aws-infrastructure
+            -   build-rc-aws-infrastructure-provider
+            -   build-rc-bootstrap-aws
+            -   build-rc-bootstrap-gcp
+            -   build-rc-default
+            -   build-rc-gcp
+            -   build-rc-gcp-infrastructure
+            -   build-rc-gcp-infrastructure-provider
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Placeholder for RC validation tests
+                run: |
+                    echo "RC validation tests run here (placeholder)."
+                    echo "TODO: integrate automated tests against the RC artifacts in external-assets-nonprd."
+    approve:
+        environment: production-release
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        needs: test-rc
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Wait for manual approval
+                run: |
+                    echo "Approval received. Proceeding to promotion."
+    publish-aws-marketplace:
+        env:
+            ECR_REGISTRY: 709825985650.dkr.ecr.us-east-1.amazonaws.com
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        needs: approve
+        permissions:
+            contents: read
+            id-token: write
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    filter: blob:none
+                    show-progress: false
+            -   name: Configure AWS credentials
+                uses: aws-actions/configure-aws-credentials@v5.1.0
+                with:
+                    aws-region: us-east-1
+                    role-session-name: GitHubActions
+                    role-to-assume: arn:aws:iam::831926597587:role/GitHubActionsRole
+            -   name: Log in to ECR
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    aws ecr get-login-password --region us-east-1 \
+                        | helm registry login "${ECR_REGISTRY}" \
+                            --password-stdin \
+                            --username AWS
+            -   id: verify_version
+                name: Verify Helm chart version
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        CHART_VERSION=$(cat ./Chart.yaml | yq .version)
+
+                        echo "Verifying Helm chart version ${CHART_VERSION}."
+
+                        if ! helm show readme "oci://${ECR_REGISTRY}/liferay/liferay-aws-marketplace:${CHART_VERSION}" >/dev/null 2>&1
+                        then
+                            echo "Verified Helm Chart version ${CHART_VERSION}."
+
+                            echo "CHART_VERSION=${CHART_VERSION}" >> ${GITHUB_ENV}
+
+                            echo "should_publish=true" >> ${GITHUB_OUTPUT}
+                        else
+                            echo "Chart liferay-aws-marketplace@${CHART_VERSION} already exists."
+
+                            echo "liferay-aws-marketplace: \`${CHART_VERSION}\` already published." >> ${GITHUB_STEP_SUMMARY}
+                        fi
+                    }
+
+                    main "${@}"
+                working-directory: ./cloud/helm/aws-marketplace
+            -   if: ${{steps.verify_version.outputs.should_publish == 'true'}}
+                name: Package and push Helm chart
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local dist_dir="${{runner.temp}}/aws-marketplace/dist"
+
+                        rm --force --recursive "${dist_dir}"
+
+                        mkdir --parents "${dist_dir}"
+
+                        helm dependency update
+
+                        helm package . \
+                            --destination "${dist_dir}" \
+                            --version "${CHART_VERSION}"
+
+                        for file_name in "${dist_dir}"/*.tgz
+                        do
+                            echo "Pushing ${file_name}."
+
+                            helm push "${file_name}" "oci://${ECR_REGISTRY}/liferay"
+                        done
+                    }
+
+                    main "${@}"
+                working-directory: ./cloud/helm/aws-marketplace
+    promote:
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        needs:
+            -   approve
+            -   setup
+        permissions:
+            contents: write
+            id-token: write
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    sparse-checkout: |
+                        cloud/helm
+                        cloud/scripts
+            -   name: Compute release tag
+                id: vars
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local branch="${GITHUB_REF_NAME}"
+                        local tag="${branch//\//-}"
+
+                        echo "branch=${branch}" >> ${GITHUB_OUTPUT}
+                        echo "tag=${tag}" >> ${GITHUB_OUTPUT}
+                    }
+
+                    main "${@}"
+            -   name: Install oras
+                uses: oras-project/setup-oras@v1
+            -   id: auth_nonprd
+                name: Authenticate to Google Cloud (nonprd)
+                uses: google-github-actions/auth@v3
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_NONPRD}}
+                    token_format: access_token
+                    workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_NONPRD}}
+            -   id: auth_prd
+                name: Authenticate to Google Cloud (prd)
+                uses: google-github-actions/auth@v3
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_PRD}}
+                    token_format: access_token
+                    workload_identity_provider: ${{secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_EXTERNAL_PRD}}
+            -   name: Promote chart images to prd
+                env:
+                    BRANCH: ${{steps.vars.outputs.branch}}
+                    NONPRD_REGISTRY: ${{vars.HELM_CHART_REGISTRY_NONPRD}}
+                    NONPRD_TOKEN: ${{steps.auth_nonprd.outputs.access_token}}
+                    PRD_REGISTRY: ${{vars.HELM_CHART_REGISTRY_PRD}}
+                    PRD_TOKEN: ${{steps.auth_prd.outputs.access_token}}
+                    RELEASE_TAG: ${{steps.vars.outputs.tag}}
+                    VERSION_SUFFIX: ${{needs.setup.outputs.version_suffix}}
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local nonprd_registry="${NONPRD_REGISTRY}"
+                        local prd_registry="${{PRD_REGISTRY}}"
+
+                        for chart_dir in cloud/helm/*/
+                        do
+                            local chart_name
+
+                            chart_name="liferay-$(basename "${chart_dir}")"
+
+                            if [[ "${chart_name}" == "liferay-aws-marketplace" ]]
+                            then
+                                continue
+                            fi
+
+                            local version
+
+                            version=$(yq .version "${chart_dir}/Chart.yaml")
+
+                            local src="${nonprd_registry}/${BRANCH}/${chart_name}:${version}${VERSION_SUFFIX}"
+                            local dst="${prd_registry}/${chart_name}:${version}"
+
+                            echo "Promoting ${src} to ${dst}."
+
+                            oras cp \
+                                --from-username oauth2accesstoken \
+                                --from-password "${NONPRD_TOKEN}" \
+                                --to-annotation "com.liferay.cne.release-tag=${RELEASE_TAG}" \
+                                --to-annotation "org.opencontainers.image.revision=${GITHUB_SHA}" \
+                                --to-annotation "org.opencontainers.image.source=https://github.com/cloudnative-team/liferay-portal" \
+                                --to-username oauth2accesstoken \
+                                --to-password "${PRD_TOKEN}" \
+                                "${src}" \
+                                "${dst}"
+                        done
+                    }
+
+                    main "${@}"
+            -   name: Set up Google Cloud CLI
+                uses: google-github-actions/setup-gcloud@v2
+                with:
+                    project_id: ${{secrets.GCP_PROJECT_ID_EXTERNAL_PRD}}
+            -   name: Promote bootstrap tarballs to prd
+                env:
+                    BRANCH: ${{steps.vars.outputs.branch}}
+                    NONPRD_BOOTSTRAP_PATH: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+                    NONPRD_TOKEN: ${{steps.auth_nonprd.outputs.access_token}}
+                    PRD_TOKEN: ${{steps.auth_prd.outputs.access_token}}
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local sanitized_branch="${BRANCH//\//-}"
+
+                        for provider in aws gcp
+                        do
+                            local version
+
+                            version=$(jq --raw-output ".\"liferay-${provider}-bootstrap\"" ./cloud/scripts/versions.json)
+
+                            local file_name="liferay-${provider}-bootstrap-${version}.tar.gz"
+                            local src="${NONPRD_BOOTSTRAP_PATH}/${sanitized_branch}/liferay-${provider}-bootstrap/${file_name}"
+                            local dst="gs://liferay-cloud-native-bootstrap/bootstrap/liferay-${provider}-bootstrap/${file_name}"
+
+                            echo "Downloading ${src} with nonprd credentials."
+
+                            CLOUDSDK_AUTH_ACCESS_TOKEN="${NONPRD_TOKEN}" \
+                                gcloud storage cp "${src}" "/tmp/${file_name}"
+
+                            echo "Uploading to ${dst} with prd credentials."
+
+                            CLOUDSDK_AUTH_ACCESS_TOKEN="${PRD_TOKEN}" \
+                                gcloud storage cp "/tmp/${file_name}" "${dst}"
+                        done
+                    }
+
+                    main "${@}"
+            -   name: Tag the release
+                env:
+                    RELEASE_TAG: ${{steps.vars.outputs.tag}}
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        git config user.email "github-actions[bot]@users.noreply.github.com"
+                        git config user.name "github-actions[bot]"
+
+                        git tag --annotate "${RELEASE_TAG}" --message "Release ${RELEASE_TAG}"
+
+                        git push origin "${RELEASE_TAG}"
+                    }
+
+                    main "${@}"
+on:
+    push:
+        branches:
+            -   release/**
+permissions:
+    contents: read
+    id-token: write
