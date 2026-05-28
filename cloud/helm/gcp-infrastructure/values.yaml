@@ -16,6 +16,7 @@ database:
     queryInsightsEnabled: true
     storageGB: 20
 deletionProtection: true
+deploymentName: ""
 enabled: true
 endpoints: {}
 environmentId: ""
@@ -36,9 +37,16 @@ license:
     targetSecretName: liferay-license
 orphanOnDelete: false
 overlay:
+    bucket:
+        enabled: false
+        encryption:
+            kmsKeyName: ""
+        forceDestroy: false
+        region: ""
+        storageClass: STANDARD
+        versioning: true
     enabled: false
     githubRepo: ""
-    region: ""
 podMonitoring:
     instances:
         envoy:

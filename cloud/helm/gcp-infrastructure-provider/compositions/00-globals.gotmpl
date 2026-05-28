@@ -49,3 +49,4 @@
 {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
 
 {{- $cmkKeyName := printf "projects/%s/locations/%s/keyRings/%s-keyring/cryptoKeys/%s-key" $env.projectId $region $baseName $baseName -}}
+{{- $overlayBucketName := printf "%s-liferay-overlay" $env.deploymentName -}}

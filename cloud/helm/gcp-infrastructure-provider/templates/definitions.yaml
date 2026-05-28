@@ -78,8 +78,6 @@ spec:
                                             type: boolean
                                         githubRepo:
                                             type: string
-                                        region:
-                                            type: string
                                     type: object
                                 projectId:
                                     type: string

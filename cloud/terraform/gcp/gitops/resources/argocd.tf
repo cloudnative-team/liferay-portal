@@ -469,3 +469,79 @@ resource "kubernetes_manifest" "liferay_appproject" {
 		}
 	}
 }
+resource "kubernetes_manifest" "resources_application" {
+	count=var.overlay_bucket_enabled ? 1 : 0
+	depends_on=[kubernetes_manifest.infrastructure_appproject]
+	field_manager {
+		force_conflicts=true
+		name=local.terraform_manager_name
+	}
+	manifest={
+		apiVersion="argoproj.io/v1alpha1"
+		kind="Application"
+		metadata={
+			annotations={
+				"argocd.argoproj.io/compare-options"="IgnoreExtraneous"
+				"argocd.argoproj.io/sync-wave"="-40"
+			}
+			finalizers=["resources-finalizer.argocd.argoproj.io"]
+			labels=merge(
+				local.common_labels,
+				{
+					"app.kubernetes.io/name"="liferay-gcp-resources"
+				})
+			name="liferay-gcp-resources"
+			namespace=var.argocd_namespace
+		}
+		spec={
+			destination={
+				namespace=var.resources_namespace
+				server="https://kubernetes.default.svc"
+			}
+			project=local.infrastructure_appproject_name
+			sources=[
+				merge(
+					{
+						helm={
+							parameters=[
+								{
+									name="deploymentName"
+									value=var.deployment_name
+								},
+								{
+									name="enabled"
+									value="false"
+								},
+								{
+									name="overlay.bucket.enabled"
+									value="true"
+								},
+								{
+									name="overlay.bucket.region"
+									value=var.region
+								},
+							]
+						}
+						repoURL=var.infrastructure_helm_chart_config.chart_url
+						targetRevision=var.infrastructure_helm_chart_version
+					},
+					var.infrastructure_helm_chart_config.path == null ? {
+						chart=var.infrastructure_helm_chart_config.chart_name
+					} : {
+						path=var.infrastructure_helm_chart_config.path
+					}
+				),
+			]
+			syncPolicy={
+				automated={
+					prune=true
+					selfHeal=true
+				}
+				syncOptions=[
+					"CreateNamespace=true",
+					"SkipDryRunOnMissingResource=true",
+				]
+			}
+		}
+	}
+}
