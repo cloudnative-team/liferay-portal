@@ -58,6 +58,10 @@ resource "kubernetes_manifest" "infrastructure_applicationset" {
 								helm={
 									parameters=[
 										{
+											name="deploymentName"
+											value=var.deployment_name
+										},
+										{
 											name="environmentId"
 											value=var.infrastructure_git_repo_config.target.slugEnvironmentId
 										},
