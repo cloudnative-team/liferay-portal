@@ -21,7 +21,7 @@ spec:
         forceDestroy: {{ $bucket.forceDestroy }}
         labels:
             deployment-name: {{ $deploymentName | quote }}
-        location: {{ required "overlay.bucket.region is required when overlay.bucket.enabled is true." $bucket.region | quote }}
+        location: {{ default .Values.region $bucket.region | required "overlay.bucket.region or region is required when overlay.bucket.enabled is true." | quote }}
         storageClass: {{ $bucket.storageClass | quote }}
         uniformBucketLevelAccess: true
         versioning:
