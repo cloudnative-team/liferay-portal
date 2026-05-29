@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+_ARGOCD_NAMESPACE="argocd-system"
+
 function _die {
 	echo "ERROR: ${*}" >&2
 	exit 1
@@ -33,7 +35,7 @@ function _patch_application_source {
 	_log "application/${application}: sources[${source_idx}] -> ${repo_url}@${target_revision}"
 
 	kubectl patch application "${application}" \
-		--namespace "${ARGOCD_NAMESPACE}" \
+		--namespace "${_ARGOCD_NAMESPACE}" \
 		--patch="[
 			{
 				\"op\": \"replace\",
@@ -58,7 +60,7 @@ function _patch_applicationset_source {
 	_log "applicationset/${applicationset}: template.spec.sources[${source_idx}] -> ${repo_url}@${target_revision}"
 
 	kubectl patch applicationset "${applicationset}" \
-		--namespace "${ARGOCD_NAMESPACE}" \
+		--namespace "${_ARGOCD_NAMESPACE}" \
 		--patch="[
 			{
 				\"op\": \"replace\",
@@ -79,7 +81,7 @@ function _patch_appproject_source_repo {
 	local repo_url="${2}"
 
 	if kubectl get appproject "${appproject}" \
-		--namespace "${ARGOCD_NAMESPACE}" \
+		--namespace "${_ARGOCD_NAMESPACE}" \
 		--output json |
 		jq --arg url "${repo_url}" --exit-status '(.spec.sourceRepos // []) | index($url)' \
 			> /dev/null
@@ -91,7 +93,7 @@ function _patch_appproject_source_repo {
 	_log "appproject/${appproject}: adding sourceRepo ${repo_url}"
 
 	kubectl patch appproject "${appproject}" \
-		--namespace "${ARGOCD_NAMESPACE}" \
+		--namespace "${_ARGOCD_NAMESPACE}" \
 		--patch="[
 			{
 				\"op\": \"add\",
@@ -132,20 +134,6 @@ function _resolve_chart_version {
 	fi
 
 	echo "${latest_tag}"
-}
-
-function _resolve_argocd_namespace {
-	ARGOCD_NAMESPACE=$(
-		kubectl get pods \
-			--all-namespaces \
-			--selector app.kubernetes.io/name=argocd-server \
-			--output jsonpath='{.items[0].metadata.namespace}'
-	)
-
-	if [[ -z "${ARGOCD_NAMESPACE}" ]]
-	then
-		_die "Could not detect the ArgoCD namespace."
-	fi
 }
 
 function main {
@@ -193,10 +181,6 @@ function main {
 	local provider_infra_repo="${registry}/liferay-${provider}-infrastructure"
 	local provider_infra_provider_repo="${registry}/liferay-${provider}-infrastructure-provider"
 	local provider_repo="${registry}/liferay-${provider}"
-
-	_resolve_argocd_namespace
-
-	_log "ArgoCD namespace: ${ARGOCD_NAMESPACE}"
 
 	local appproject
 	local repo
