@@ -413,6 +413,10 @@ resource "kubernetes_manifest" "liferay_applicationset" {
 											name="global.projectId"
 											value=var.liferay_git_repo_config.target.slugProjectId
 										},
+										{
+											name="overlay.type"
+											value="s3"
+										},
 									],
 									valueFiles=[
 										"$values/${var.liferay_git_repo_config.source_paths.base}/${var.liferay_git_repo_config.source_paths.values_filename}",
