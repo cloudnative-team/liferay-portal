@@ -63,8 +63,6 @@ spec:
                                         storageGB:
                                             type: integer
                                     type: object
-                                deploymentName:
-                                    type: string
                                 environmentId:
                                     type: string
                                 forceDestroy:
@@ -107,7 +105,6 @@ spec:
                                     type: string
                             required:
                                 -   database
-                                -   deploymentName
                                 -   environmentId
                                 -   projectId
                                 -   region

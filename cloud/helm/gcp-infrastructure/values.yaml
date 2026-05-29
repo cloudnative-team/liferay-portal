@@ -16,7 +16,6 @@ database:
     queryInsightsEnabled: true
     storageGB: 20
 deletionProtection: true
-deploymentName: ""
 enabled: true
 endpoints: {}
 environmentId: ""
@@ -72,6 +71,7 @@ podMonitoring:
             port: 12345
     interval: 1m
 projectId: ""
+projectNumber: ""
 region: ""
 search:
     elasticsearch:

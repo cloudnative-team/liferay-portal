@@ -1,7 +1,8 @@
 {{- if .Values.overlay.bucket.enabled }}
 {{- $bucket := .Values.overlay.bucket }}
-{{- $deploymentName := required "deploymentName is required when overlay.bucket.enabled is true." .Values.deploymentName }}
 {{- $projectId := required "projectId is required when overlay.bucket.enabled is true." .Values.projectId }}
+{{- $projectNumber := required "projectNumber is required when overlay.bucket.enabled is true." .Values.projectNumber }}
+{{- $hash := printf "%s-%s" $projectId $projectNumber | sha256sum | trunc 6 }}
 apiVersion: storage.gcp.m.upbound.io/v1beta1
 kind: Bucket
 metadata:
@@ -11,9 +12,8 @@ metadata:
         app.kubernetes.io/component: gcp-resources
         app.kubernetes.io/managed-by: liferay-gcp-infrastructure
         app.kubernetes.io/name: overlay-bucket
-        deployment-name: {{ $deploymentName | quote }}
         project-id: {{ $projectId | quote }}
-    name: {{ printf "%s-%s-liferay-overlay" $deploymentName $projectId | quote }}
+    name: {{ printf "%s-%s-liferay-overlay" $projectId $hash | quote }}
 spec:
     forProvider:
         {{- with $bucket.encryption.kmsKeyName }}
@@ -22,7 +22,6 @@ spec:
         {{- end }}
         forceDestroy: {{ $bucket.forceDestroy }}
         labels:
-            deployment-name: {{ $deploymentName | quote }}
             project-id: {{ $projectId | quote }}
         location: {{ default .Values.region $bucket.region | required "overlay.bucket.region or region is required when overlay.bucket.enabled is true." | quote }}
         storageClass: {{ $bucket.storageClass | quote }}
