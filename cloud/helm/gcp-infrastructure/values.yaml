@@ -38,7 +38,7 @@ license:
 orphanOnDelete: false
 overlay:
     bucket:
-        enabled: true
+        enabled: false
         encryption:
             kmsKeyName: ""
         forceDestroy: false
