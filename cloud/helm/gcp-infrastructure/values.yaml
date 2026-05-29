@@ -45,6 +45,7 @@ overlay:
         region: ""
         storageClass: STANDARD
         versioning: true
+    enabled: false
     githubRepo: ""
 podMonitoring:
     instances:

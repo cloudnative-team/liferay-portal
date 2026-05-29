@@ -78,6 +78,10 @@ resource "kubernetes_manifest" "infrastructure_applicationset" {
 											value="false"
 										},
 										{
+											name="overlay.enabled"
+											value=tostring(var.overlay_bucket_enabled)
+										},
+										{
 											name="projectId"
 											value=var.infrastructure_git_repo_config.target.slugProjectId
 										},
@@ -548,7 +552,7 @@ resource "kubernetes_manifest" "resources_applicationset" {
 										},
 										{
 											name="overlay.bucket.enabled"
-											value="true"
+											value=tostring(var.overlay_bucket_enabled)
 										},
 										{
 											name="overlay.bucket.region"
