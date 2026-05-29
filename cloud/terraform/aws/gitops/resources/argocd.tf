@@ -70,6 +70,14 @@ resource "kubernetes_manifest" "infrastructure_applicationset" {
 											value=local.gateway_name
 										},
 										{
+											name="overlay.bucket.enabled"
+											value="false"
+										},
+										{
+											name="overlay.enabled"
+											value=tostring(var.overlay_bucket_enabled)
+										},
+										{
 											name="projectId"
 											value=var.infrastructure_git_repo_config.target.slugProjectId
 										},
@@ -494,6 +502,124 @@ resource "kubernetes_manifest" "liferay_appproject" {
 				"${local.liferay_helm_chart_config.chart_url}/*",
 				var.liferay_git_repo_url,
 			]
+		}
+	}
+}
+resource "kubernetes_manifest" "resources_applicationset" {
+	count=var.overlay_bucket_enabled ? 1 : 0
+	depends_on=[
+		kubernetes_manifest.git_repo_credentials_external_secret,
+		kubernetes_manifest.infrastructure_appproject,
+	]
+	field_manager {
+		force_conflicts=true
+		name=local.terraform_manager_name
+	}
+	manifest={
+		apiVersion="argoproj.io/v1alpha1"
+		kind="ApplicationSet"
+		metadata={
+			finalizers=["resources-finalizer.argocd.argoproj.io"]
+			labels=merge(
+				local.common_labels,
+				{
+					"app.kubernetes.io/name"="liferay-resources-applicationset"
+				})
+			name="liferay-resources-applicationset"
+			namespace=var.argocd_namespace
+		}
+		spec={
+			generators=[
+				{
+					git={
+						directories=[
+							{
+								path="liferay/projects/*"
+							},
+						]
+						repoURL=local.infrastructure_git_repo_url
+						revision=var.infrastructure_git_repo_config.revision
+					}
+				},
+			]
+			template={
+				metadata={
+					annotations={
+						"argocd.argoproj.io/compare-options"="IgnoreExtraneous"
+						"argocd.argoproj.io/sync-wave"="-40"
+					}
+					labels=merge(
+						local.common_labels,
+						{
+							"app.kubernetes.io/name"="liferay-{{path.basename}}-resources"
+						})
+					name="liferay-{{path.basename}}-resources"
+				}
+				spec={
+					destination={
+						namespace="liferay-{{path.basename}}-resources"
+						server="https://kubernetes.default.svc"
+					}
+					project=local.infrastructure_appproject_name
+					sources=[
+						merge(
+							{
+								helm={
+									ignoreMissingValueFiles=true
+									parameters=[
+										{
+											forceString=true
+											name="accountId"
+											value=local.account_id
+										},
+										{
+											name="enabled"
+											value="false"
+										},
+										{
+											name="overlay.bucket.enabled"
+											value=tostring(var.overlay_bucket_enabled)
+										},
+										{
+											name="overlay.bucket.region"
+											value=var.region
+										},
+										{
+											name="projectId"
+											value="{{path.basename}}"
+										},
+									]
+									valueFiles=[
+										"$values/liferay/projects/{{path.basename}}/base/${var.infrastructure_git_repo_config.source_paths.values_filename}",
+									]
+								}
+								repoURL=var.infrastructure_helm_chart_config.chart_url
+								targetRevision=var.infrastructure_helm_chart_version
+							},
+							var.infrastructure_helm_chart_config.path == null ? {
+								chart=var.infrastructure_helm_chart_config.chart_name
+							} : {
+								path=var.infrastructure_helm_chart_config.path
+							}
+						),
+						{
+							ref="values"
+							repoURL=local.infrastructure_git_repo_url
+							targetRevision=var.infrastructure_git_repo_config.revision
+						},
+					]
+					syncPolicy={
+						automated={
+							prune=true
+							selfHeal=true
+						}
+						syncOptions=[
+							"CreateNamespace=true",
+							"SkipDryRunOnMissingResource=true",
+						]
+					}
+				}
+			}
 		}
 	}
 }
