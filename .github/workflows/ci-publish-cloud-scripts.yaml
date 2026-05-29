@@ -53,7 +53,7 @@ jobs:
 
                         local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
 
-                        if [ "${GITHUB_REF_TYPE}" == "tag" ]
+                        if [[ "${GITHUB_REF_NAME}" == release/* ]]
                         then
                             bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
                         fi
@@ -139,7 +139,7 @@ jobs:
 
                         local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
 
-                        if [ "${GITHUB_REF_TYPE}" == "tag" ]
+                        if [[ "${GITHUB_REF_NAME}" == release/* ]]
                         then
                             bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
                         fi
@@ -180,8 +180,7 @@ on:
     push:
         branches:
             -   LCD-*
-        tags:
-            -   release/*
+            -   release/**
         paths:
             -   .github/workflows/ci-publish-cloud-scripts.yaml
             -   cloud/scripts/**
