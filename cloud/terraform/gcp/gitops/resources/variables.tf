@@ -175,6 +175,10 @@ variable "liferay_helm_chart_name" {
 variable "liferay_helm_chart_version" {
 	type=string
 }
+variable "overlay_bucket_enabled" {
+	default=true
+	type=bool
+}
 variable "project_id" {
 	type=string
 }

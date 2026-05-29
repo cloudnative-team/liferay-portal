@@ -26,6 +26,7 @@ spec:
     forceDestroy: {{ .Values.forceDestroy }}
     orphanOnDelete: {{ .Values.orphanOnDelete }}
     overlay:
+        enabled: {{ .Values.overlay.enabled }}
         githubRepo: {{ .Values.overlay.githubRepo | quote }}
     projectId: {{ .Values.projectId }}
     region: {{ .Values.region }}
