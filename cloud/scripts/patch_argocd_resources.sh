@@ -104,10 +104,10 @@ function _patch_appproject_source_repo {
 		--type=json
 }
 
-function _resolve_chart_version {
-	local chart_dir="${1}"
+function _verify_ghcr_tag {
+	local chart_name="${1}"
+	local tag="${2}"
 
-	local chart_name="liferay-${chart_dir}"
 	local repo="cloudnative-team/charts-pr/${PR_NUMBER}/${chart_name}"
 
 	local token
@@ -118,22 +118,48 @@ function _resolve_chart_version {
 		jq --raw-output .token
 	)
 
-	local latest_tag
+	local code
 
-	latest_tag=$(
-		curl --fail --silent --show-error \
+	code=$(
+		curl --silent \
+			--header "Accept: application/vnd.oci.image.manifest.v1+json" \
 			--header "Authorization: Bearer ${token}" \
-			"https://ghcr.io/v2/${repo}/tags/list" |
-		jq --raw-output --arg pr "${PR_NUMBER}" '.tags[]? | select(test("-pr-" + $pr + "-g[0-9a-f]+$"))' |
-		tail -n 1
+			--output /dev/null \
+			--request HEAD \
+			--write-out "%{http_code}" \
+			"https://ghcr.io/v2/${repo}/manifests/${tag}"
 	)
 
-	if [[ -z "${latest_tag}" ]]
+	if [[ "${code}" != "200" ]]
 	then
-		_die "No GHCR tags found for ${chart_name} under cloudnative-team/charts-pr/${PR_NUMBER}. Was the publish workflow run for PR ${PR_NUMBER}?"
+		_die "Tag ${tag} not found on GHCR for ${chart_name} (HTTP ${code}). The publish workflow may not have finished, or git rev-parse --short HEAD (${_SHORT_SHA}) may use a different abbrev length than the GHA used."
+	fi
+}
+
+function _resolve_chart_version {
+	local chart_dir="${1}"
+
+	local chart_yaml="${_SCRIPT_DIR}/../helm/${chart_dir}/Chart.yaml"
+
+	if [[ ! -f "${chart_yaml}" ]]
+	then
+		_die "Chart.yaml not found at ${chart_yaml}. Run this script from a liferay-portal checkout."
 	fi
 
-	echo "${latest_tag}"
+	local base_version
+
+	base_version=$(awk '/^version:[[:space:]]/ {gsub(/"|'\''/, "", $2); print $2; exit}' "${chart_yaml}")
+
+	if [[ -z "${base_version}" ]]
+	then
+		_die "Could not read .version from ${chart_yaml}."
+	fi
+
+	local tag="${base_version}-pr-${PR_NUMBER}-g${_SHORT_SHA}"
+
+	_verify_ghcr_tag "liferay-${chart_dir}" "${tag}"
+
+	echo "${tag}"
 }
 
 function main {
@@ -152,14 +178,18 @@ function main {
 		*) _die "Unsupported provider '${provider}'. Valid providers: aws, gcp." ;;
 	esac
 
-	for cmd in curl jq kubectl
+	for cmd in awk curl git jq kubectl
 	do
 		command -v "${cmd}" > /dev/null || _die "Required command '${cmd}' is not on PATH."
 	done
 
+	_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+	_SHORT_SHA=$(git -C "${_SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null) || _die "Could not resolve git HEAD SHA. Run this script from a liferay-portal checkout."
+
 	_parse_pr_url "${2}"
 
-	_log "Resolving PR cloudnative-team/liferay-portal#${PR_NUMBER} (provider: ${provider})"
+	_log "Resolving PR cloudnative-team/liferay-portal#${PR_NUMBER} (provider: ${provider}, HEAD g${_SHORT_SHA})"
 
 	local provider_infra_provider_version
 
