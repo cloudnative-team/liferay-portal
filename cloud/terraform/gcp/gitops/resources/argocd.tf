@@ -473,78 +473,110 @@ resource "kubernetes_manifest" "liferay_appproject" {
 		}
 	}
 }
-resource "kubernetes_manifest" "resources_application" {
+resource "kubernetes_manifest" "resources_applicationset" {
 	count=var.overlay_bucket_enabled ? 1 : 0
-	depends_on=[kubernetes_manifest.infrastructure_appproject]
+	depends_on=[
+		kubernetes_manifest.git_repo_credentials_external_secret,
+		kubernetes_manifest.infrastructure_appproject,
+	]
 	field_manager {
 		force_conflicts=true
 		name=local.terraform_manager_name
 	}
 	manifest={
 		apiVersion="argoproj.io/v1alpha1"
-		kind="Application"
+		kind="ApplicationSet"
 		metadata={
-			annotations={
-				"argocd.argoproj.io/compare-options"="IgnoreExtraneous"
-				"argocd.argoproj.io/sync-wave"="-40"
-			}
 			finalizers=["resources-finalizer.argocd.argoproj.io"]
 			labels=merge(
 				local.common_labels,
 				{
-					"app.kubernetes.io/name"="liferay-gcp-resources"
+					"app.kubernetes.io/name"="liferay-resources-applicationset"
 				})
-			name="liferay-gcp-resources"
+			name="liferay-resources-applicationset"
 			namespace=var.argocd_namespace
 		}
 		spec={
-			destination={
-				namespace=var.resources_namespace
-				server="https://kubernetes.default.svc"
-			}
-			project=local.infrastructure_appproject_name
-			sources=[
-				merge(
-					{
-						helm={
-							parameters=[
-								{
-									name="deploymentName"
-									value=var.deployment_name
-								},
-								{
-									name="enabled"
-									value="false"
-								},
-								{
-									name="overlay.bucket.enabled"
-									value="true"
-								},
-								{
-									name="overlay.bucket.region"
-									value=var.region
-								},
-							]
-						}
-						repoURL=var.infrastructure_helm_chart_config.chart_url
-						targetRevision=var.infrastructure_helm_chart_version
-					},
-					var.infrastructure_helm_chart_config.path == null ? {
-						chart=var.infrastructure_helm_chart_config.chart_name
-					} : {
-						path=var.infrastructure_helm_chart_config.path
+			generators=[
+				{
+					git={
+						directories=[
+							{
+								path="liferay/projects/*"
+							},
+						]
+						repoURL=local.infrastructure_git_repo_url
+						revision=var.infrastructure_git_repo_config.revision
 					}
-				),
+				},
 			]
-			syncPolicy={
-				automated={
-					prune=true
-					selfHeal=true
+			template={
+				metadata={
+					annotations={
+						"argocd.argoproj.io/compare-options"="IgnoreExtraneous"
+						"argocd.argoproj.io/sync-wave"="-40"
+					}
+					labels=merge(
+						local.common_labels,
+						{
+							"app.kubernetes.io/name"="liferay-{{path.basename}}-resources"
+						})
+					name="liferay-{{path.basename}}-resources"
 				}
-				syncOptions=[
-					"CreateNamespace=true",
-					"SkipDryRunOnMissingResource=true",
-				]
+				spec={
+					destination={
+						namespace="liferay-{{path.basename}}-resources"
+						server="https://kubernetes.default.svc"
+					}
+					project=local.infrastructure_appproject_name
+					sources=[
+						merge(
+							{
+								helm={
+									parameters=[
+										{
+											name="deploymentName"
+											value=var.deployment_name
+										},
+										{
+											name="enabled"
+											value="false"
+										},
+										{
+											name="overlay.bucket.enabled"
+											value="true"
+										},
+										{
+											name="overlay.bucket.region"
+											value=var.region
+										},
+										{
+											name="projectId"
+											value="{{path.basename}}"
+										},
+									]
+								}
+								repoURL=var.infrastructure_helm_chart_config.chart_url
+								targetRevision=var.infrastructure_helm_chart_version
+							},
+							var.infrastructure_helm_chart_config.path == null ? {
+								chart=var.infrastructure_helm_chart_config.chart_name
+							} : {
+								path=var.infrastructure_helm_chart_config.path
+							}
+						),
+					]
+					syncPolicy={
+						automated={
+							prune=true
+							selfHeal=true
+						}
+						syncOptions=[
+							"CreateNamespace=true",
+							"SkipDryRunOnMissingResource=true",
+						]
+					}
+				}
 			}
 		}
 	}

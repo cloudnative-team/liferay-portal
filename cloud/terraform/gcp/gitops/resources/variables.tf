@@ -185,7 +185,3 @@ variable "project_id" {
 variable "region" {
 	type=string
 }
-variable "resources_namespace" {
-	default="liferay-gcp-resources"
-	type=string
-}
