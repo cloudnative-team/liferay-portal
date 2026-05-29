@@ -478,6 +478,7 @@ resource "kubernetes_manifest" "liferay_appproject" {
 	}
 }
 resource "kubernetes_manifest" "resources_applicationset" {
+	count=var.overlay_bucket_enabled ? 1 : 0
 	depends_on=[
 		kubernetes_manifest.git_repo_credentials_external_secret,
 		kubernetes_manifest.infrastructure_appproject,

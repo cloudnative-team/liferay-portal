@@ -124,7 +124,7 @@ function _resolve_chart_version {
 		curl --fail --silent --show-error \
 			--header "Authorization: Bearer ${token}" \
 			"https://ghcr.io/v2/${repo}/tags/list" |
-		jq --raw-output ".tags[]? | select(test(\"-pr-${PR_NUMBER}-g[0-9a-f]+\$\"))" |
+		jq --raw-output --arg pr "${PR_NUMBER}" '.tags[]? | select(test("-pr-" + $pr + "-g[0-9a-f]+$"))' |
 		tail -n 1
 	)
 
