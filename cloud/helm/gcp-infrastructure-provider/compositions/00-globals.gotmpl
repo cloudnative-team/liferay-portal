@@ -49,4 +49,5 @@
 {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
 
 {{- $cmkKeyName := printf "projects/%s/locations/%s/keyRings/%s-keyring/cryptoKeys/%s-key" $env.projectId $region $baseName $baseName -}}
-{{- $overlayBucketName := printf "%s-%s-liferay-overlay" $env.deploymentName $xr.spec.projectId -}}
+{{- $overlayBucketHash := printf "%s-%s" $xr.spec.projectId $env.projectNumber | sha256sum | trunc 6 -}}
+{{- $overlayBucketName := printf "%s-%s-liferay-overlay" $xr.spec.projectId $overlayBucketHash -}}

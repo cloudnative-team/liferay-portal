@@ -58,10 +58,6 @@ resource "kubernetes_manifest" "infrastructure_applicationset" {
 								helm={
 									parameters=[
 										{
-											name="deploymentName"
-											value=var.deployment_name
-										},
-										{
 											name="environmentId"
 											value=var.infrastructure_git_repo_config.target.slugEnvironmentId
 										},
@@ -543,10 +539,6 @@ resource "kubernetes_manifest" "resources_applicationset" {
 									ignoreMissingValueFiles=true
 									parameters=[
 										{
-											name="deploymentName"
-											value=var.deployment_name
-										},
-										{
 											name="enabled"
 											value="false"
 										},
@@ -561,6 +553,11 @@ resource "kubernetes_manifest" "resources_applicationset" {
 										{
 											name="projectId"
 											value="{{path.basename}}"
+										},
+										{
+											forceString=true
+											name="projectNumber"
+											value=data.google_project.project.number
 										},
 									]
 									valueFiles=[

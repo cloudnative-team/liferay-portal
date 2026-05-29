@@ -21,7 +21,6 @@ spec:
         {{- $database := .Values.database -}}
         {{- $_ := set $database "rootPasswordSecretName" (printf "%s-db-root-password" .Release.Name) -}}
         {{- $database | toYaml | nindent 8 }}
-    deploymentName: {{ .Values.deploymentName | quote }}
     environmentId: {{ .Values.environmentId }}
     forceDestroy: {{ .Values.forceDestroy }}
     orphanOnDelete: {{ .Values.orphanOnDelete }}
