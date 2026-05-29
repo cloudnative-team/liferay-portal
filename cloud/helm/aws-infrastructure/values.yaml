@@ -1,3 +1,4 @@
+accountId: ""
 backup:
     enabled: false
     rules:
@@ -25,7 +26,16 @@ forceDestroy: false
 gateway: {}
 license: {}
 orphanOnDelete: false
-overlay: {}
+overlay:
+    bucket:
+        enabled: false
+        forceDestroy: false
+        lifecycle:
+            abortIncompleteMultipartUploadDays: 7
+            noncurrentVersionExpirationDays: 7
+        region: ""
+        versioning: true
+    enabled: false
 search:
     elasticsearch:
         annotations:

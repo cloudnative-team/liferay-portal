@@ -103,8 +103,9 @@ spec:
                                     type: boolean
                                 overlay:
                                     properties:
-                                        region:
-                                            type: string
+                                        enabled:
+                                            default: false
+                                            type: boolean
                                     type: object
                                 projectId:
                                     type: string

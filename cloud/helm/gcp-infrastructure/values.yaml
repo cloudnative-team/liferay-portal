@@ -36,9 +36,16 @@ license:
     targetSecretName: liferay-license
 orphanOnDelete: false
 overlay:
+    bucket:
+        enabled: false
+        encryption:
+            kmsKeyName: ""
+        forceDestroy: false
+        region: ""
+        storageClass: STANDARD
+        versioning: true
     enabled: false
     githubRepo: ""
-    region: ""
 podMonitoring:
     instances:
         envoy:
@@ -64,6 +71,7 @@ podMonitoring:
             port: 12345
     interval: 1m
 projectId: ""
+projectNumber: ""
 region: ""
 search:
     elasticsearch:
