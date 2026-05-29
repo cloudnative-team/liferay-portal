@@ -183,20 +183,16 @@ function main {
 	local provider_repo="${registry}/liferay-${provider}"
 
 	local appproject
-	local repo
 
 	for appproject in liferay-application liferay-infrastructure
 	do
-		for repo in \
+		_patch_appproject_source_repo "${appproject}" \
 			"${provider_infra_provider_repo}" \
 			"${provider_infra_provider_repo}/*" \
 			"${provider_infra_repo}" \
 			"${provider_infra_repo}/*" \
 			"${provider_repo}" \
 			"${provider_repo}/*"
-		do
-			_patch_appproject_source_repo "${appproject}" "${repo}"
-		done
 	done
 
 	_patch_application_source \
