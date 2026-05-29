@@ -16,6 +16,7 @@ jobs:
                 uses: actions/checkout@v4
                 with:
                     fetch-depth: 1
+                    fetch-tags: true
                     sparse-checkout: |
                         cloud/scripts
                         cloud/terraform/aws
@@ -53,7 +54,7 @@ jobs:
 
                         local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
 
-                        if [[ "${GITHUB_REF_NAME}" == release/* ]]
+                        if [[ "${GITHUB_REF_NAME}" == release/* ]] && git tag --points-at HEAD | grep --quiet "^release/"
                         then
                             bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
                         fi
@@ -102,6 +103,7 @@ jobs:
                 uses: actions/checkout@v4
                 with:
                     fetch-depth: 1
+                    fetch-tags: true
                     sparse-checkout: |
                         cloud/scripts
                         cloud/terraform/gcp
@@ -139,7 +141,7 @@ jobs:
 
                         local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
 
-                        if [[ "${GITHUB_REF_NAME}" == release/* ]]
+                        if [[ "${GITHUB_REF_NAME}" == release/* ]] && git tag --points-at HEAD | grep --quiet "^release/"
                         then
                             bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
                         fi
