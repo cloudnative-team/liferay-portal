@@ -90,8 +90,10 @@ jobs:
                     set -o pipefail
 
                     function main {
-                        local config_file="${DIST_DIR}/helm-oci-config.json"
-                        local tgz="${DIST_DIR}/${{inputs.chart_name}}-${CHART_VERSION}.tgz"
+                        local config_file="helm-oci-config.json"
+                        local tgz="${{inputs.chart_name}}-${CHART_VERSION}.tgz"
+
+                        cd "${DIST_DIR}"
 
                         printf '{"name":"%s","version":"%s"}' \
                             "${{inputs.chart_name}}" \
