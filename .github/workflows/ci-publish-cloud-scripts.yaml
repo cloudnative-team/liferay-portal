@@ -164,6 +164,8 @@ on:
     push:
         branches:
             -   LCD-*
+        tags:
+            -   release/*
         paths:
             -   .github/workflows/ci-publish-cloud-scripts.yaml
             -   cloud/scripts/**
