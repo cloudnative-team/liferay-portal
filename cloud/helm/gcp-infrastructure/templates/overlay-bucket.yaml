@@ -1,7 +1,7 @@
 {{- if .Values.overlay.bucket.enabled }}
+{{- $bucket := .Values.overlay.bucket }}
 {{- $deploymentName := required "deploymentName is required when overlay.bucket.enabled is true." .Values.deploymentName }}
 {{- $projectId := required "projectId is required when overlay.bucket.enabled is true." .Values.projectId }}
-{{- $bucket := .Values.overlay.bucket }}
 apiVersion: storage.gcp.m.upbound.io/v1beta1
 kind: Bucket
 metadata:

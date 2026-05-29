@@ -74,6 +74,10 @@ resource "kubernetes_manifest" "infrastructure_applicationset" {
 											value=local.gateway_name
 										},
 										{
+											name="overlay.bucket.enabled"
+											value="false"
+										},
+										{
 											name="projectId"
 											value=var.infrastructure_git_repo_config.target.slugProjectId
 										},
@@ -474,7 +478,6 @@ resource "kubernetes_manifest" "liferay_appproject" {
 	}
 }
 resource "kubernetes_manifest" "resources_applicationset" {
-	count=var.overlay_bucket_enabled ? 1 : 0
 	depends_on=[
 		kubernetes_manifest.git_repo_credentials_external_secret,
 		kubernetes_manifest.infrastructure_appproject,
@@ -533,6 +536,7 @@ resource "kubernetes_manifest" "resources_applicationset" {
 						merge(
 							{
 								helm={
+									ignoreMissingValueFiles=true
 									parameters=[
 										{
 											name="deploymentName"
@@ -543,10 +547,6 @@ resource "kubernetes_manifest" "resources_applicationset" {
 											value="false"
 										},
 										{
-											name="overlay.bucket.enabled"
-											value="true"
-										},
-										{
 											name="overlay.bucket.region"
 											value=var.region
 										},
@@ -554,6 +554,9 @@ resource "kubernetes_manifest" "resources_applicationset" {
 											name="projectId"
 											value="{{path.basename}}"
 										},
+									]
+									valueFiles=[
+										"$values/liferay/projects/{{path.basename}}/base/${var.infrastructure_git_repo_config.source_paths.values_filename}",
 									]
 								}
 								repoURL=var.infrastructure_helm_chart_config.chart_url
@@ -565,6 +568,11 @@ resource "kubernetes_manifest" "resources_applicationset" {
 								path=var.infrastructure_helm_chart_config.path
 							}
 						),
+						{
+							ref="values"
+							repoURL=local.infrastructure_git_repo_url
+							targetRevision=var.infrastructure_git_repo_config.revision
+						},
 					]
 					syncPolicy={
 						automated={
