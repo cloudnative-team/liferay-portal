@@ -547,6 +547,10 @@ resource "kubernetes_manifest" "resources_applicationset" {
 											value="false"
 										},
 										{
+											name="overlay.bucket.enabled"
+											value="true"
+										},
+										{
 											name="overlay.bucket.region"
 											value=var.region
 										},
