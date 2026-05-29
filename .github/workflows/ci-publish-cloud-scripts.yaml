@@ -7,7 +7,8 @@ defaults:
 jobs:
     publish-liferay-aws-bootstrap:
         env:
-            BOOTSTRAP_STORAGE_PATH: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+            BOOTSTRAP_STORAGE_PATH_NONPRD: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+            BOOTSTRAP_STORAGE_PATH_PRD: ${{vars.BOOTSTRAP_STORAGE_PATH_PRD}}
         if: github.repository == 'cloudnative-team/liferay-portal'
         runs-on: ubuntu-latest
         steps:
@@ -50,7 +51,14 @@ jobs:
 
                         echo "CURRENT_VERSION=${current_version}" >> ${GITHUB_ENV}
 
-                        local gcs_path="${BOOTSTRAP_STORAGE_PATH}/liferay-aws-bootstrap/liferay-aws-bootstrap-${current_version}.tar.gz"
+                        local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
+
+                        if [ "${GITHUB_REF_TYPE}" == "tag" ]
+                        then
+                            bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
+                        fi
+
+                        local gcs_path="${bootstrap_storage_path}/liferay-aws-bootstrap/liferay-aws-bootstrap-${current_version}.tar.gz"
 
                         echo "GCS_PATH=${gcs_path}" >> ${GITHUB_ENV}
                     }
@@ -85,7 +93,8 @@ jobs:
                     main "${@}"
     publish-liferay-gcp-bootstrap:
         env:
-            BOOTSTRAP_STORAGE_PATH: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+            BOOTSTRAP_STORAGE_PATH_NONPRD: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
+            BOOTSTRAP_STORAGE_PATH_PRD: ${{vars.BOOTSTRAP_STORAGE_PATH_PRD}}
         if: github.repository == 'cloudnative-team/liferay-portal'
         runs-on: ubuntu-latest
         steps:
@@ -128,7 +137,14 @@ jobs:
 
                         echo "CURRENT_VERSION=${current_version}" >> ${GITHUB_ENV}
 
-                        local gcs_path="${BOOTSTRAP_STORAGE_PATH}/liferay-gcp-bootstrap/liferay-gcp-bootstrap-${current_version}.tar.gz"
+                        local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
+
+                        if [ "${GITHUB_REF_TYPE}" == "tag" ]
+                        then
+                            bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
+                        fi
+
+                        local gcs_path="${bootstrap_storage_path}/liferay-gcp-bootstrap/liferay-gcp-bootstrap-${current_version}.tar.gz"
 
                         echo "GCS_PATH=${gcs_path}" >> ${GITHUB_ENV}
                     }
