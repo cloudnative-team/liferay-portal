@@ -26,7 +26,9 @@ jobs:
 
                         if [[ -n "${{inputs.path_prefix}}" ]]
                         then
-                            registry="${registry}/${{inputs.path_prefix}}"
+                            local path_prefix="${{inputs.path_prefix}}"
+
+                            registry="${registry}/${path_prefix,,}"
                         fi
 
                         local target_ref="${registry}/${{inputs.chart_name}}:${chart_version}${{inputs.version_suffix}}"
