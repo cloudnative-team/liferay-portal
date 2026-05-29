@@ -239,8 +239,8 @@ function main {
 		"${provider_infra_repo}" \
 		"${provider_infra_version}"
 
-	_patch_application_source \
-		"liferay-${provider}-resources" \
+	_patch_applicationset_source \
+		"liferay-resources-applicationset" \
 		0 \
 		"${provider_infra_repo}" \
 		"${provider_infra_version}"
