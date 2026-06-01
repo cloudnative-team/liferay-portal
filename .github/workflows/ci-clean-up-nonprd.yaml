@@ -46,7 +46,7 @@ jobs:
                         do
                             local image="${HELM_CHART_REGISTRY}/${EVENT_REF}/${chart}"
 
-                            echo "Deleting ${image}"
+                            echo "${image} will be deleted."
 
                             gcloud artifacts docker images delete \
                                 "${image}" \
@@ -64,29 +64,15 @@ jobs:
                     set -o pipefail
 
                     function main {
-                        local sanitized
+                        local event_ref_sanitized
 
-                        sanitized=$(echo "${EVENT_REF}" | sed 's|/|-|g')
+                        event_ref_sanitized=$(echo "${EVENT_REF}" | sed 's|/|-|g')
 
-                        if [[ "${EVENT_REF}" == release/* ]]
-                        then
-                            local path="${BOOTSTRAP_STORAGE_PATH}/${sanitized}/"
+                        local bootstrap_path="${BOOTSTRAP_STORAGE_PATH}/${event_ref_sanitized}/"
 
-                            echo "Deleting ${path} recursively"
+                        echo "${bootstrap_path} will be recursively deleted."
 
-                            gcloud storage rm --recursive "${path}" \
-                                || true
-                        else
-                            for provider in aws gcp
-                            do
-                                local pattern="${BOOTSTRAP_STORAGE_PATH}/liferay-${provider}-bootstrap/liferay-${provider}-bootstrap-*-${sanitized}-g*.tar.gz"
-
-                                echo "Deleting ${pattern}"
-
-                                gcloud storage rm "${pattern}" \
-                                    || true
-                            done
-                        fi
+                        gcloud storage rm --recursive "${bootstrap_path}" || true
                     }
 
                     main "${@}"
