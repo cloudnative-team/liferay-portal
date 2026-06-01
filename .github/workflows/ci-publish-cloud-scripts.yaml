@@ -8,7 +8,6 @@ jobs:
     publish-liferay-aws-bootstrap:
         env:
             BOOTSTRAP_STORAGE_PATH_NONPRD: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
-            BOOTSTRAP_STORAGE_PATH_PRD: ${{vars.BOOTSTRAP_STORAGE_PATH_PRD}}
         if: github.repository == 'cloudnative-team/liferay-portal'
         runs-on: ubuntu-latest
         steps:
@@ -54,11 +53,6 @@ jobs:
 
                         local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
 
-                        if [[ "${GITHUB_REF_NAME}" == release/* ]] && git tag --points-at HEAD | grep --quiet "^release/"
-                        then
-                            bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
-                        fi
-
                         local gcs_path="${bootstrap_storage_path}/liferay-aws-bootstrap/liferay-aws-bootstrap-${current_version}.tar.gz"
 
                         echo "GCS_PATH=${gcs_path}" >> ${GITHUB_ENV}
@@ -95,7 +89,6 @@ jobs:
     publish-liferay-gcp-bootstrap:
         env:
             BOOTSTRAP_STORAGE_PATH_NONPRD: ${{vars.BOOTSTRAP_STORAGE_PATH_NONPRD}}
-            BOOTSTRAP_STORAGE_PATH_PRD: ${{vars.BOOTSTRAP_STORAGE_PATH_PRD}}
         if: github.repository == 'cloudnative-team/liferay-portal'
         runs-on: ubuntu-latest
         steps:
@@ -141,11 +134,6 @@ jobs:
 
                         local bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_NONPRD}"
 
-                        if [[ "${GITHUB_REF_NAME}" == release/* ]] && git tag --points-at HEAD | grep --quiet "^release/"
-                        then
-                            bootstrap_storage_path="${BOOTSTRAP_STORAGE_PATH_PRD}"
-                        fi
-
                         local gcs_path="${bootstrap_storage_path}/liferay-gcp-bootstrap/liferay-gcp-bootstrap-${current_version}.tar.gz"
 
                         echo "GCS_PATH=${gcs_path}" >> ${GITHUB_ENV}
@@ -182,7 +170,6 @@ on:
     push:
         branches:
             -   LCD-*
-            -   release/**
         paths:
             -   .github/workflows/ci-publish-cloud-scripts.yaml
             -   cloud/scripts/**
