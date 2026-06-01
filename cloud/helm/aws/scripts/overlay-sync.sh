@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -o errexit
 set -o nounset
@@ -12,13 +12,13 @@ function main {
 		exit 1
 	fi
 
-	local bucket_name="${LIFERAY_OVERLAY_BUCKET_NAME:-${S3_BUCKET_ID:-}}"
+	local bucket_name="${LIFERAY_OVERLAY_BUCKET_NAME:-}"
 	local from_path="${2}"
 	local into_path="${3}"
 
 	if [ -z "${bucket_name}" ]
 	then
-		_log_json "No overlay bucket found (checked LIFERAY_OVERLAY_BUCKET_NAME and S3_BUCKET_ID). Skipping sync." "ERROR"
+		_log_json "LIFERAY_OVERLAY_BUCKET_NAME is not set. Skipping overlay sync." "ERROR"
 
 		exit 1
 	fi
@@ -49,7 +49,7 @@ function main {
 function _log_json {
 	local escaped_message
 
-	escaped_message=$(echo "${1}" | sed 's/"/\\"/g')
+	escaped_message=$(echo "${1}" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 	local script_name
 

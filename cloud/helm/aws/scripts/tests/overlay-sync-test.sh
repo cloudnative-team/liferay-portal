@@ -4,17 +4,17 @@ set -o errexit
 set -o nounset
 
 SCRIPT="$(cd "$(dirname "${0}")/.." && pwd)/overlay-sync.sh"
-pass=0
-fail=0
 
 function main {
+	local pass=0
+	local fail=0
+
 	aws() { echo "aws ${*}"; }
 
 	export -f aws
 
 	_run_test _test_exits_with_error_when_argument_count_is_wrong
 	_run_test _test_exits_with_error_when_no_bucket_env_var_is_set
-	_run_test _test_falls_back_to_s3_bucket_id_when_primary_is_unset
 	_run_test _test_passes_plain_path_to_aws_without_include
 	_run_test _test_splits_glob_pattern_into_path_and_include_filter
 	_run_test _test_strips_wildcard_and_passes_include_for_wildcard_path
@@ -52,17 +52,9 @@ function _test_exits_with_error_when_argument_count_is_wrong {
 function _test_exits_with_error_when_no_bucket_env_var_is_set {
 	local output
 
-	output=$(unset LIFERAY_OVERLAY_BUCKET_NAME S3_BUCKET_ID; bash "${SCRIPT}" s3 source/path dest/path 2>&1 || true)
+	output=$(unset LIFERAY_OVERLAY_BUCKET_NAME; bash "${SCRIPT}" s3 source/path dest/path 2>&1 || true)
 
-	[[ "${output}" == *"No overlay bucket found"* ]]
-}
-
-function _test_falls_back_to_s3_bucket_id_when_primary_is_unset {
-	local output
-
-	output=$(unset LIFERAY_OVERLAY_BUCKET_NAME; S3_BUCKET_ID="s3-fallback" bash "${SCRIPT}" s3 source/path dest/path 2>&1)
-
-	[[ "${output}" == *"s3://s3-fallback/source/path"* ]]
+	[[ "${output}" == *"LIFERAY_OVERLAY_BUCKET_NAME is not set"* ]]
 }
 
 function _test_passes_plain_path_to_aws_without_include {
@@ -105,4 +97,4 @@ function _test_uses_liferay_overlay_bucket_name_when_set {
 	[[ "${output}" == *"s3://test-bucket/source/path"* ]]
 }
 
-main "${@}"
+main
