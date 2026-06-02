@@ -17,6 +17,7 @@ jobs:
                 with:
                     fetch-depth: 1
                     filter: blob:none
+                    ref: ${{ github.head_ref }}
                     show-progress: false
             -   if: ${{env.IS_PR == 'true'}}
                 name: Modify version for pull request
@@ -34,7 +35,7 @@ jobs:
 
                         short_sha=$(git rev-parse --short HEAD)
 
-                        local new_version="${chart_version}-pr-${{inputs.pr_number}}-g${short_sha}"
+                        local new_version="${chart_version}-pr-${{inputs.pr_number}}-${short_sha}"
 
                         echo "Modifying chart version from ${chart_version} to ${new_version}."
 
