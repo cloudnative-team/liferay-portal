@@ -6,6 +6,8 @@ set -o pipefail
 
 _ARGOCD_NAMESPACE="argocd-system"
 
+_SHORT_SHA=$(git rev-parse --short=9 HEAD)
+
 function _die {
 	echo "ERROR: ${*}" >&2
 	exit 1
@@ -186,19 +188,6 @@ function main {
 	_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 	_parse_pr_url "${2}"
-
-	# ci-publish-cloud-helm-charts.yaml runs `git rev-parse --short HEAD` inside actions/checkout@v4,
-	# which checks out refs/pull/<n>/merge — so the tag SHA is the merge commit's, not the PR HEAD's.
-	# Pull the merge_commit_sha from the GitHub API to match. Override PATCH_ABBREV_LENGTH if the
-	# GHA's effective abbrev length ever changes (currently 9 for this repo).
-	local merge_sha
-	merge_sha=$(gh api "repos/cloudnative-team/liferay-portal/pulls/${PR_NUMBER}" --jq .merge_commit_sha 2>/dev/null) || _die "Could not resolve PR ${PR_NUMBER} merge_commit_sha via gh api."
-	if [[ -z "${merge_sha}" || "${merge_sha}" == "null" ]]
-	then
-		_die "PR ${PR_NUMBER} has no merge_commit_sha yet (GitHub may still be computing the test merge — retry in a moment)."
-	fi
-
-	_SHORT_SHA="${merge_sha:0:${PATCH_ABBREV_LENGTH:-9}}"
 
 	_log "Resolving PR cloudnative-team/liferay-portal#${PR_NUMBER} (provider: ${provider}, merge g${_SHORT_SHA})"
 
