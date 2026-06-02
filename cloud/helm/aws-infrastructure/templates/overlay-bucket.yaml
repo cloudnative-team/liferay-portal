@@ -1,199 +1,23 @@
 {{- if .Values.overlay.bucket.enabled }}
 {{- $bucket := .Values.overlay.bucket }}
 {{- $projectId := required "projectId is required when overlay.bucket.enabled is true." .Values.projectId }}
-{{- $accountId := required "accountId is required when overlay.bucket.enabled is true." .Values.accountId }}
-{{- $hash := printf "%s-%s" $projectId $accountId | sha256sum | trunc 6 }}
-{{- $bucketName := printf "%s-%s-liferay-overlay" $projectId $hash }}
 {{- $region := default .Values.region $bucket.region | required "overlay.bucket.region or region is required when overlay.bucket.enabled is true." }}
-apiVersion: s3.aws.m.upbound.io/v1beta1
-kind: Bucket
+apiVersion: aws.liferay.com/v1alpha1
+kind: LiferayOverlayBucket
 metadata:
     annotations:
         argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}
     labels:
-        app: liferay
         app.kubernetes.io/component: aws-resources
         app.kubernetes.io/managed-by: liferay-aws-infrastructure
         app.kubernetes.io/name: overlay-bucket
-        component: overlay
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}
+    name: {{ $projectId }}-overlay-bucket
 spec:
-    forProvider:
-        forceDestroy: {{ $bucket.forceDestroy }}
-        region: {{ $region | quote }}
-        tags:
-            Name: {{ $bucketName }}
-            ProjectId: {{ $projectId | quote }}
----
-apiVersion: s3.aws.m.upbound.io/v1beta1
-kind: BucketLifecycleConfiguration
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}
-    labels:
-        component: overlay-lifecycle
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}
-spec:
-    forProvider:
-        bucketSelector:
-            matchLabels:
-                app: liferay
-                component: overlay
-                project-id: {{ $projectId | quote }}
-        region: {{ $region | quote }}
-        rule:
-            -   abortIncompleteMultipartUpload:
-                    -   daysAfterInitiation: {{ $bucket.lifecycle.abortIncompleteMultipartUploadDays }}
-                expiration:
-                    -   expiredObjectDeleteMarker: true
-                id: bucket-scoped-rule
-                noncurrentVersionExpiration:
-                    -   noncurrentDays: {{ $bucket.lifecycle.noncurrentVersionExpirationDays }}
-                status: Enabled
----
-apiVersion: s3.aws.m.upbound.io/v1beta1
-kind: BucketPublicAccessBlock
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}-bucket-public-access-block
-    labels:
-        component: overlay-public-access-block
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}
-spec:
-    forProvider:
-        blockPublicAcls: true
-        blockPublicPolicy: true
-        bucketSelector:
-            matchLabels:
-                app: liferay
-                component: overlay
-                project-id: {{ $projectId | quote }}
-        ignorePublicAcls: true
-        region: {{ $region | quote }}
-        restrictPublicBuckets: true
----
-apiVersion: s3.aws.m.upbound.io/v1beta1
-kind: BucketVersioning
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}-bucket-versioning
-    labels:
-        component: overlay-versioning
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}
-spec:
-    forProvider:
-        bucketSelector:
-            matchLabels:
-                app: liferay
-                component: overlay
-                project-id: {{ $projectId | quote }}
-        region: {{ $region | quote }}
-        versioningConfiguration:
-            status: {{ ternary "Enabled" "Suspended" $bucket.versioning | quote }}
----
-apiVersion: iam.aws.m.upbound.io/v1beta1
-kind: Policy
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}-upload-only-policy
-    labels:
-        aws.liferay.com/username: {{ $bucketName }}-ci-uploader
-        component: overlay-upload-only-policy
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}-upload-only
-spec:
-    forProvider:
-        policy: |
-            {
-                "Statement": [
-                    {
-                        "Action": [
-                            "s3:ListBucket"
-                        ],
-                        "Effect": "Allow",
-                        "Resource": [
-                            "arn:aws:s3:::{{ $bucketName }}"
-                        ],
-                        "Sid": "AllowListBucket"
-                    },
-                    {
-                        "Action": [
-                            "s3:PutObject"
-                        ],
-                        "Effect": "Allow",
-                        "Resource": [
-                            "arn:aws:s3:::{{ $bucketName }}/*"
-                        ],
-                        "Sid": "AllowPutBucket"
-                    },
-                    {
-                        "Action": [
-                            "s3:DeleteObject",
-                            "s3:DeleteObjectVersion"
-                        ],
-                        "Effect": "Deny",
-                        "Resource": [
-                            "arn:aws:s3:::{{ $bucketName }}",
-                            "arn:aws:s3:::{{ $bucketName }}/*"
-                        ],
-                        "Sid": "DenyDeleteBucket"
-                    }
-                ],
-                "Version": "2012-10-17"
-            }
----
-apiVersion: iam.aws.m.upbound.io/v1beta1
-kind: User
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}-ci-uploader-user
-    labels:
-        aws.liferay.com/username: {{ $bucketName }}-ci-uploader
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}-ci-uploader
-spec:
-    forProvider: {}
----
-apiVersion: iam.aws.m.upbound.io/v1beta1
-kind: UserPolicyAttachment
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}-ci-uploader-user-policy-attachment
-    labels:
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}-ci-uploader
-spec:
-    forProvider:
-        policyArnSelector:
-            matchLabels:
-                aws.liferay.com/username: {{ $bucketName }}-ci-uploader
-        userSelector:
-            matchLabels:
-                aws.liferay.com/username: {{ $bucketName }}-ci-uploader
----
-apiVersion: iam.aws.m.upbound.io/v1beta1
-kind: AccessKey
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-30"
-        crossplane.io/external-name: {{ $bucketName }}-ci-uploader-access-key
-    labels:
-        project-id: {{ $projectId | quote }}
-    name: {{ $bucketName }}-ci-uploader
-spec:
-    forProvider:
-        userSelector:
-            matchLabels:
-                aws.liferay.com/username: {{ $bucketName }}-ci-uploader
+    forceDestroy: {{ $bucket.forceDestroy }}
+    lifecycle:
+        abortIncompleteMultipartUploadDays: {{ $bucket.lifecycle.abortIncompleteMultipartUploadDays }}
+        noncurrentVersionExpirationDays: {{ $bucket.lifecycle.noncurrentVersionExpirationDays }}
+    projectId: {{ $projectId | quote }}
+    region: {{ $region | quote }}
+    versioning: {{ default true $bucket.versioning }}
 {{- end }}

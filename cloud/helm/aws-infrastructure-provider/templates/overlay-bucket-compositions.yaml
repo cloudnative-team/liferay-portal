@@ -1,0 +1,236 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+    annotations:
+        argocd.argoproj.io/sync-wave: "-50"
+    name: liferay-overlay-bucket.aws.liferay.com
+spec:
+    compositeTypeRef:
+        apiVersion: aws.liferay.com/v1alpha1
+        kind: LiferayOverlayBucket
+    mode: Pipeline
+    pipeline:
+        -   functionRef:
+                name: function-go-templating
+            input:
+                apiVersion: template.fn.crossplane.io/v1beta1
+                inline:
+                    template: |
+                        {{`
+                        {{- $accountId := `}}{{ .Values.aws.accountId | quote }}{{` -}}
+
+                        {{- $xr := .observed.composite.resource -}}
+                        {{- $projectId := $xr.spec.projectId -}}
+                        {{- $region := $xr.spec.region -}}
+                        {{- $forceDestroy := $xr.spec.forceDestroy -}}
+                        {{- $versioning := $xr.spec.versioning -}}
+                        {{- $lifecycle := $xr.spec.lifecycle -}}
+                        {{- $namespace := $xr.metadata.namespace -}}
+
+                        {{- $bucketHash := printf "%s-%s" $projectId $accountId | sha256sum | trunc 6 -}}
+                        {{- $bucketName := printf "%s-%s-liferay-overlay" $projectId $bucketHash -}}
+                        ---
+                        apiVersion: s3.aws.m.upbound.io/v1beta1
+                        kind: Bucket
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket
+                            labels:
+                                app: liferay
+                                app.kubernetes.io/component: aws-resources
+                                app.kubernetes.io/managed-by: liferay-overlay-bucket
+                                app.kubernetes.io/name: overlay-bucket
+                                component: overlay
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                forceDestroy: {{ $forceDestroy }}
+                                region: {{ $region | quote }}
+                                tags:
+                                    Name: {{ $bucketName }}
+                                    ProjectId: {{ $projectId | quote }}
+                        ---
+                        apiVersion: s3.aws.m.upbound.io/v1beta1
+                        kind: BucketLifecycleConfiguration
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-lifecycle
+                            labels:
+                                component: overlay-lifecycle
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                bucketSelector:
+                                    matchLabels:
+                                        app: liferay
+                                        component: overlay
+                                        project-id: {{ $projectId | quote }}
+                                region: {{ $region | quote }}
+                                rule:
+                                    -   abortIncompleteMultipartUpload:
+                                            -   daysAfterInitiation: {{ $lifecycle.abortIncompleteMultipartUploadDays }}
+                                        expiration:
+                                            -   expiredObjectDeleteMarker: true
+                                        id: bucket-scoped-rule
+                                        noncurrentVersionExpiration:
+                                            -   noncurrentDays: {{ $lifecycle.noncurrentVersionExpirationDays }}
+                                        status: Enabled
+                        ---
+                        apiVersion: s3.aws.m.upbound.io/v1beta1
+                        kind: BucketPublicAccessBlock
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}-bucket-public-access-block
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-public-access-block
+                            labels:
+                                component: overlay-public-access-block
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                blockPublicAcls: true
+                                blockPublicPolicy: true
+                                bucketSelector:
+                                    matchLabels:
+                                        app: liferay
+                                        component: overlay
+                                        project-id: {{ $projectId | quote }}
+                                ignorePublicAcls: true
+                                region: {{ $region | quote }}
+                                restrictPublicBuckets: true
+                        ---
+                        apiVersion: s3.aws.m.upbound.io/v1beta1
+                        kind: BucketVersioning
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}-bucket-versioning
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-versioning
+                            labels:
+                                component: overlay-versioning
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                bucketSelector:
+                                    matchLabels:
+                                        app: liferay
+                                        component: overlay
+                                        project-id: {{ $projectId | quote }}
+                                region: {{ $region | quote }}
+                                versioningConfiguration:
+                                    status: {{ ternary "Enabled" "Suspended" $versioning | quote }}
+                        ---
+                        apiVersion: iam.aws.m.upbound.io/v1beta1
+                        kind: Policy
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}-upload-only-policy
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-upload-policy
+                            labels:
+                                aws.liferay.com/username: {{ $bucketName }}-ci-uploader
+                                component: overlay-upload-only-policy
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}-upload-only
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                policy: |
+                                    {
+                                        "Statement": [
+                                            {
+                                                "Action": [
+                                                    "s3:ListBucket"
+                                                ],
+                                                "Effect": "Allow",
+                                                "Resource": [
+                                                    "arn:aws:s3:::{{ $bucketName }}"
+                                                ],
+                                                "Sid": "AllowListBucket"
+                                            },
+                                            {
+                                                "Action": [
+                                                    "s3:PutObject"
+                                                ],
+                                                "Effect": "Allow",
+                                                "Resource": [
+                                                    "arn:aws:s3:::{{ $bucketName }}/*"
+                                                ],
+                                                "Sid": "AllowPutBucket"
+                                            },
+                                            {
+                                                "Action": [
+                                                    "s3:DeleteObject",
+                                                    "s3:DeleteObjectVersion"
+                                                ],
+                                                "Effect": "Deny",
+                                                "Resource": [
+                                                    "arn:aws:s3:::{{ $bucketName }}",
+                                                    "arn:aws:s3:::{{ $bucketName }}/*"
+                                                ],
+                                                "Sid": "DenyDeleteBucket"
+                                            }
+                                        ],
+                                        "Version": "2012-10-17"
+                                    }
+                        ---
+                        apiVersion: iam.aws.m.upbound.io/v1beta1
+                        kind: User
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}-ci-uploader-user
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-ci-uploader-user
+                            labels:
+                                aws.liferay.com/username: {{ $bucketName }}-ci-uploader
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}-ci-uploader
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider: {}
+                        ---
+                        apiVersion: iam.aws.m.upbound.io/v1beta1
+                        kind: UserPolicyAttachment
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}-ci-uploader-user-policy-attachment
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-ci-uploader-user-policy-attachment
+                            labels:
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}-ci-uploader
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                policyArnSelector:
+                                    matchLabels:
+                                        aws.liferay.com/username: {{ $bucketName }}-ci-uploader
+                                userSelector:
+                                    matchLabels:
+                                        aws.liferay.com/username: {{ $bucketName }}-ci-uploader
+                        ---
+                        apiVersion: iam.aws.m.upbound.io/v1beta1
+                        kind: AccessKey
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $bucketName }}-ci-uploader-access-key
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-ci-uploader-access-key
+                            labels:
+                                project-id: {{ $projectId | quote }}
+                            name: {{ $bucketName }}-ci-uploader
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                userSelector:
+                                    matchLabels:
+                                        aws.liferay.com/username: {{ $bucketName }}-ci-uploader
+                        `}}
+            step: render-overlay-bucket-resources
+        -   functionRef:
+                name: function-auto-ready
+            step: automatically-detect-ready-composed-resources
