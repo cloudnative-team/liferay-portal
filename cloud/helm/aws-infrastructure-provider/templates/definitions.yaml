@@ -101,11 +101,6 @@ spec:
                                     type: boolean
                                 orphanOnDelete:
                                     type: boolean
-                                overlay:
-                                    properties:
-                                        region:
-                                            type: string
-                                    type: object
                                 projectId:
                                     type: string
                                 region:
