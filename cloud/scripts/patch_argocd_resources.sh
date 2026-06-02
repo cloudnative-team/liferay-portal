@@ -180,7 +180,7 @@ function main {
 		*) _die "Unsupported provider '${provider}'. Valid providers: aws, gcp." ;;
 	esac
 
-	for cmd in awk curl gh jq kubectl
+	for cmd in awk curl git jq kubectl
 	do
 		command -v "${cmd}" > /dev/null || _die "Required command '${cmd}' is not on PATH."
 	done
