@@ -25,7 +25,8 @@ forceDestroy: false
 gateway: {}
 license: {}
 orphanOnDelete: false
-overlay: {}
+overlay:
+    enabled: false
 search:
     elasticsearch:
         annotations:
