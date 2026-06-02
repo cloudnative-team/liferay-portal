@@ -1,0 +1,321 @@
+concurrency:
+    cancel-in-progress: true
+    group: publish-cloud-production-artifacts-${{github.ref_name}}
+defaults:
+    run:
+        shell: bash
+jobs:
+    approve-release:
+        environment: production-release
+        needs: test-rcs
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Wait for manual approval
+                run: |
+                    echo "Approval to release received. All release candidates will be promoted."
+    promote-rc-aws:
+        needs:
+            -   approve-release
+            -   publish-rc-aws
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-aws
+            chart_version: ${{needs.publish-rc-aws.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-aws.outputs.image_ref}}
+    promote-rc-aws-infrastructure:
+        needs:
+            -   approve-release
+            -   publish-rc-aws-infrastructure
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-aws-infrastructure
+            chart_version: ${{needs.publish-rc-aws-infrastructure.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-aws-infrastructure.outputs.image_ref}}
+    promote-rc-aws-infrastructure-provider:
+        needs:
+            -   approve-release
+            -   publish-rc-aws-infrastructure-provider
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-aws-infrastructure-provider
+            chart_version: ${{needs.publish-rc-aws-infrastructure-provider.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-aws-infrastructure-provider.outputs.image_ref}}
+    promote-rc-bootstrap-aws:
+        needs:
+            -   approve-release
+            -   publish-rc-bootstrap-aws
+        uses: ./.github/workflows/ci-reusable-promote-bootstrap-tarball.yaml
+        with:
+            provider: aws
+            source_object_name: ${{needs.publish-rc-bootstrap-aws.outputs.object_name}}
+    promote-rc-bootstrap-gcp:
+        needs:
+            -   approve-release
+            -   publish-rc-bootstrap-gcp
+        uses: ./.github/workflows/ci-reusable-promote-bootstrap-tarball.yaml
+        with:
+            provider: gcp
+            source_object_name: ${{needs.publish-rc-bootstrap-gcp.outputs.object_name}}
+    promote-rc-default:
+        needs:
+            -   approve-release
+            -   publish-rc-default
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-default
+            chart_version: ${{needs.publish-rc-default.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-default.outputs.image_ref}}
+    promote-rc-gcp:
+        needs:
+            -   approve-release
+            -   publish-rc-gcp
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-gcp
+            chart_version: ${{needs.publish-rc-gcp.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-gcp.outputs.image_ref}}
+    promote-rc-gcp-infrastructure:
+        needs:
+            -   approve-release
+            -   publish-rc-gcp-infrastructure
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-gcp-infrastructure
+            chart_version: ${{needs.publish-rc-gcp-infrastructure.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-gcp-infrastructure.outputs.image_ref}}
+    promote-rc-gcp-infrastructure-provider:
+        needs:
+            -   approve-release
+            -   publish-rc-gcp-infrastructure-provider
+        uses: ./.github/workflows/ci-reusable-promote-helm-chart.yaml
+        with:
+            chart_name: liferay-gcp-infrastructure-provider
+            chart_version: ${{needs.publish-rc-gcp-infrastructure-provider.outputs.chart_version}}
+            source_image_ref: ${{needs.publish-rc-gcp-infrastructure-provider.outputs.image_ref}}
+    publish-aws-marketplace:
+        env:
+            ECR_REGISTRY: 709825985650.dkr.ecr.us-east-1.amazonaws.com
+        needs: approve-release
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    filter: blob:none
+                    show-progress: false
+            -   name: Configure AWS credentials
+                uses: aws-actions/configure-aws-credentials@v5.1.0
+                with:
+                    aws-region: us-east-1
+                    role-session-name: GitHubActions
+                    role-to-assume: arn:aws:iam::831926597587:role/GitHubActionsRole
+            -   name: Log in to ECR
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    aws ecr get-login-password --region us-east-1 \
+                        | helm registry login "${ECR_REGISTRY}" \
+                            --password-stdin \
+                            --username AWS
+            -   id: verify_version
+                name: Verify Helm chart version
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        CHART_VERSION=$(cat ./Chart.yaml | yq .version)
+
+                        echo "Verifying Helm chart version ${CHART_VERSION}."
+
+                        if ! helm show readme "oci://${ECR_REGISTRY}/liferay/liferay-aws-marketplace:${CHART_VERSION}" >/dev/null 2>&1
+                        then
+                            echo "Verified Helm Chart version ${CHART_VERSION}."
+
+                            echo "CHART_VERSION=${CHART_VERSION}" >> ${GITHUB_ENV}
+
+                            echo "should_publish=true" >> ${GITHUB_OUTPUT}
+                        else
+                            echo "Chart liferay-aws-marketplace@${CHART_VERSION} already exists."
+
+                            echo "liferay-aws-marketplace: \`${CHART_VERSION}\` already published." >> ${GITHUB_STEP_SUMMARY}
+                        fi
+                    }
+
+                    main "${@}"
+                working-directory: ./cloud/helm/aws-marketplace
+            -   if: ${{steps.verify_version.outputs.should_publish == 'true'}}
+                name: Package and push Helm chart
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local dist_dir="${{runner.temp}}/aws-marketplace/dist"
+
+                        rm --force --recursive "${dist_dir}"
+
+                        mkdir --parents "${dist_dir}"
+
+                        helm dependency update
+
+                        helm package . \
+                            --destination "${dist_dir}" \
+                            --version "${CHART_VERSION}"
+
+                        for file_name in "${dist_dir}"/*.tgz
+                        do
+                            echo "Pushing ${file_name}."
+
+                            helm push "${file_name}" "oci://${ECR_REGISTRY}/liferay"
+                        done
+                    }
+
+                    main "${@}"
+                working-directory: ./cloud/helm/aws-marketplace
+    publish-rc-aws:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-aws
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/aws
+    publish-rc-aws-infrastructure:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-aws-infrastructure
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/aws-infrastructure
+    publish-rc-aws-infrastructure-provider:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-aws-infrastructure-provider
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/aws-infrastructure-provider
+    publish-rc-bootstrap-aws:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-bootstrap-tarball.yaml
+        with:
+            provider: aws
+    publish-rc-bootstrap-gcp:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-bootstrap-tarball.yaml
+        with:
+            provider: gcp
+    publish-rc-default:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-default
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/default
+    publish-rc-gcp:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-gcp
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/gcp
+    publish-rc-gcp-infrastructure:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-gcp-infrastructure
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/gcp-infrastructure
+    publish-rc-gcp-infrastructure-provider:
+        needs: set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-gcp-infrastructure-provider
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/gcp-infrastructure-provider
+    set-up-variables:
+        if: github.repository == 'cloudnative-team/liferay-portal'
+        outputs:
+            image_tag_suffix: ${{steps.vars.outputs.image_tag_suffix}}
+        runs-on: ubuntu-latest
+        steps:
+            -   id: vars
+                name: Set up variables
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        echo "image_tag_suffix=-g${GITHUB_SHA::7}" >> ${GITHUB_OUTPUT}
+                    }
+
+                    main "${@}"
+    tag-release:
+        needs:
+            -   promote-rc-aws
+            -   promote-rc-aws-infrastructure
+            -   promote-rc-aws-infrastructure-provider
+            -   promote-rc-bootstrap-aws
+            -   promote-rc-bootstrap-gcp
+            -   promote-rc-default
+            -   promote-rc-gcp
+            -   promote-rc-gcp-infrastructure
+            -   promote-rc-gcp-infrastructure-provider
+        permissions:
+            contents: write
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 1
+                    filter: blob:none
+                    show-progress: false
+            -   name: Tag the release
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                        git config user.name "github-actions[bot]"
+
+                        local release_git_tag
+
+                        release_git_tag=$(echo "${GITHUB_REF_NAME}" | tr '/' '-')
+
+                        git tag --annotate "${release_git_tag}" --message "Release ${release_git_tag}"
+
+                        git push origin "${release_git_tag}"
+                    }
+
+                    main "${@}"
+    test-rcs:
+        needs:
+            -   publish-rc-aws
+            -   publish-rc-aws-infrastructure
+            -   publish-rc-aws-infrastructure-provider
+            -   publish-rc-bootstrap-aws
+            -   publish-rc-bootstrap-gcp
+            -   publish-rc-default
+            -   publish-rc-gcp
+            -   publish-rc-gcp-infrastructure
+            -   publish-rc-gcp-infrastructure-provider
+        runs-on: ubuntu-latest
+        steps:
+            -   name: RC validation tests
+                run: |
+                    echo "RC validation tests run here."
+on:
+    push:
+        branches:
+            -   release/**
+permissions:
+    contents: read
+    id-token: write
