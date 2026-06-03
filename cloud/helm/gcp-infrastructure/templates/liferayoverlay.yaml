@@ -9,7 +9,7 @@ metadata:
     namespace: {{ .Release.Namespace }}
 spec:
     commonTags:
-        project_id: {{ .Values.projectId }}
+        {{- merge (dict "project_id" .Values.projectId) (.Values.overlay.commonTags | default dict) | toYaml | nindent 8 }}
     forceDestroy: {{ .Values.overlay.forceDestroy }}
     orphanOnDelete: {{ .Values.overlay.orphanOnDelete }}
     projectId: {{ .Values.projectId }}
