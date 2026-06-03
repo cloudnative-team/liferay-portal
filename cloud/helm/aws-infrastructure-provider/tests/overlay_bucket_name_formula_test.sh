@@ -3,8 +3,8 @@
 # Guards against the per-project overlay bucket name formula drifting between
 # the places that compute it. The same formula is implemented three times:
 #
-#   - cloud/helm/aws/templates/_helpers.tpl
-#   - cloud/helm/aws-infrastructure-provider/.../compositions.yaml (2x)
+# - cloud/helm/aws/templates/_helpers.tpl
+# - cloud/helm/aws-infrastructure-provider/.../compositions.yaml (2x)
 #
 # The consumer chart derives the bucket name to mount, and the compositions
 # derive the name they provision / expose in the overlay-bucket-details secret.
@@ -27,8 +27,8 @@ _HASH="$(printf '%s-%s-%s' "${_ACCOUNT_ID}" "${_DEPLOYMENT_NAME}" "${_PROJECT_ID
 _GOLDEN="${_DEPLOYMENT_NAME}-overlay-${_PROJECT_ID:0:18}-${_HASH}"
 
 _SYNC_HINT="Keep the overlay bucket name formula identical in:
-  - ${_COMPOSITIONS} (LiferayOverlay and LiferayInfrastructure compositions)
-  - ${_HELPERS} (liferay-aws.overlayBucketName)"
+- ${_COMPOSITIONS} (LiferayOverlay and LiferayInfrastructure compositions)
+- ${_HELPERS} (liferay-aws.overlayBucketName)"
 
 _FAIL=0
 

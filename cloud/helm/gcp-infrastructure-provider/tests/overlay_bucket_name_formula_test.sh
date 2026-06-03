@@ -3,8 +3,8 @@
 # Guards against the per-project overlay bucket name formula drifting between
 # the places that compute it. The same formula is implemented twice:
 #
-#   - compositions/00-globals.gotmpl         (LiferayInfrastructure composition)
-#   - compositions-overlay/00-globals.gotmpl (LiferayOverlay composition)
+# - compositions/00-globals.gotmpl (LiferayInfrastructure composition)
+# - compositions-overlay/00-globals.gotmpl (LiferayOverlay composition)
 #
 # The LiferayOverlay composition provisions the bucket and the LiferayInfrastructure
 # composition exposes the name in the overlay-bucket-details secret. If they
@@ -28,8 +28,8 @@ _HASH="$(printf '%s-%s' "${_PROJECT_NUMBER}" "${_PROJECT_ID}" | sha256sum | cut 
 _GOLDEN="${_PROJECT_ID:0:18}-${_HASH}-overlay"
 
 _SYNC_HINT="Keep the overlay bucket name formula identical in:
-  - compositions/00-globals.gotmpl
-  - compositions-overlay/00-globals.gotmpl"
+- compositions/00-globals.gotmpl
+- compositions-overlay/00-globals.gotmpl"
 
 _FAIL=0
 
