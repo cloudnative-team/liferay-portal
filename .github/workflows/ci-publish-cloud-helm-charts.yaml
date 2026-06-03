@@ -346,7 +346,6 @@ jobs:
 on:
     pull_request:
         branches:
-            -   brianchandotcom-master
             -   master
         paths:
             -   .github/workflows/ci-publish-cloud-helm-charts.yaml
