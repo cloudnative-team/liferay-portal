@@ -17,7 +17,7 @@ resource "helm_release" "argocd" {
 							memory="768Mi"
 						}
 						requests={
-							cpu="15m"
+							cpu="500m"
 							memory="128Mi"
 						}
 					}
@@ -70,7 +70,7 @@ resource "helm_release" "argocd" {
 							memory="8Gi"
 						}
 						requests={
-							cpu="109m"
+							cpu="500m"
 							memory="1.5Gi"
 						}
 					}
@@ -81,7 +81,7 @@ resource "helm_release" "argocd" {
 							memory="768Mi"
 						}
 						requests={
-							cpu="15m"
+							cpu="500m"
 							memory="128Mi"
 						}
 					}
@@ -98,7 +98,7 @@ resource "helm_release" "argocd" {
 							memory="256Mi"
 						}
 						requests={
-							cpu="15m"
+							cpu="500m"
 							memory="128Mi"
 						}
 					}
@@ -109,7 +109,7 @@ resource "helm_release" "argocd" {
 							memory="256Mi"
 						}
 						requests={
-							cpu="15m"
+							cpu="500m"
 							memory="128Mi"
 						}
 					}
@@ -117,11 +117,11 @@ resource "helm_release" "argocd" {
 				repoServer={
 					resources={
 						limits={
-							memory="1.5Gi"
+							memory="4Gi"
 						}
 						requests={
-							cpu="15m"
-							memory="128Mi"
+							cpu="500m"
+							memory="1Gi"
 						}
 					}
 				}
@@ -139,7 +139,7 @@ resource "helm_release" "argocd" {
 							memory="768Mi"
 						}
 						requests={
-							cpu="15m"
+							cpu="500m"
 							memory="128Mi"
 						}
 					}

@@ -13,19 +13,21 @@ resource "helm_release" "crossplane" {
 				podSecurityContextRBACManager=local.default_crossplane_pod_security_context
 				resourcesCrossplane={
 					limits={
+						cpu="500m"
 						memory="2Gi"
 					}
 					requests={
-						cpu="63m"
+						cpu="500m"
 						memory="768Mi"
 					}
 				}
 				resourcesRBACManager={
 					limits={
+						cpu="500m"
 						memory="512Mi"
 					}
 					requests={
-						cpu="15m"
+						cpu="500m"
 						memory="256Mi"
 					}
 				}

@@ -141,7 +141,7 @@ resource "kubernetes_manifest" "function_auto_ready_runtime_config" {
 											memory="256Mi"
 										}
 										requests={
-											cpu="15m"
+											cpu="500m"
 											memory="128Mi"
 										}
 									}
@@ -204,7 +204,7 @@ resource "kubernetes_manifest" "function_go_templating_runtime_config" {
 											memory="512Mi"
 										}
 										requests={
-											cpu="15m"
+											cpu="500m"
 											memory="128Mi"
 										}
 									}
@@ -267,7 +267,7 @@ resource "kubernetes_manifest" "function_tag_manager_runtime_config" {
 											memory="256Mi"
 										}
 										requests={
-											cpu="15m"
+											cpu="500m"
 											memory="128Mi"
 										}
 									}

@@ -3,6 +3,18 @@ module "eks" {
 		amazon-cloudwatch-observability={
 			configuration_values=jsonencode(
 				{
+					agent={
+						resources={
+							limits={
+								cpu="500m"
+								memory="2Gi"
+							}
+							requests={
+								cpu="250m"
+								memory="128Mi"
+							}
+						}
+					},
 					containerLogs={
 						enabled=true
 					},
