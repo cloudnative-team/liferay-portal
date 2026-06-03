@@ -1652,7 +1652,6 @@ spec:
                                             {
                                                 "Action": [
                                                     "s3:ListBucket",
-                                                    "s3:PutObject"
                                                 ],
                                                 "Effect": "Allow",
                                                 "Resource": [
