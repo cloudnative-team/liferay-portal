@@ -8,6 +8,8 @@ _ARGOCD_NAMESPACE="argocd-system"
 
 _PR_NUMBER=""
 
+_PROVIDER=""
+
 _SHORT_SHA=$(git rev-parse --short=9 HEAD)
 
 function _die {
@@ -174,11 +176,11 @@ function main {
 		exit 1
 	fi
 
-	local provider="${1}"
+	_PROVIDER="${1}"
 
-	case "${provider}" in
+	case "${_PROVIDER}" in
 		aws|gcp) ;;
-		*) _die "Unsupported provider '${provider}'. Valid providers: aws, gcp." ;;
+		*) _die "Unsupported provider '${_PROVIDER}'. Valid providers: aws, gcp." ;;
 	esac
 
 	for cmd in awk curl git jq kubectl
@@ -190,32 +192,32 @@ function main {
 
 	_parse_pr_url "${2}"
 
-	_log "Resolving PR cloudnative-team/liferay-portal#${PR_NUMBER} (provider: ${provider}, sha: ${_SHORT_SHA})"
+	_log "Resolving PR cloudnative-team/liferay-portal#${_PR_NUMBER} (provider: ${_PROVIDER}, sha: ${_SHORT_SHA})"
 
 	local provider_infra_provider_version
 
-	provider_infra_provider_version=$(_resolve_chart_version "${provider}-infrastructure-provider")
+	provider_infra_provider_version=$(_resolve_chart_version "${_PROVIDER}-infrastructure-provider")
 
 	local provider_infra_version
 
-	provider_infra_version=$(_resolve_chart_version "${provider}-infrastructure")
+	provider_infra_version=$(_resolve_chart_version "${_PROVIDER}-infrastructure")
 
 	local provider_version
 
-	provider_version=$(_resolve_chart_version "${provider}")
+	provider_version=$(_resolve_chart_version "${_PROVIDER}")
 
-	_log "$(printf '%-40s: %s\n' "liferay-${provider}" "${provider_version}")"
-	_log "$(printf '%-40s: %s\n' "liferay-${provider}-infrastructure" "${provider_infra_version}")"
-	_log "$(printf '%-40s: %s\n' "liferay-${provider}-infrastructure-provider" "${provider_infra_provider_version}")"
+	_log "$(printf '%-40s: %s\n' "liferay-${_PROVIDER}" "${provider_version}")"
+	_log "$(printf '%-40s: %s\n' "liferay-${_PROVIDER}-infrastructure" "${provider_infra_version}")"
+	_log "$(printf '%-40s: %s\n' "liferay-${_PROVIDER}-infrastructure-provider" "${provider_infra_provider_version}")"
 
-
-	local provider_infra_repo="${registry}/liferay-${provider}-infrastructure"
-
-	local provider_infra_provider_repo="${registry}/liferay-${provider}-infrastructure-provider"
-
-	local provider_repo="${registry}/liferay-${provider}"
 
 	local registry="oci://ghcr.io/cloudnative-team/charts-pr/${_PR_NUMBER}"
+
+	local provider_infra_repo="${registry}/liferay-${_PROVIDER}-infrastructure"
+
+	local provider_infra_provider_repo="${registry}/liferay-${_PROVIDER}-infrastructure-provider"
+
+	local provider_repo="${registry}/liferay-${_PROVIDER}"
 
 	local appproject
 	local repo
