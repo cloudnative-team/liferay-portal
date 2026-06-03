@@ -1,5 +1,7 @@
 apiVersion: v1
 data:
+    overlay-sync.sh: |
+{{ .Files.Get "scripts/overlay-sync.sh" | nindent 8 }}
     wait-for-elasticsearch.sh: |
 {{ .Files.Get "scripts/wait-for-elasticsearch.sh" | nindent 8 }}
 kind: ConfigMap

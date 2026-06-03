@@ -377,20 +377,6 @@ resource "kubernetes_secret" "search_connection_details" {
 	}
 	type="Opaque"
 }
-resource "kubernetes_storage_class" "liferay_overlay_storage" {
-	allow_volume_expansion=false
-	depends_on=[
-		module.s3_bucket_liferay_overlay
-	]
-	metadata {
-		name=module.s3_bucket_liferay_overlay.s3_bucket_id
-	}
-	parameters={
-		"bucketName"=module.s3_bucket_liferay_overlay.s3_bucket_id
-	}
-	storage_provisioner="s3.csi.aws.com"
-	volume_binding_mode="WaitForFirstConsumer"
-}
 resource "null_resource" "opensearch_service_role" {
 	provisioner "local-exec" {
 		command=<<-EOT
