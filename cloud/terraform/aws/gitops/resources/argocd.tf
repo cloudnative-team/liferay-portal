@@ -561,10 +561,6 @@ resource "kubernetes_manifest" "resources_applicationset" {
 											value="false"
 										},
 										{
-											name="overlay.enabled"
-											value="true"
-										},
-										{
 											name="projectId"
 											value=var.infrastructure_git_repo_config.target.slugProjectId
 										},
