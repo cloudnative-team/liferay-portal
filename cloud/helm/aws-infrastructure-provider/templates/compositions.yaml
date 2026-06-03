@@ -1168,7 +1168,6 @@ spec:
                         {{- $uidHash := printf "%s-%s-%s" $accountId $deploymentName $projectIdFull | sha256sum | trunc 6 -}}
                         {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
 
-                        {{- /* Overlay bucket name (per-project). MUST match the LiferayOverlay composition's formula. */ -}}
                         {{- $overlayUidHash := printf "%s-%s-%s" $accountId $deploymentName $projectId | sha256sum | trunc 6 -}}
                         {{- $overlayBaseName := printf "%.18s-%s" $projectId $overlayUidHash -}}
                         {{- $overlayBucketName := printf "%s-overlay-%s" $deploymentName $overlayBaseName -}}
@@ -1568,8 +1567,8 @@ spec:
                         {{- $xr := .observed.composite.resource -}}
 
                         {{- $forceDestroy := $xr.spec.forceDestroy -}}
-                        {{- $projectId := $xr.spec.projectId -}}
                         {{- $overlayRegion := $xr.spec.region -}}
+                        {{- $projectId := $xr.spec.projectId -}}
 
                         {{- $managementPolicies := $xr.spec.orphanOnDelete | ternary (list "Create" "Observe" "Update") (list "*") | toJson -}}
                         {{- $namespace := $xr.metadata.namespace -}}
