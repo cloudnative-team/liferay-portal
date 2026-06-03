@@ -1,0 +1,17 @@
+suite: AWS infrastructure provider CompositeResourceDefinition
+templates:
+    -   definitions.yaml
+tests:
+    -   asserts:
+            -   isKind:
+                    of: CompositeResourceDefinition
+            -   equal:
+                    path: metadata.name
+                    value: liferayinfrastructures.aws.liferay.com
+            -   equal:
+                    path: spec.group
+                    value: aws.liferay.com
+            -   equal:
+                    path: spec.names.kind
+                    value: LiferayInfrastructure
+        it: defines the LiferayInfrastructure composite resource

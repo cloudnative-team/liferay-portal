@@ -1,0 +1,30 @@
+suite: LiferayInfrastructure AWS composite resource
+templates:
+    -   liferayinfrastructure.yaml
+tests:
+    -   asserts:
+            -   isKind:
+                    of: LiferayInfrastructure
+            -   equal:
+                    path: apiVersion
+                    value: aws.liferay.com/v1alpha1
+            -   equal:
+                    path: spec.region
+                    value: us-east-1
+            -   equal:
+                    path: spec.commonTags.EnvironmentId
+                    value: test-environment
+            -   equal:
+                    path: spec.commonTags.ProjectId
+                    value: test-project
+        it: renders a LiferayInfrastructure XR for the configured region
+        set:
+            environmentId: test-environment
+            projectId: test-project
+            region: us-east-1
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: renders nothing when the chart is disabled
+        set:
+            enabled: false

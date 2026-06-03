@@ -1,0 +1,20 @@
+suite: GCP infrastructure provider Composition
+templates:
+    -   compositions.yaml
+tests:
+    -   asserts:
+            -   isKind:
+                    of: Composition
+            -   equal:
+                    path: spec.compositeTypeRef.kind
+                    value: LiferayInfrastructure
+            -   equal:
+                    path: spec.mode
+                    value: Pipeline
+            -   equal:
+                    path: spec.pipeline[1].step
+                    value: go-templating
+            -   equal:
+                    path: spec.pipeline[1].functionRef.name
+                    value: function-go-templating
+        it: wires the Pipeline-mode Composition for LiferayInfrastructure

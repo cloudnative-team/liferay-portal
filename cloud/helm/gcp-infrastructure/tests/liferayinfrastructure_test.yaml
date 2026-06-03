@@ -1,0 +1,33 @@
+suite: LiferayInfrastructure GCP composite resource
+templates:
+    -   liferayinfrastructure.yaml
+tests:
+    -   asserts:
+            -   isKind:
+                    of: LiferayInfrastructure
+            -   equal:
+                    path: apiVersion
+                    value: gcp.liferay.com/v1alpha1
+            -   equal:
+                    path: spec.projectId
+                    value: test-project
+            -   equal:
+                    path: spec.region
+                    value: us-central1
+            -   equal:
+                    path: spec.commonTags.environment_id
+                    value: test-environment
+            -   equal:
+                    path: spec.commonTags.project_id
+                    value: test-project
+        it: renders a LiferayInfrastructure XR with the GCP project and region
+        set:
+            environmentId: test-environment
+            projectId: test-project
+            region: us-central1
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: renders nothing when the chart is disabled
+        set:
+            enabled: false
