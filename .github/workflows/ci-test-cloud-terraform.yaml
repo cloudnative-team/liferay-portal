@@ -4,6 +4,9 @@ defaults:
 jobs:
     test-cloud-terraform:
         if: ${{(github.event_name == 'pull_request' && github.repository == 'cloudnative-team/liferay-portal') || (github.event_name == 'push' && github.repository == 'liferay/liferay-portal')}}
+        permissions:
+            checks: write
+            contents: read
         runs-on: ubuntu-latest
         steps:
             -   name: Checkout code
@@ -11,39 +14,37 @@ jobs:
             -   name: Set up Terraform
                 uses: hashicorp/setup-terraform@v3
                 with:
-                    terraform_version: 1.10.0
+                    terraform_version: 1.11.4
+                    terraform_wrapper: false
             -   name: Set up TFLint
                 uses: terraform-linters/setup-tflint@v4
                 with:
                     github_token: ${{secrets.GITHUB_TOKEN}}
-            -   name: Initialize Terraform
-                run: terraform init -backend=false -input=false
-                working-directory: ./cloud/terraform/${{matrix.stack}}
-            -   name: Validate Terraform
-                run: terraform validate
-                working-directory: ./cloud/terraform/${{matrix.stack}}
-            -   name: Run TFLint
-                run: |
-                    function main {
-                        local cloud="${{matrix.stack}}"
-
-                        cloud="${cloud%%/*}"
-
-                        local config="${GITHUB_WORKSPACE}/cloud/terraform/${cloud}/.tflint.hcl"
-
-                        tflint --config="${config}" --init
-
-                        tflint --config="${config}"
-                    }
-
-                    main
-                working-directory: ./cloud/terraform/${{matrix.stack}}
-            -   name: Run Checkov
-                uses: bridgecrewio/checkov-action@v12
+            -   name: Set up Checkov
+                uses: actions/setup-python@v5
                 with:
-                    directory: ./cloud/terraform/${{matrix.stack}}
-                    framework: terraform
-                    soft_fail: false
+                    python-version: "3.12"
+            -   name: Install Checkov
+                run: pip install checkov
+            -   name: Compute stack id
+                env:
+                    STACK: ${{matrix.stack}}
+                run: echo "STACK_ID=${STACK//\//-}" >> "${GITHUB_ENV}"
+            -   name: Run Terraform tests
+                run: ./cloud/scripts/tests/run-terraform-tests.sh "${{matrix.stack}}" cloud/test-reports
+            -   name: Upload test reports
+                if: ${{!cancelled()}}
+                uses: actions/upload-artifact@v4
+                with:
+                    name: terraform-test-reports-${{env.STACK_ID}}
+                    path: cloud/test-reports/*.xml
+            -   name: Publish test report
+                if: ${{!cancelled()}}
+                uses: dorny/test-reporter@v2
+                with:
+                    name: Terraform tests (${{matrix.stack}})
+                    path: cloud/test-reports/*.xml
+                    reporter: java-junit
         strategy:
             fail-fast: false
             matrix:
@@ -61,10 +62,12 @@ on:
     pull_request:
         paths:
             -   .github/workflows/ci-test-cloud-terraform.yaml
+            -   cloud/scripts/tests/**
             -   cloud/terraform/**
     push:
         branches:
             -   master
         paths:
             -   .github/workflows/ci-test-cloud-terraform.yaml
+            -   cloud/scripts/tests/**
             -   cloud/terraform/**
