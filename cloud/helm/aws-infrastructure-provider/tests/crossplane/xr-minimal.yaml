@@ -1,0 +1,45 @@
+# A minimal LiferayInfrastructure composite resource exercising the AWS
+# Composition pipeline through "crossplane render". It sets the booleans that the
+# Composition templates branch on (backup, cmk, forceDestroy, orphanOnDelete,
+# search), since "crossplane render" does not apply the XRD's defaults to the
+# input XR.
+apiVersion: aws.liferay.com/v1alpha1
+kind: LiferayInfrastructure
+metadata:
+    name: liferay-test
+    namespace: liferay-test
+spec:
+    backup:
+        enabled: false
+        rules:
+            -   retentionDays: 30
+                ruleName: daily-backups
+                schedule: cron(0 5 * * ? *)
+                startWindow: 60
+    cmk:
+        enabled: false
+    database:
+        deletionProtection: true
+        engine: postgres
+        engineVersion: "16.11"
+        instanceClass: db.t3.medium
+        multiAz: false
+        storageGB: 20
+        username: liferay_database_admin
+    environmentId: test-environment
+    forceDestroy: false
+    orphanOnDelete: false
+    projectId: test-project
+    region: us-east-1
+    search:
+        elasticsearch:
+            enabled: false
+        opensearch:
+            enabled: true
+            engineVersion: OpenSearch_2.15
+            instanceCount: 2
+            instanceType: t3.small.search
+            username: liferay_search_admin
+            volumeSizeGB: 20
+    storage:
+        region: us-east-1

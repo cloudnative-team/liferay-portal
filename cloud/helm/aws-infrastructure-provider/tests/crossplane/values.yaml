@@ -1,0 +1,13 @@
+# Helm values used only by the Crossplane render test. The AWS Composition
+# templates inject environment-specific identifiers (account, VPC, subnets, OIDC
+# provider) at Helm render time, so they must be supplied with placeholder values
+# to produce a renderable Composition. privateSubnetIds is a JSON-encoded array
+# because the Composition parses it with fromJson.
+aws:
+    accountId: "123456789012"
+    nodesSecurityGroupId: sg-0123456789abcdef0
+    oidcProvider: oidc.eks.us-east-1.amazonaws.com/id/EXAMPLE0123456789ABCDEF
+    privateSubnetIds: '["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]'
+    vpcId: vpc-0123456789abcdef0
+deploymentName: liferay-test
+liferayServiceAccountRoleName: liferay-test-role

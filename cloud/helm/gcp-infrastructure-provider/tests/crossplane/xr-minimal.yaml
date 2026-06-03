@@ -1,0 +1,28 @@
+# A minimal LiferayInfrastructure composite resource exercising the GCP
+# Composition pipeline through "crossplane render". It sets the booleans that the
+# Composition templates branch on (backup, cmk, forceDestroy, orphanOnDelete),
+# since "crossplane render" does not apply the XRD's defaults to the input XR.
+apiVersion: gcp.liferay.com/v1alpha1
+kind: LiferayInfrastructure
+metadata:
+    name: liferay-test
+    namespace: liferay-test
+spec:
+    backup:
+        enabled: false
+    cmk:
+        enabled: false
+    database:
+        databaseVersion: POSTGRES_18
+        deletionProtection: true
+        instanceType: db-custom-1-3840
+        region: us-central1
+        storageGB: 20
+    environmentId: test-environment
+    forceDestroy: false
+    orphanOnDelete: false
+    projectId: test-project
+    region: us-central1
+    storage:
+        enableVersioning: true
+        region: us-central1

@@ -1,0 +1,23 @@
+# Composition Functions referenced by the LiferayInfrastructure Composition
+# pipeline. "crossplane render" pulls and runs these images with Docker. Keep the
+# versions in sync with cloud/terraform/aws/gitops/resources/crossplane.tf.
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+    name: function-go-templating
+spec:
+    package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.11.3
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+    name: function-tag-manager
+spec:
+    package: xpkg.upbound.io/crossplane-contrib/function-tag-manager:v0.6.0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+    name: function-auto-ready
+spec:
+    package: xpkg.upbound.io/upbound/function-auto-ready:v0.6.0
