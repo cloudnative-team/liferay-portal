@@ -1,0 +1,58 @@
+defaults:
+    run:
+        shell: bash
+jobs:
+    test-cloud-crossplane:
+        if: ${{github.repository == 'cloudnative-team/liferay-portal'}}
+        permissions:
+            checks: write
+            contents: read
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+            -   name: Install Helm
+                uses: azure/setup-helm@v4
+            -   name: Install Crossplane CLI
+                run: |
+                    curl -sL "https://releases.crossplane.io/stable/v2.2.0/bin/linux_amd64/crank" -o crossplane
+
+                    chmod +x crossplane
+
+                    sudo mv crossplane /usr/local/bin/crossplane
+            -   name: Run Crossplane tests
+                run: ./cloud/scripts/tests/run-crossplane-tests.sh "${{matrix.chart}}" cloud/test-reports
+            -   name: Upload test reports
+                if: ${{!cancelled()}}
+                uses: actions/upload-artifact@v4
+                with:
+                    name: crossplane-test-reports-${{matrix.chart}}
+                    path: cloud/test-reports/*.xml
+            -   name: Publish test report
+                if: ${{!cancelled()}}
+                uses: dorny/test-reporter@v2
+                with:
+                    name: Crossplane tests (${{matrix.chart}})
+                    path: cloud/test-reports/*.xml
+                    reporter: java-junit
+        strategy:
+            fail-fast: false
+            matrix:
+                chart:
+                    -   aws-infrastructure-provider
+                    -   gcp-infrastructure-provider
+on:
+    pull_request:
+        paths:
+            -   .github/workflows/ci-test-cloud-crossplane.yaml
+            -   cloud/helm/aws-infrastructure-provider/**
+            -   cloud/helm/gcp-infrastructure-provider/**
+            -   cloud/scripts/tests/**
+    push:
+        branches:
+            -   master
+        paths:
+            -   .github/workflows/ci-test-cloud-crossplane.yaml
+            -   cloud/helm/aws-infrastructure-provider/**
+            -   cloud/helm/gcp-infrastructure-provider/**
+            -   cloud/scripts/tests/**
