@@ -70,7 +70,7 @@ function _patch_applicationset_source {
 				\"value\":\"${repo_url}\"
 			},
 			{
-				\"op\": \"replace\", 
+				\"op\": \"replace\",
 				\"path\": \"/spec/template/spec/sources/${source_idx}/targetRevision\",
 				\"value\":\"${target_revision}\"
 			}
