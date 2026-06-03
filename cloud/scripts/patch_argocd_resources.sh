@@ -157,7 +157,7 @@ function _resolve_chart_version {
 		_die "Could not read .version from ${chart_yaml}."
 	fi
 
-	local tag="${base_version}-pr-${PR_NUMBER}-g${_SHORT_SHA}"
+	local tag="${base_version}-pr-${PR_NUMBER}-${_SHORT_SHA}"
 
 	_verify_ghcr_tag "liferay-${chart_dir}" "${tag}"
 
