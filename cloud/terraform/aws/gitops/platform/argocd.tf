@@ -17,7 +17,7 @@ resource "helm_release" "argocd" {
 							memory="768Mi"
 						}
 						requests={
-							cpu="500m"
+							cpu="100m"
 							memory="128Mi"
 						}
 					}
@@ -70,7 +70,7 @@ resource "helm_release" "argocd" {
 							memory="8Gi"
 						}
 						requests={
-							cpu="500m"
+							cpu="250m"
 							memory="1.5Gi"
 						}
 					}
@@ -81,7 +81,7 @@ resource "helm_release" "argocd" {
 							memory="768Mi"
 						}
 						requests={
-							cpu="500m"
+							cpu="250m"
 							memory="128Mi"
 						}
 					}
@@ -98,7 +98,7 @@ resource "helm_release" "argocd" {
 							memory="256Mi"
 						}
 						requests={
-							cpu="500m"
+							cpu="250m"
 							memory="128Mi"
 						}
 					}
@@ -109,7 +109,7 @@ resource "helm_release" "argocd" {
 							memory="256Mi"
 						}
 						requests={
-							cpu="500m"
+							cpu="250m"
 							memory="128Mi"
 						}
 					}
@@ -120,7 +120,7 @@ resource "helm_release" "argocd" {
 							memory="4Gi"
 						}
 						requests={
-							cpu="500m"
+							cpu="250m"
 							memory="1Gi"
 						}
 					}
@@ -139,7 +139,7 @@ resource "helm_release" "argocd" {
 							memory="768Mi"
 						}
 						requests={
-							cpu="500m"
+							cpu="250m"
 							memory="128Mi"
 						}
 					}

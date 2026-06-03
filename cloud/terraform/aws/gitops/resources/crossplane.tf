@@ -138,10 +138,11 @@ resource "kubernetes_manifest" "function_auto_ready_runtime_config" {
 									name="package-runtime"
 									resources={
 										limits={
+											cpu="500m"
 											memory="256Mi"
 										}
 										requests={
-											cpu="500m"
+											cpu="250m"
 											memory="128Mi"
 										}
 									}
@@ -201,10 +202,11 @@ resource "kubernetes_manifest" "function_go_templating_runtime_config" {
 									name="package-runtime"
 									resources={
 										limits={
+											cpu="500m"
 											memory="512Mi"
 										}
 										requests={
-											cpu="500m"
+											cpu="250m"
 											memory="128Mi"
 										}
 									}
@@ -264,10 +266,11 @@ resource "kubernetes_manifest" "function_tag_manager_runtime_config" {
 									name="package-runtime"
 									resources={
 										limits={
+											cpu="500m"
 											memory="256Mi"
 										}
 										requests={
-											cpu="500m"
+											cpu="250m"
 											memory="128Mi"
 										}
 									}

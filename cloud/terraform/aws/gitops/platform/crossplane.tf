@@ -17,7 +17,7 @@ resource "helm_release" "crossplane" {
 						memory="2Gi"
 					}
 					requests={
-						cpu="500m"
+						cpu="250m"
 						memory="768Mi"
 					}
 				}
@@ -27,7 +27,7 @@ resource "helm_release" "crossplane" {
 						memory="512Mi"
 					}
 					requests={
-						cpu="500m"
+						cpu="250m"
 						memory="256Mi"
 					}
 				}
