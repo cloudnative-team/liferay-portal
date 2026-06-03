@@ -8,7 +8,6 @@
 
 {{- $labels := merge ($xr.spec.commonTags | default dict) (dict "app" "liferay" "deployment-name" $env.deploymentName "project-id" $projectId) -}}
 
-{{- /* Overlay bucket name (per-project). MUST match compositions/00-globals.gotmpl. */ -}}
 {{- $overlayUidHash := printf "%s-%s" $env.projectNumber $projectId | sha256sum | trunc 6 -}}
 {{- $overlayBaseName := printf "%.18s-%s" $projectId $overlayUidHash -}}
 {{- $overlayBucketName := printf "%s-overlay" $overlayBaseName -}}
