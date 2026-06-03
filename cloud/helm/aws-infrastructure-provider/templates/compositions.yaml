@@ -1461,6 +1461,48 @@ spec:
                             managementPolicies: {{ $managementPolicies }}
                         {{- end }}
                         ---
+                        {{- /* Overlay bucket name (per-project). MUST match the LiferayOverlay composition's formula. */ -}}
+                        {{- $overlayUidHash := printf "%s-%s-%s" $accountId $deploymentName $projectId | sha256sum | trunc 6 -}}
+                        {{- $overlayBaseName := printf "%.18s-%s" $projectId $overlayUidHash -}}
+                        {{- $overlayBucketName := printf "%s-overlay-%s" $deploymentName $overlayBaseName -}}
+                        apiVersion: kubernetes.m.crossplane.io/v1alpha1
+                        kind: Object
+                        metadata:
+                            annotations:
+                                crossplane.io/external-name: {{ $baseName }}-overlay-bucket-details-secret
+                                gotemplating.fn.crossplane.io/composition-resource-name: overlay-bucket-details-secret
+                            labels:
+                                app: liferay
+                                component: overlay-bucket-details-secret
+                                environmentId: {{ $environmentId }}
+                                projectId: {{ $projectId }}
+                            name: {{ $baseName }}-overlay-bucket-details-secret
+                            namespace: {{ $namespace }}
+                        spec:
+                            forProvider:
+                                manifest:
+                                    apiVersion: v1
+                                    data:
+                                        LIFERAY_OVERLAY_BUCKET_NAME: {{ $overlayBucketName | b64enc | quote }}
+                                    kind: Secret
+                                    metadata:
+                                        labels:
+                                            app: liferay
+                                            component: overlay-bucket-details-secret
+                                            environmentId: {{ $environmentId }}
+                                            projectId: {{ $projectId }}
+                                        name: overlay-bucket-details
+                                        namespace: {{ $namespace }}
+                                        ownerReferences:
+                                            -   apiVersion: aws.liferay.com/v1alpha1
+                                                blockOwnerDeletion: true
+                                                controller: true
+                                                kind: LiferayInfrastructure
+                                                name: {{ .observed.composite.resource.metadata.name }}
+                                                uid: {{ .observed.composite.resource.metadata.uid }}
+                                    type: Opaque
+                            managementPolicies: {{ $managementPolicies }}
+                        ---
                         {{ $isDatabaseReady := false -}}
                         {{- if and $databaseAddress $databasePassword $databasePort -}}
                             {{- $isDatabaseReady = true -}}
