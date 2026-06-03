@@ -22,10 +22,10 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: spec.template.spec.initContainers[?(@.name=="liferay-overlay")].command[2]
-                    pattern: '"osgi/"'
+                    pattern: 'osgi/'
             -   matchRegex:
                     path: spec.template.spec.initContainers[?(@.name=="liferay-overlay")].command[2]
-                    pattern: '"osgi/configs/"'
+                    pattern: 'osgi/configs/'
         documentSelector:
             path: kind
             skipEmptyTemplates: true
