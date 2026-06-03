@@ -6,6 +6,8 @@ set -o pipefail
 
 _ARGOCD_NAMESPACE="argocd-system"
 
+_PR_NUMBER=""
+
 _SHORT_SHA=$(git rev-parse --short=9 HEAD)
 
 function _die {
@@ -25,28 +27,28 @@ function _parse_pr_url {
 		_die "Invalid PR URL: ${pr_url}. Expected: https://github.com/cloudnative-team/liferay-portal/pull/<number>"
 	fi
 
-	PR_NUMBER="${BASH_REMATCH[1]}"
+	_PR_NUMBER="${BASH_REMATCH[1]}"
 }
 
 function _patch_application_source {
 	local application="${1}"
-	local source_idx="${2}"
+	local idx="${2}"
 	local repo_url="${3}"
 	local target_revision="${4}"
 
-	_log "application/${application}: sources[${source_idx}] -> ${repo_url}@${target_revision}"
+	_log "application/${application}: sources[${idx}] -> ${repo_url}@${target_revision}"
 
 	kubectl patch application "${application}" \
 		--namespace "${_ARGOCD_NAMESPACE}" \
 		--patch="[
 			{
 				\"op\": \"replace\",
-				\"path\":\"/spec/sources/${source_idx}/repoURL\",
+				\"path\":\"/spec/sources/${idx}/repoURL\",
 				\"value\":\"${repo_url}\"
 			},
 			{
 				\"op\": \"replace\",
-				\"path\": \"/spec/sources/${source_idx}/targetRevision\",
+				\"path\": \"/spec/sources/${idx}/targetRevision\",
 				\"value\":\"${target_revision}\"
 			}
 		]" \
@@ -55,23 +57,23 @@ function _patch_application_source {
 
 function _patch_applicationset_source {
 	local applicationset="${1}"
-	local source_idx="${2}"
+	local idx="${2}"
 	local repo_url="${3}"
 	local target_revision="${4}"
 
-	_log "applicationset/${applicationset}: template.spec.sources[${source_idx}] -> ${repo_url}@${target_revision}"
+	_log "applicationset/${applicationset}: template.spec.sources[${idx}] -> ${repo_url}@${target_revision}"
 
 	kubectl patch applicationset "${applicationset}" \
 		--namespace "${_ARGOCD_NAMESPACE}" \
 		--patch="[
 			{
 				\"op\": \"replace\",
-				\"path\": \"/spec/template/spec/sources/${source_idx}/repoURL\",
+				\"path\": \"/spec/template/spec/sources/${idx}/repoURL\",
 				\"value\":\"${repo_url}\"
 			},
 			{
 				\"op\": \"replace\",
-				\"path\": \"/spec/template/spec/sources/${source_idx}/targetRevision\",
+				\"path\": \"/spec/template/spec/sources/${idx}/targetRevision\",
 				\"value\":\"${target_revision}\"
 			}
 		]" \
@@ -106,11 +108,36 @@ function _patch_appproject_source_repo {
 		--type=json
 }
 
+function _resolve_chart_version {
+	local chart_dir="${1}"
+
+	local chart_yaml="${_SCRIPT_DIR}/../helm/${chart_dir}/Chart.yaml"
+
+	if [[ ! -f "${chart_yaml}" ]]
+	then
+		_die "Chart.yaml not found at ${chart_yaml}."
+	fi
+
+	local base_version
+
+	base_version=$(awk '/^version:[[:space:]]/ {gsub(/"|'\''/, "", $2); print $2; exit}' "${chart_yaml}")
+
+	if [[ -z "${base_version}" ]]
+	then
+		_die "Could not read .version from ${chart_yaml}."
+	fi
+
+	local tag="${base_version}-pr-${_PR_NUMBER}-${_SHORT_SHA}"
+
+	_verify_ghcr_tag "liferay-${chart_dir}" "${tag}"
+
+	echo "${tag}"
+}
+
 function _verify_ghcr_tag {
 	local chart_name="${1}"
+	local repo="cloudnative-team/charts-pr/${_PR_NUMBER}/${chart_name}"
 	local tag="${2}"
-
-	local repo="cloudnative-team/charts-pr/${PR_NUMBER}/${chart_name}"
 
 	local token
 
@@ -134,34 +161,8 @@ function _verify_ghcr_tag {
 
 	if [[ "${code}" != "200" ]]
 	then
-		_die "Tag ${tag} not found on GHCR for ${chart_name} (HTTP ${code}). The publish workflow may not have finished, or git rev-parse --short HEAD (${_SHORT_SHA}) may use a different abbrev length than the GHA used."
+		_die "Tag ${tag} not found on GHCR for ${chart_name} (HTTP ${code})."
 	fi
-}
-
-function _resolve_chart_version {
-	local chart_dir="${1}"
-
-	local chart_yaml="${_SCRIPT_DIR}/../helm/${chart_dir}/Chart.yaml"
-
-	if [[ ! -f "${chart_yaml}" ]]
-	then
-		_die "Chart.yaml not found at ${chart_yaml}. Run this script from a liferay-portal checkout."
-	fi
-
-	local base_version
-
-	base_version=$(awk '/^version:[[:space:]]/ {gsub(/"|'\''/, "", $2); print $2; exit}' "${chart_yaml}")
-
-	if [[ -z "${base_version}" ]]
-	then
-		_die "Could not read .version from ${chart_yaml}."
-	fi
-
-	local tag="${base_version}-pr-${PR_NUMBER}-${_SHORT_SHA}"
-
-	_verify_ghcr_tag "liferay-${chart_dir}" "${tag}"
-
-	echo "${tag}"
 }
 
 function main {
@@ -207,10 +208,14 @@ function main {
 	_log "$(printf '%-40s: %s\n' "liferay-${provider}-infrastructure" "${provider_infra_version}")"
 	_log "$(printf '%-40s: %s\n' "liferay-${provider}-infrastructure-provider" "${provider_infra_provider_version}")"
 
-	local registry="oci://ghcr.io/cloudnative-team/charts-pr/${PR_NUMBER}"
+
 	local provider_infra_repo="${registry}/liferay-${provider}-infrastructure"
+
 	local provider_infra_provider_repo="${registry}/liferay-${provider}-infrastructure-provider"
+
 	local provider_repo="${registry}/liferay-${provider}"
+
+	local registry="oci://ghcr.io/cloudnative-team/charts-pr/${_PR_NUMBER}"
 
 	local appproject
 	local repo
