@@ -48,4 +48,9 @@
 
 {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
 
+{{- /* Overlay bucket name (per-project). MUST match compositions-overlay/00-globals.gotmpl. */ -}}
+{{- $overlayUidHash := printf "%s-%s" $env.projectNumber $projectId | sha256sum | trunc 6 -}}
+{{- $overlayBaseName := printf "%.18s-%s" $projectId $overlayUidHash -}}
+{{- $overlayBucketName := printf "%s-overlay" $overlayBaseName -}}
+
 {{- $cmkKeyName := printf "projects/%s/locations/%s/keyRings/%s-keyring/cryptoKeys/%s-key" $env.projectId $region $baseName $baseName -}}
