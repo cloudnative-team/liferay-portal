@@ -235,6 +235,8 @@ liferay-default:
                             except:
                                 -   169.254.169.254/32
     overlay:
+        copy: []
+        enabled: false
         type: s3
     podSecurityContext:
         fsGroup: 1000
