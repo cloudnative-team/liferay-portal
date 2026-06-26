@@ -1,0 +1,87 @@
+{
+  "base_commit": "fd94e525ef67f0c5aa2673af515aec092fb00054",
+  "bootstraps": {
+    "aws": {
+      "sha256": "46c1dfdf310c674ced6c85fa0db1f11665791824141c1e49eedda730f5dbd908",
+      "version": "1.1.0"
+    },
+    "gcp": {
+      "sha256": "fe6050181758f2c53ed575347a6ff29e6eaf3703c142c1bf7375877e8b50e116",
+      "version": "1.1.0"
+    }
+  },
+  "charts": {
+    "liferay-aws": {
+      "digest": "sha256:d8fadbf2c1f94fe273ef086c3fd1df48f23703a8d76b0019fd61ed1407d3f9c1",
+      "version": "1.0.0"
+    },
+    "liferay-aws-infrastructure": {
+      "digest": "sha256:693d7e1d76e47a53ca2f389da4052aa0c020cd670357407dd8783639b865adf9",
+      "version": "1.0.0"
+    },
+    "liferay-aws-infrastructure-provider": {
+      "digest": "sha256:46d76f733e439b06df5902d0a8331fa3480b39766356452736b932f20526f9bb",
+      "version": "1.0.0"
+    },
+    "liferay-default": {
+      "digest": "sha256:8aba8687227a646df893fe74ce5090472b3477745ed632e4a8acbcb5b4ff142b",
+      "version": "1.0.0"
+    },
+    "liferay-gcp": {
+      "digest": "sha256:16062ae005a710717fb21495c505f856999b97d4c085cfa5665b08c78df354df",
+      "version": "1.0.0"
+    },
+    "liferay-gcp-infrastructure": {
+      "digest": "sha256:37118a9c418dd3141a8cf28d9019d2cf8ea4683924273f8b82ad651516931991",
+      "version": "1.0.0"
+    },
+    "liferay-gcp-infrastructure-provider": {
+      "digest": "sha256:b7221b1ea377447fb515cbb0b0d560c0e423691eebbb48b0593fb2e042a7d62c",
+      "version": "1.0.0"
+    }
+  },
+  "included_lcd_tickets": [
+    "LCD-51368",
+    "LCD-51369",
+    "LCD-51370",
+    "LCD-51373",
+    "LCD-51756",
+    "LCD-51884",
+    "LCD-51901",
+    "LCD-51902",
+    "LCD-51971",
+    "LCD-51972",
+    "LCD-51987",
+    "LCD-51991",
+    "LCD-51992",
+    "LCD-51993",
+    "LCD-52005",
+    "LCD-52006",
+    "LCD-52007",
+    "LCD-52008",
+    "LCD-52009",
+    "LCD-52015",
+    "LCD-52016",
+    "LCD-52018",
+    "LCD-52019",
+    "LCD-52020",
+    "LCD-52036",
+    "LCD-52115",
+    "LCD-52135",
+    "LCD-52136",
+    "LCD-52161",
+    "LCD-52164",
+    "LCD-52207",
+    "LCD-52208",
+    "LCD-52209",
+    "LCD-52210",
+    "LCD-52251",
+    "LCD-52254",
+    "LCD-52259",
+    "LCD-52267",
+    "LCD-52285"
+  ],
+  "release_id": "release-2026-06-26T15-54-16Z",
+  "release_ticket": "LCD-52251",
+  "source_branch": "release/LCD-52251"
+}
