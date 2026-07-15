@@ -18,6 +18,19 @@ resource "azurerm_network_security_group" "main" {
 	resource_group_name=local.resource_group_name
 	tags=local.tags
 }
+resource "azurerm_network_security_rule" "envoy_ingress" {
+	access="Allow"
+	destination_address_prefix="*"
+	destination_port_ranges=["10080", "10443"]
+	direction="Inbound"
+	name="${var.deployment_name}-allow-envoy-ingress"
+	network_security_group_name=azurerm_network_security_group.main.name
+	priority=1000
+	protocol="Tcp"
+	resource_group_name=local.resource_group_name
+	source_address_prefix=var.vpc_cidr
+	source_port_range="*"
+}
 resource "azurerm_public_ip" "nat" {
 	allocation_method="Static"
 	location=var.region
