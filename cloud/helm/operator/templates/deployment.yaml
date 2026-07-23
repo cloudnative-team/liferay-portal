@@ -22,7 +22,7 @@ spec:
             containers:
                 -   env:
                         -   name: HEARTBEAT_INTERVAL
-                            value: {{ printf ":%d" (int .Values.heartbeatInterval) | quote }}
+                            value: {{ .Values.heartbeatInterval | quote }}
                         -   name: METRICS_ADDRESS
                             value: {{ printf ":%d" (int .Values.metrics.port) | quote }}
                         -   name: PROBE_ADDRESS
