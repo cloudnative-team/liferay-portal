@@ -1,3 +1,7 @@
+// +kubebuilder:rbac:groups=licensing.liferay.com,resources=liferayenvironments,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=licensing.liferay.com,resources=liferayenvironments/finalizers,verbs=update
+// +kubebuilder:rbac:groups=licensing.liferay.com,resources=liferayenvironments/status,verbs=get;update;patch
+
 package licensing
 
 import (
@@ -19,9 +23,6 @@ type LiferayEnvironmentReconciler struct {
 	HeartbeatInterval time.Duration
 }
 
-// +kubebuilder:rbac:groups=licensing.liferay.com,resources=liferayenvironments,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=licensing.liferay.com,resources=liferayenvironments/finalizers,verbs=update
-// +kubebuilder:rbac:groups=licensing.liferay.com,resources=liferayenvironments/status,verbs=get;update;patch
 func (r *LiferayEnvironmentReconciler) Reconcile(
 	ctx context.Context,
 	req ctrl.Request,

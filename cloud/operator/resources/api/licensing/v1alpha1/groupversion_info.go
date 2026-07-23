@@ -1,5 +1,6 @@
-// +kubebuilder:object:generate=true
 // +groupName=licensing.liferay.com
+// +kubebuilder:object:generate=true
+
 package v1alpha1
 
 import (

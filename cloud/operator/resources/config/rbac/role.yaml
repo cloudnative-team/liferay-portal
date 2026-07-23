@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+    name: manager-role
+rules:
+-   apiGroups:
+    -   licensing.liferay.com
+    resources:
+    -   liferayenvironments
+    verbs:
+    -   get
+    -   list
+    -   patch
+    -   update
+    -   watch
+-   apiGroups:
+    -   licensing.liferay.com
+    resources:
+    -   liferayenvironments/finalizers
+    verbs:
+    -   update
+-   apiGroups:
+    -   licensing.liferay.com
+    resources:
+    -   liferayenvironments/status
+    verbs:
+    -   get
+    -   patch
+    -   update
