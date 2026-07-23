@@ -40,10 +40,10 @@ func (r *LiferayEnvironmentReconciler) Reconcile(
 	meta.SetStatusCondition(
 		&lenv.Status.Conditions,
 		metav1.Condition{
-			Type:    "Ready",
-			Status:  metav1.ConditionFalse,
-			Reason:  "NotImplemented",
 			Message: "Reconcile is not implemented.",
+			Reason:  "NotImplemented",
+			Status:  metav1.ConditionFalse,
+			Type:    "Ready",
 		},
 	)
 
