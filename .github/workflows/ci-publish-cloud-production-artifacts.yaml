@@ -78,6 +78,15 @@ jobs:
         with:
             chart_name: liferay-default
             working_directory: ./cloud/helm/default
+    check-dxp-operator:
+        needs:
+            -   test-cloud-helm-chart
+            -   test-cloud-helm-chart-smoke
+            -   test-cloud-terraform
+        uses: ./.github/workflows/ci-reusable-check-helm-chart-version.yaml
+        with:
+            chart_name: liferay-dxp-operator
+            working_directory: ./cloud/helm/dxp-operator
     check-gcp:
         needs:
             -   test-cloud-helm-chart
@@ -356,6 +365,16 @@ jobs:
             chart_name: liferay-default
             image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
             working_directory: ./cloud/helm/default
+    push-rc-dxp-operator:
+        if: ${{needs.check-dxp-operator.outputs.should_release == 'true'}}
+        needs:
+            -   check-dxp-operator
+            -   set-up-variables
+        uses: ./.github/workflows/ci-reusable-push-helm-chart.yaml
+        with:
+            chart_name: liferay-dxp-operator
+            image_tag_suffix: ${{needs.set-up-variables.outputs.image_tag_suffix}}
+            working_directory: ./cloud/helm/dxp-operator
     push-rc-gcp:
         if: ${{needs.check-gcp.outputs.should_release == 'true'}}
         needs:
