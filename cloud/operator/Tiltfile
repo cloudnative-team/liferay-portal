@@ -15,23 +15,37 @@ if not context.startswith('k3d-'):
 
 allow_k8s_contexts(context)
 
+# Lean per-edit build for the live-update loop. Intentionally NOT go_build.sh —
+# that script does go mod download + go generate + a full `-a` rebuild for the
+# image/CI build and is too slow to run on every code change. Run `go generate`
+# yourself after changing the API types under resources/api.
+# Regenerate deepcopy + CRD before compiling. Runs at startup and only when the
+# API types change (not on every code edit), so `tilt up` works on a fresh
+# checkout without a manual `go generate` first.
+local_resource(
+    'operator-generate',
+    cmd='go generate ./...',
+    dir='resources',
+    deps=['resources/api', 'resources/generate.go'],
+    ignore=['resources/api/licensing/v1alpha1/zz_generated.deepcopy.go'],
+    labels=['operator'],
+)
+
 local_resource(
     'operator-compile',
     cmd='mkdir -p build && CGO_ENABLED=0 GOOS=linux go build -o build/manager .',
     dir='resources',
-    deps=[
-		'resources'
-	],
-    ignore=[
-		'resources/build'
-	],
-    labels=[
-		'operator'
-	],
+    deps=['resources'],
+    ignore=['resources/build'],
+    resource_deps=['operator-generate'],
+    labels=['operator'],
 )
 
+# Dev image ref = the value we override image.repository to below, so Tilt wires
+# its build into the Deployment. The chart's real image is a GAR path; for local
+# dev we swap it for a simple name the k3d registry can hold.
 docker_build_with_restart(
-    'liferay/liferay-cloud-operator',
+    'liferay/liferay-dxp-operator',
     context='resources/build',
     dockerfile_contents='\n'.join([
         'FROM gcr.io/distroless/static:debug-nonroot',
@@ -44,79 +58,70 @@ docker_build_with_restart(
 )
 
 k8s_yaml(
-	blob('\n'.join([
-			'apiVersion: v1',
-			'kind: Namespace',
-			'metadata:',
-			'  name: liferay-system',
-		])
-	)
+    blob('\n'.join([
+        'apiVersion: v1',
+        'kind: Namespace',
+        'metadata:',
+        '  name: liferay-system',
+    ]))
 )
 
 k8s_yaml(
-	helm(
-		'../helm/operator',
-		name='liferay-operator',
-		namespace='liferay-system',
-		set=[
-			'securityContext.readOnlyRootFilesystem=false',
-		],
-	)
+    helm(
+        '../helm/dxp-operator',
+        name='liferay-dxp-operator',
+        namespace='liferay-system',
+        set=[
+            'image.repository=liferay/liferay-dxp-operator',
+            'securityContext.readOnlyRootFilesystem=false',
+        ],
+    )
 )
 
 k8s_resource(
     labels=['operator'],
-    port_forwards=[
-		'8080:8080', '8081:8081'
-	],
-    resource_deps=[
-		'operator-compile'
-	],
-    workload='liferay-operator',
+    port_forwards=['8080:8080', '8081:8081'],
+    resource_deps=['operator-compile'],
+    workload='liferay-dxp-operator',
 )
 
 k8s_yaml(
-	blob('\n'.join([
-			'apiVersion: licensing.liferay.com/v1alpha1',
-			'kind: LiferayEnvironment',
-			'metadata:',
-			'  name: dev',
-			'  namespace: liferay-system',
-			'spec:',
-			'  activationCodeSecretRef:',
-			'    name: dev-activation',
-			'    key: activationCode',
-			'  environmentName: "Local dev"',
-			'  workloadRef:',
-			'    name: dev-liferay',
-		])
-	)
+    blob('\n'.join([
+        'apiVersion: licensing.liferay.com/v1alpha1',
+        'kind: LiferayEnvironment',
+        'metadata:',
+        '  name: dev',
+        '  namespace: liferay-system',
+        'spec:',
+        '  activationCodeSecretRef:',
+        '    name: dev-activation',
+        '    key: activationCode',
+        '  environmentName: "Local dev"',
+        '  workloadRef:',
+        '    name: dev-liferay',
+    ]))
 )
 
 k8s_resource(
-    labels=[
-		'operator'
-	],
+    labels=['operator'],
     new_name='operator-infra',
     objects=[
         'liferayenvironments.licensing.liferay.com:customresourcedefinition',
-        'liferay-operator:serviceaccount',
-        'liferay-operator:clusterrole',
-        'liferay-operator:clusterrolebinding',
+        'liferay-dxp-operator:serviceaccount',
+        'liferay-dxp-operator:clusterrole',
+        'liferay-dxp-operator:clusterrolebinding',
         'liferay-system:namespace',
     ],
 )
 
 k8s_resource(
-    labels=[
-		'operator'
-	],
+    labels=['operator'],
     new_name='sample-environment',
     objects=[
         'dev:liferayenvironment',
     ],
     resource_deps=[
-        'liferay-operator',
+        'liferay-dxp-operator',
         'operator-infra',
     ],
 )
