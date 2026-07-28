@@ -39,13 +39,13 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 		return controllerruntime.Result{}, client.IgnoreNotFound(error)
 	}
 
-	environmentId, error := liferayEnvironmentReconciler.resolveEnvironmentId(context, liferayEnvironment.Namespace)
+	environmentID, error := liferayEnvironmentReconciler.resolveEnvironmentID(context, liferayEnvironment.Namespace)
 
 	if error != nil {
 		return controllerruntime.Result{}, error
 	}
 
-	liferayEnvironment.Status.EnvironmentId = environmentId
+	liferayEnvironment.Status.EnvironmentID = environmentID
 
 	if _, error := liferayEnvironmentReconciler.ensureIdentity(context, liferayEnvironment); error != nil {
 		return controllerruntime.Result{}, error
@@ -196,7 +196,7 @@ func publicKeyPEM(privateKey *rsa.PrivateKey) (string, error) {
 	), nil
 }
 
-func (LiferayEnvironmentReconciler *LiferayEnvironmentReconciler) resolveEnvironmentId(
+func (LiferayEnvironmentReconciler *LiferayEnvironmentReconciler) resolveEnvironmentID(
 	context context.Context,
 	namespaceName string,
 ) (string, error) {
