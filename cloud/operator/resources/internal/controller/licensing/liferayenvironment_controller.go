@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"time"
@@ -55,7 +56,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 	}
 
 	if liferayEnvironment.Status.ActivatedAt == nil {
-		publicKey, error := publicKeyPEM(privateKey)
+		publicKey, error := publicKeyBase64(privateKey)
 
 		if error != nil {
 			return controllerruntime.Result{}, error
@@ -174,16 +175,9 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) ensureIdentity
 		&pem.Block{Type: "PRIVATE KEY", Bytes: privateBytes},
 	)
 
-	publicPEM, error := publicKeyPEM(privateKey)
-
-	if error != nil {
-		return nil, error
-	}
-
 	secret = &corev1.Secret{
 		Data: map[string][]byte{
 			"private.pem": privatePEM,
-			"public.pem":  []byte(publicPEM),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{"controller-watched": "yes"},
@@ -243,21 +237,14 @@ func parsePrivateKey(data []byte) (*rsa.PrivateKey, error) {
 	return privateKey, nil
 }
 
-func publicKeyPEM(privateKey *rsa.PrivateKey) (string, error) {
+func publicKeyBase64(privateKey *rsa.PrivateKey) (string, error) {
 	publicBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 
 	if err != nil {
 		return "", err
 	}
 
-	return string(
-		pem.EncodeToMemory(
-			&pem.Block{
-				Bytes: publicBytes,
-				Type:  "PUBLIC KEY",
-			},
-		),
-	), nil
+	return base64.StdEncoding.EncodeToString(publicBytes), nil
 }
 
 func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) readActivationCode(

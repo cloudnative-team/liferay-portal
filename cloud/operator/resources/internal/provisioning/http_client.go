@@ -37,7 +37,7 @@ func (httpClient *HTTPClient) Activate(
 	}
 
 	url := fmt.Sprintf(
-		"%s/o/provisioning-rest/v1.0/cloud/environment/%s/activation",
+		"%s/o/provisioning-rest/v1.0/cloud/environments/%s/activation",
 		httpClient.BaseURL, activationRequest.EnvironmentID,
 	)
 
@@ -85,7 +85,7 @@ func (httpClient *HTTPClient) post(
 		return nil, error
 	}
 
-	request.Header.Set("Content-Type", "application/jwt")
+	request.Header.Set("Content-Type", "text/plain")
 
 	return httpClient.Client.Do(request)
 }
