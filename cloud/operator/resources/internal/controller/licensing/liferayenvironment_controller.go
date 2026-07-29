@@ -71,9 +71,19 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 			provisioning.ActivationRequest{
 				ActivationCode:  activationCode,
 				EnvironmentID:   environmentID,
-				EnvironmentName: liferayEnvironment.Name,
+				EnvironmentName: liferayEnvironment.Spec.EnvironmentName,
 				PublicKey:       publicKey,
 			}, context, privateKey); error != nil {
+
+			meta.SetStatusCondition(
+				&liferayEnvironment.Status.Conditions,
+				metav1.Condition{
+					Message: error.Error(),
+					Reason:  "ActivationRejected",
+					Status:  metav1.ConditionFalse,
+					Type:    "Activated",
+				},
+			)
 
 			liferayEnvironment.Status.Phase = "Degraded"
 
@@ -81,6 +91,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 		}
 
 		now := metav1.Now()
+
 		liferayEnvironment.Status.ActivatedAt = &now
 
 		meta.SetStatusCondition(
@@ -96,16 +107,6 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 	if liferayEnvironment.Status.Phase == "" {
 		liferayEnvironment.Status.Phase = "Pending"
 	}
-
-	meta.SetStatusCondition(
-		&liferayEnvironment.Status.Conditions,
-		metav1.Condition{
-			Message: "Reconcile is not implemented.",
-			Reason:  "NotImplemented",
-			Status:  metav1.ConditionFalse,
-			Type:    "Ready",
-		},
-	)
 
 	status := liferayEnvironmentReconciler.Status()
 
