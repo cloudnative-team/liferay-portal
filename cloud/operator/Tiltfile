@@ -102,6 +102,18 @@ k8s_yaml(
     ]))
 )
 
+k8s_yaml(
+    blob('\n'.join([
+        'apiVersion: v1',
+        'kind: Secret',
+        'metadata:',
+        '  name: dev-activation',
+        '  namespace: liferay-system',
+        'stringData:',
+        '  activationCode: dev-activation-code',
+    ]))
+)
+
 k8s_resource(
     labels=['operator'],
     new_name='operator-infra',
@@ -119,6 +131,7 @@ k8s_resource(
     new_name='sample-environment',
     objects=[
         'dev:liferayenvironment',
+        'dev-activation:secret',
     ],
     resource_deps=[
         'liferay-dxp-operator',
