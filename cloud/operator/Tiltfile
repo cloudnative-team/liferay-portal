@@ -15,6 +15,11 @@ if not context.startswith('k3d-'):
 
 allow_k8s_contexts(context)
 
+# The activation code is a one-time credential — never commit it. Provide it at
+# runtime:  ACTIVATION_CODE=<code> tilt up   (falls back to a placeholder that
+# the server will reject).
+activation_code = os.getenv('ACTIVATION_CODE', 'dev-activation-code')
+
 # Lean per-edit build for the live-update loop. Intentionally NOT go_build.sh —
 # that script does go mod download + go generate + a full `-a` rebuild for the
 # image/CI build and is too slow to run on every code change. Run `go generate`
@@ -73,6 +78,7 @@ k8s_yaml(
         namespace='liferay-system',
         set=[
             'image.repository=liferay/liferay-dxp-operator',
+            'provisioning.baseURL=https://webserver-lrprovisioning-uat.lfr.cloud',
             'securityContext.readOnlyRootFilesystem=false',
         ],
     )
@@ -110,7 +116,7 @@ k8s_yaml(
         '  name: dev-activation',
         '  namespace: liferay-system',
         'stringData:',
-        '  activationCode: dev-activation-code',
+        '  activationCode: "' + activation_code + '"',
     ]))
 )
 
