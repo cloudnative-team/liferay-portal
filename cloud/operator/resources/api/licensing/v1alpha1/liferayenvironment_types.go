@@ -48,7 +48,7 @@ type LiferayEnvironmentList struct {
 
 type LiferayEnvironmentSpec struct {
 	// +kubebuilder:validation:Required
-	ActivationCodeSecretRef SecretKeyRef `json:"activationCodeSecretRef"`
+	ActivationCodeSecretRef SecretKeyRef `json:"activationCodeSecretRef,omitempty"`
 
 	// +optional
 	DxpVersion string `json:"dxpVersion,omitempty"`
