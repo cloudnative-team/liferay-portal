@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -56,6 +57,9 @@ type LiferayEnvironmentSpec struct {
 	// +optional
 	EnvironmentName string `json:"environmentName,omitempty"`
 
+	// +optional
+	MarketplaceVolume *MarketplaceVolumeSpec `json:"marketplaceVolume,omitempty"`
+
 	// +kubebuilder:validation:Required
 	WorkloadRef WorkloadRef `json:"workloadRef"`
 }
@@ -75,7 +79,30 @@ type LiferayEnvironmentStatus struct {
 	// +optional
 	License LicenseStatus `json:"license,omitempty"`
 
+	// +optional
+	MarketplaceVolume MarketplaceVolumeStatus `json:"marketplaceVolume,omitempty"`
+
 	// +kubebuilder:validation:Enum=Degraded;Pending;Ready
+	// +optional
+	Phase string `json:"phase,omitempty"`
+}
+
+type MarketplaceVolumeSpec struct {
+	// +optional
+	ClaimName string `json:"claimName,omitempty"`
+
+	// +kubebuilder:validation:Required
+	Size resource.Quantity `json:"size"`
+
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	StorageClassName string `json:"storageClassName"`
+}
+
+type MarketplaceVolumeStatus struct {
+	// +optional
+	ClaimName string `json:"claimName,omitempty"`
+
 	// +optional
 	Phase string `json:"phase,omitempty"`
 }
