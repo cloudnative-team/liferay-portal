@@ -22,12 +22,8 @@ const (
 	StateStorageClassNotFound   State = "StorageClassNotFound"
 )
 
-func (manager *Manager) Ensure(
-	context context.Context,
-	owner client.Object,
-	spec Spec,
-) (Result, error) {
-	storageClassFound, error := manager.storageClassExists(context, spec.StorageClassName)
+func (pvcManager *PersistentVolumeClaimManager) Ensure() (Result, error) {
+	storageClassFound, error := pvcManager.storageClassExists(pvcManager.Spec.StorageClassName)
 
 	if error != nil {
 		return Result{}, error
@@ -37,18 +33,14 @@ func (manager *Manager) Ensure(
 		return Result{State: StateStorageClassNotFound}, nil
 	}
 
-	persistentVolumeClaim, error := manager.resolvePersistentVolumeClaim(context, spec)
+	persistentVolumeClaim, error := pvcManager.resolvePersistentVolumeClaim()
 
 	if error != nil {
 		return Result{}, error
 	}
 
 	if persistentVolumeClaim == nil {
-		if error := manager.createPersistentVolumeClaim(
-			context,
-			owner,
-			spec,
-		); error != nil {
+		if error := pvcManager.createPersistentVolumeClaim(); error != nil {
 			return Result{}, error
 		}
 
@@ -60,27 +52,23 @@ func (manager *Manager) Ensure(
 
 	return Result{
 		Phase: persistentVolumeClaim.Status.Phase,
-		State: resolveState(persistentVolumeClaim, spec),
+		State: resolveState(persistentVolumeClaim, pvcManager.Spec),
 	}, nil
 }
 
-func (manager *Manager) createPersistentVolumeClaim(
-	context context.Context,
-	owner client.Object,
-	spec Spec,
-) error {
-	persistentVolumeClaim := getManifest(spec)
+func (pvcManager *PersistentVolumeClaimManager) createPersistentVolumeClaim() error {
+	persistentVolumeClaim := getManifest(pvcManager.Spec)
 
 	if error := controllerruntime.SetControllerReference(
-		owner,
+		pvcManager.Owner,
 		persistentVolumeClaim,
-		manager.Scheme(),
+		pvcManager.Scheme(),
 	); error != nil {
 		return error
 	}
 
-	if error := manager.Create(
-		context,
+	if error := pvcManager.Create(
+		pvcManager.Context,
 		persistentVolumeClaim,
 	); error != nil && !errors.IsAlreadyExists(error) {
 		return error
@@ -89,19 +77,16 @@ func (manager *Manager) createPersistentVolumeClaim(
 	return nil
 }
 
-func (manager *Manager) resolvePersistentVolumeClaim(
-	context context.Context,
-	spec Spec,
-) (*corev1.PersistentVolumeClaim, error) {
+func (pvcManager *PersistentVolumeClaimManager) resolvePersistentVolumeClaim() (*corev1.PersistentVolumeClaim, error) {
 	persistentVolumeClaim := &corev1.PersistentVolumeClaim{}
 
 	namespacedName := types.NamespacedName{
-		Name:      spec.Name,
-		Namespace: spec.Namespace,
+		Name:      pvcManager.Spec.Name,
+		Namespace: pvcManager.Spec.Namespace,
 	}
 
-	if error := manager.Get(
-		context,
+	if error := pvcManager.Get(
+		pvcManager.Context,
 		namespacedName,
 		persistentVolumeClaim,
 	); error != nil {
@@ -115,14 +100,11 @@ func (manager *Manager) resolvePersistentVolumeClaim(
 	return persistentVolumeClaim, nil
 }
 
-func (manager *Manager) storageClassExists(
-	context context.Context,
-	storageClassName string,
-) (bool, error) {
+func (pvcManager *PersistentVolumeClaimManager) storageClassExists(storageClassName string) (bool, error) {
 	storageClass := &storagev1.StorageClass{}
 
-	error := manager.Get(
-		context,
+	error := pvcManager.Get(
+		pvcManager.Context,
 		types.NamespacedName{Name: storageClassName},
 		storageClass,
 	)
@@ -173,8 +155,12 @@ func resolveState(
 	return StateBound
 }
 
-type Manager struct {
+type PersistentVolumeClaimManager struct {
 	client.Client
+
+	Context context.Context
+	Spec    Spec
+	Owner   client.Object
 }
 
 type Result struct {

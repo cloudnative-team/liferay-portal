@@ -40,15 +40,14 @@ func (volumeManager *VolumeManager) reconcileClaim(
 
 	liferayEnvironment.Status.MarketplaceVolume.ClaimName = persistentVolumeClaimSpec.Name
 
-	persistentVolumeClaimManager := &persistentvolumeclaim.Manager{
-		Client: volumeManager.Client,
+	persistentVolumeClaimManager := &persistentvolumeclaim.PersistentVolumeClaimManager{
+		Client:  volumeManager.Client,
+		Context: context,
+		Spec:    persistentVolumeClaimSpec,
+		Owner:   statefulSet,
 	}
 
-	persistentVolumeClaimResult, error := persistentVolumeClaimManager.Ensure(
-		context,
-		statefulSet,
-		persistentVolumeClaimSpec,
-	)
+	persistentVolumeClaimResult, error := persistentVolumeClaimManager.Ensure()
 
 	if error != nil {
 		return metav1.Condition{}, error
