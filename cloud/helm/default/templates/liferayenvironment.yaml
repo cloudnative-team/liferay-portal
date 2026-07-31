@@ -8,10 +8,10 @@ metadata:
     name: {{ include "liferay.name" . }}
     namespace: {{ include "liferay.namespace" . }}
 spec:
+    {{- if .Values.marketplace.enabled }}
     marketplaceVolume:
-        claimName: {{ .Values.marketplace.claimName | default (printf "%s-marketplace" (include "liferay.name" .)) }}
-        size: {{ .Values.marketplace.size | quote }}
-        storageClassName: {{ required "A ReadWriteMany storage class is required when marketplace.enabled is true. Set marketplace.storageClassName." .Values.marketplace.storageClassName | quote }}
+    {{ .Values.marketplace | toYaml | nindent 8 }}
+    {{- end }}
     workloadRef:
         name: {{ include "liferay.name" . }}
 {{- end }}

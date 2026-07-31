@@ -17,6 +17,6 @@ tests:
             -   equal:
                     path: spec.marketplaceVolume.storageClassName
                     value: efs-custom-sc
-        it: Honors an overridden storage class
+        it: Overrides storage class
         set:
             liferay-default.marketplace.storageClassName: efs-custom-sc

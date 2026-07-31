@@ -5,7 +5,7 @@
 {{- end -}}
 {{- $suffix := ternary "" (printf "-%s" .name) (eq .name "") }}
 {{- $marketplace := .statefulset.marketplace | default dict }}
-{{- $marketplaceEnabled := and (eq .name "") $marketplace.enabled }}
+{{- $marketplaceEnabled := $marketplace.enabled }}
 {{- $marketplaceClaimName := $marketplace.claimName | default (printf "%s-marketplace" (include "liferay.name" .root)) }}
 {{- $marketplaceVolumeName := $marketplace.volumeName | default "liferay-lpkg" }}
 apiVersion: apps/v1
@@ -171,7 +171,7 @@ spec:
             tolerations:
             {{- toYaml . | nindent 12 }}
             {{- end }}
-            {{- if or .statefulset.volumes .statefulset.customVolumes $marketplaceEnabled }}
+            {{- if or .statefulset.volumes .statefulset.customVolumes $marketplace.enabled }}
             volumes:
                 {{- with .statefulset.volumes }}
                 {{- toYaml . | nindent 16 }}
@@ -179,7 +179,7 @@ spec:
                 {{- range $k, $v := .statefulset.customVolumes }}
                 {{- toYaml $v | nindent 16 }}
                 {{- end }}
-                {{- if $marketplaceEnabled }}
+                {{- if $marketplace.enabled }}
                 {{- list (dict "name" $marketplaceVolumeName "persistentVolumeClaim" (dict "claimName" $marketplaceClaimName)) | toYaml | nindent 16 }}
                 {{- end }}
             {{- end }}
