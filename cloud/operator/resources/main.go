@@ -6,9 +6,9 @@ import (
 
 	env "github.com/caarlos0/env/v11"
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
-	controller "github.com/liferay/liferay-portal/cloud/operator/internal/controller"
-	licensingcontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controller/licensing"
-	liferaycontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controller/liferay"
+	"github.com/liferay/liferay-portal/cloud/operator/internal/controllers"
+	licensingcontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/licensing"
+	liferaycontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/liferay"
 	provisioning "github.com/liferay/liferay-portal/cloud/operator/internal/provisioning"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -60,7 +60,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if error := controller.SetupWithManager(
+	if error := controllers.SetupWithManager(
 		manager,
 		&licensingcontroller.LiferayEnvironmentReconciler{
 			Client:            manager.GetClient(),

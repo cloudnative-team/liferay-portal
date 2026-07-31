@@ -8,7 +8,7 @@ import (
 	"time"
 
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
-	marketplace "github.com/liferay/liferay-portal/cloud/operator/internal/controller/liferay/marketplace"
+	marketplace "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/liferay/marketplace"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
-	persistentvolumeclaim "github.com/liferay/liferay-portal/cloud/operator/internal/controller/persistentvolumeclaim"
+	persistentvolumeclaim "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/persistentvolumeclaim"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"

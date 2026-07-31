@@ -2,7 +2,7 @@ package marketplace
 
 import (
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
-	persistentvolumeclaim "github.com/liferay/liferay-portal/cloud/operator/internal/controller/persistentvolumeclaim"
+	persistentvolumeclaim "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/persistentvolumeclaim"
 	corev1 "k8s.io/api/core/v1"
 )
 
