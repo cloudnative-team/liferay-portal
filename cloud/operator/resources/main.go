@@ -6,6 +6,7 @@ import (
 
 	env "github.com/caarlos0/env/v11"
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
+	controller "github.com/liferay/liferay-portal/cloud/operator/internal/controller"
 	licensingcontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controller/licensing"
 	liferaycontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controller/liferay"
 	provisioning "github.com/liferay/liferay-portal/cloud/operator/internal/provisioning"
@@ -59,25 +60,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	liferayEnvironmentReconciler := &licensingcontroller.LiferayEnvironmentReconciler{
-		Client:            manager.GetClient(),
-		HeartbeatInterval: config.HeartbeatInterval,
-		Provisioning:      provisioning.NewHTTPClient(config.ProvisioningBaseURL),
-	}
-
-	if error := liferayEnvironmentReconciler.SetupWithManager(manager); error != nil {
-		setupLog.Error(error, "Unable to create liferayenvironment controller.")
-
-		os.Exit(1)
-	}
-
-	liferayStatefulSetReconciler := &liferaycontroller.LiferayStatefulSetReconciler{
-		Client:            manager.GetClient(),
-		HeartbeatInterval: config.HeartbeatInterval,
-	}
-
-	if error := liferayStatefulSetReconciler.SetupWithManager(manager); error != nil {
-		setupLog.Error(error, "Unable to create liferaystatefulset controller.")
+	if error := controller.SetupWithManager(
+		manager,
+		&licensingcontroller.LiferayEnvironmentReconciler{
+			Client:            manager.GetClient(),
+			HeartbeatInterval: config.HeartbeatInterval,
+			Provisioning:      provisioning.NewHTTPClient(config.ProvisioningBaseURL),
+		},
+		&liferaycontroller.LiferayStatefulSetReconciler{
+			Client:            manager.GetClient(),
+			HeartbeatInterval: config.HeartbeatInterval,
+		},
+	); error != nil {
+		setupLog.Error(error, "Unable to set up controllers.")
 
 		os.Exit(1)
 	}
@@ -89,14 +84,14 @@ func main() {
 	}
 }
 
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = controllerruntime.Log.WithName("setup")
+)
+
 type config struct {
 	HeartbeatInterval   time.Duration `env:"HEARTBEAT_INTERVAL" envDefault:"10m"`
 	MetricsAddress      string        `env:"METRICS_ADDRESS" envDefault:":8080"`
 	ProbeAddress        string        `env:"PROBE_ADDRESS" envDefault:":8081"`
 	ProvisioningBaseURL string        `env:"PROVISIONING_BASE_URL" envDefault:"https://webserver-lrprovisioning.lfr.cloud"`
 }
-
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = controllerruntime.Log.WithName("setup")
-)
