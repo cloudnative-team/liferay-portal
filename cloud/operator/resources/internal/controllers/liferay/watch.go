@@ -16,16 +16,6 @@ const (
 	liferayComponentValue = "liferay"
 )
 
-func getLiferayStatefulSetPredicate() (predicate.Predicate, error) {
-	return predicate.LabelSelectorPredicate(
-		metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				liferayComponentLabel: liferayComponentValue,
-			},
-		},
-	)
-}
-
 func mapLiferayEnvironmentToStatefulSet(
 	context context.Context,
 	object client.Object,
@@ -46,4 +36,14 @@ func mapLiferayEnvironmentToStatefulSet(
 			},
 		},
 	}
+}
+
+func newLiferayStatefulSetPredicate() (predicate.Predicate, error) {
+	return predicate.LabelSelectorPredicate(
+		metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				liferayComponentLabel: liferayComponentValue,
+			},
+		},
+	)
 }

@@ -9,12 +9,12 @@ import (
 
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
 	marketplace "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/liferay/marketplace"
-	"github.com/liferay/liferay-portal/cloud/operator/internal/utils/persistentvolumeclaim"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	errors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	builder "sigs.k8s.io/controller-runtime/pkg/builder"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,51 +43,25 @@ func (liferayStatefulSetReconciler *LiferayStatefulSetReconciler) Reconcile(
 
 	originalLiferayEnvironment := liferayEnvironment.DeepCopy()
 
-	persistentVolumeClaimSpec := persistentvolumeclaim.GetPersistentVolumeClaimSpec(liferayEnvironment, "-marketplace")
-
-	marketplaceVolumeManager := &marketplace.MarketplaceVolumeManager{
-		Client: liferayStatefulSetReconciler.Client,
-		PersistentVolumeClaimManager: &persistentvolumeclaim.PersistentVolumeClaimManager{
-			Client:  liferayStatefulSetReconciler.Client,
-			Context: context,
-			Spec:    persistentVolumeClaimSpec,
-			Owner:   statefulSet,
-		},
-	}
-
-	marketplaceConditions, error := marketplaceVolumeManager.Reconcile(
+	if error := liferayStatefulSetReconciler.setMarketplaceVolumeConditions(
 		context,
 		liferayEnvironment,
 		statefulSet,
-	)
-
-	if error != nil {
+	); error != nil {
 		return controllerruntime.Result{}, error
 	}
 
-	for _, marketplaceCondition := range marketplaceConditions {
-		meta.SetStatusCondition(&liferayEnvironment.Status.Conditions, marketplaceCondition)
-	}
-
-	if error := liferayStatefulSetReconciler.updateStatus(
+	return liferayStatefulSetReconciler.updateStatus(
 		context,
 		liferayEnvironment,
 		originalLiferayEnvironment,
-	); error != nil {
-		if errors.IsConflict(error) {
-			return controllerruntime.Result{RequeueAfter: time.Second}, nil
-		}
-
-		return controllerruntime.Result{}, error
-	}
-
-	return controllerruntime.Result{RequeueAfter: liferayStatefulSetReconciler.HeartbeatInterval}, nil
+	)
 }
 
 func (liferayStatefulSetReconciler *LiferayStatefulSetReconciler) SetupWithManager(
 	manager controllerruntime.Manager,
 ) error {
-	statefulSetPredicate, error := getLiferayStatefulSetPredicate()
+	statefulSetPredicate, error := newLiferayStatefulSetPredicate()
 
 	if error != nil {
 		return error
@@ -133,23 +107,65 @@ func (liferayStatefulSetReconciler *LiferayStatefulSetReconciler) resolveLiferay
 	return nil, nil
 }
 
+func (liferayStatefulSetReconciler *LiferayStatefulSetReconciler) setMarketplaceVolumeConditions(
+	context context.Context,
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+	statefulSet *appsv1.StatefulSet,
+) error {
+	volumeManager := marketplace.NewVolumeManager(
+		context,
+		liferayStatefulSetReconciler.Client,
+		liferayEnvironment,
+		statefulSet,
+	)
+
+	volumeReadyCondition, error := volumeManager.CreateVolumeIfMissing(liferayEnvironment)
+
+	if error != nil {
+		return error
+	}
+
+	setStatusConditions(
+		liferayEnvironment,
+		volumeReadyCondition,
+		volumeManager.GetMountCondition(statefulSet),
+	)
+
+	return nil
+}
+
+func setStatusConditions(
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+	conditions ...metav1.Condition,
+) {
+	for _, condition := range conditions {
+		meta.SetStatusCondition(&liferayEnvironment.Status.Conditions, condition)
+	}
+}
+
 func (liferayStatefulSetReconciler *LiferayStatefulSetReconciler) updateStatus(
 	context context.Context,
 	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
 	originalLiferayEnvironment *licensingv1alpha1.LiferayEnvironment,
-) error {
-	if equality.Semantic.DeepEqual(originalLiferayEnvironment.Status, liferayEnvironment.Status) {
-		return nil
+) (controllerruntime.Result, error) {
+	if !equality.Semantic.DeepEqual(originalLiferayEnvironment.Status, liferayEnvironment.Status) {
+		patch := client.MergeFromWithOptions(
+			originalLiferayEnvironment,
+			client.MergeFromWithOptimisticLock{},
+		)
+
+		status := liferayStatefulSetReconciler.Status()
+
+		if error := status.Patch(context, liferayEnvironment, patch); error != nil {
+			if errors.IsConflict(error) {
+				return controllerruntime.Result{RequeueAfter: time.Second}, nil
+			}
+
+			return controllerruntime.Result{}, error
+		}
 	}
 
-	patch := client.MergeFromWithOptions(
-		originalLiferayEnvironment,
-		client.MergeFromWithOptimisticLock{},
-	)
-
-	status := liferayStatefulSetReconciler.Status()
-
-	return status.Patch(context, liferayEnvironment, patch)
+	return controllerruntime.Result{RequeueAfter: liferayStatefulSetReconciler.HeartbeatInterval}, nil
 }
 
 type LiferayStatefulSetReconciler struct {

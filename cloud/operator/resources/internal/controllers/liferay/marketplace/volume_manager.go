@@ -10,45 +10,55 @@ import (
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (volumeManager *MarketplaceVolumeManager) Reconcile(
-	context context.Context,
+func (volumeManager *VolumeManager) CreateVolumeIfMissing(
 	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
-	statefulSet *appsv1.StatefulSet,
-) ([]metav1.Condition, error) {
-	readyCondition, error := volumeManager.reconcileClaim(
-		liferayEnvironment,
-	)
-
-	if error != nil {
-		return nil, error
-	}
-
-	return []metav1.Condition{
-		readyCondition,
-		mountCondition(liferayEnvironment, statefulSet),
-	}, nil
-}
-
-func (volumeManager *MarketplaceVolumeManager) reconcileClaim(liferayEnvironment *licensingv1alpha1.LiferayEnvironment) (metav1.Condition, error) {
-	persistentVolumeClaimSpec := persistentvolumeclaim.GetPersistentVolumeClaimSpec(liferayEnvironment, "-marketplace")
-
-	liferayEnvironment.Status.MarketplaceVolume.ClaimName = persistentVolumeClaimSpec.Name
-
-	persistentVolumeClaimResult, error := volumeManager.PersistentVolumeClaimManager.Ensure()
+) (metav1.Condition, error) {
+	claimResult, error := volumeManager.GetOrCreateClaim()
 
 	if error != nil {
 		return metav1.Condition{}, error
 	}
 
-	if persistentVolumeClaimResult.Phase != "" {
-		liferayEnvironment.Status.MarketplaceVolume.Phase = string(persistentVolumeClaimResult.Phase)
-	}
+	volumeManager.setVolumeStatus(claimResult, liferayEnvironment)
 
-	return claimReadyCondition(persistentVolumeClaimResult, persistentVolumeClaimSpec), nil
+	return newClaimReadyCondition(claimResult, volumeManager.Spec), nil
 }
 
-type MarketplaceVolumeManager struct {
-	client.Client
+func (volumeManager *VolumeManager) GetMountCondition(
+	statefulSet *appsv1.StatefulSet,
+) metav1.Condition {
+	return newMountCondition(volumeManager.Spec.Name, statefulSet)
+}
 
+func NewVolumeManager(
+	context context.Context,
+	kubernetesClient client.Client,
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+	statefulSet *appsv1.StatefulSet,
+) *VolumeManager {
+	return &VolumeManager{
+		PersistentVolumeClaimManager: &persistentvolumeclaim.PersistentVolumeClaimManager{
+			Client:  kubernetesClient,
+			Context: context,
+			Owner:   statefulSet,
+			Spec:    newClaimSpec(liferayEnvironment),
+		},
+	}
+}
+
+func (volumeManager *VolumeManager) setVolumeStatus(
+	claimResult persistentvolumeclaim.Result,
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+) {
+	volumeStatus := &liferayEnvironment.Status.MarketplaceVolume
+
+	volumeStatus.ClaimName = volumeManager.Spec.Name
+
+	if claimResult.Phase != "" {
+		volumeStatus.Phase = string(claimResult.Phase)
+	}
+}
+
+type VolumeManager struct {
 	*persistentvolumeclaim.PersistentVolumeClaimManager
 }

@@ -3,7 +3,6 @@ package marketplace
 import (
 	"fmt"
 
-	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
 	"github.com/liferay/liferay-portal/cloud/operator/internal/utils/persistentvolumeclaim"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,15 +13,15 @@ const (
 	conditionTypeVolumeReady   = "MarketplaceVolumeReady"
 )
 
-func claimReadyCondition(
-	persistentVolumeClaimResult persistentvolumeclaim.Result,
-	persistentVolumeClaimSpec persistentvolumeclaim.Spec,
+func newClaimReadyCondition(
+	claimResult persistentvolumeclaim.Result,
+	claimSpec persistentvolumeclaim.Spec,
 ) metav1.Condition {
-	claimName := persistentVolumeClaimSpec.Name
+	claimName := claimSpec.Name
 
-	storageClassName := persistentVolumeClaimSpec.StorageClassName
+	storageClassName := claimSpec.StorageClassName
 
-	switch persistentVolumeClaimResult.State {
+	switch claimResult.State {
 	case persistentvolumeclaim.StateAccessModesUnsupported:
 		return newCondition(
 			conditionTypeVolumeReady,
@@ -55,7 +54,7 @@ func claimReadyCondition(
 			conditionTypeVolumeReady,
 			fmt.Sprintf(
 				"The persistent volume claim %q is not bound. Its phase is %q.",
-				claimName, persistentVolumeClaimResult.Phase),
+				claimName, claimResult.Phase),
 			"ClaimNotBound",
 			metav1.ConditionFalse,
 		)
@@ -74,18 +73,30 @@ func claimReadyCondition(
 		conditionTypeVolumeReady,
 		fmt.Sprintf(
 			"The persistent volume claim %q is in the unknown state %q.",
-			claimName, persistentVolumeClaimResult.State),
+			claimName, claimResult.State),
 		"ClaimStateUnknown",
 		metav1.ConditionUnknown,
 	)
 }
 
-func mountCondition(
-	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+func newCondition(
+	conditionType string,
+	message string,
+	reason string,
+	status metav1.ConditionStatus,
+) metav1.Condition {
+	return metav1.Condition{
+		Message: message,
+		Reason:  reason,
+		Status:  status,
+		Type:    conditionType,
+	}
+}
+
+func newMountCondition(
+	claimName string,
 	statefulSet *appsv1.StatefulSet,
 ) metav1.Condition {
-	claimName := persistentvolumeclaim.ResolveClaimName(liferayEnvironment, "-marketplace")
-
 	podSpec := &statefulSet.Spec.Template.Spec
 
 	volume := persistentvolumeclaim.GetVolumeByClaimName(claimName, podSpec)
@@ -101,7 +112,7 @@ func mountCondition(
 		)
 	}
 
-	if !persistentvolumeclaim.IsVolumeReadOnly(podSpec, volume) {
+	if !persistentvolumeclaim.IsVolumeMountedReadOnly(podSpec, volume) {
 		return newCondition(
 			conditionTypeVolumeMounted,
 			fmt.Sprintf(
@@ -120,18 +131,4 @@ func mountCondition(
 		"ClaimMounted",
 		metav1.ConditionTrue,
 	)
-}
-
-func newCondition(
-	conditionType string,
-	message string,
-	reason string,
-	status metav1.ConditionStatus,
-) metav1.Condition {
-	return metav1.Condition{
-		Message: message,
-		Reason:  reason,
-		Status:  status,
-		Type:    conditionType,
-	}
 }

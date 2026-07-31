@@ -4,15 +4,24 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func IsVolumeReadOnly(podSpec *corev1.PodSpec, volume *corev1.Volume) bool {
-	containers := []corev1.Container{}
+func GetVolumeByClaimName(claimName string, podSpec *corev1.PodSpec) *corev1.Volume {
+	for index, volume := range podSpec.Volumes {
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
 
-	containers = append(containers, podSpec.Containers...)
-	containers = append(containers, podSpec.InitContainers...)
+		if volume.PersistentVolumeClaim.ClaimName == claimName {
+			return &podSpec.Volumes[index]
+		}
+	}
 
+	return nil
+}
+
+func IsVolumeMountedReadOnly(podSpec *corev1.PodSpec, volume *corev1.Volume) bool {
 	mounted := false
 
-	for _, container := range containers {
+	for _, container := range getContainers(podSpec) {
 		for _, volumeMount := range container.VolumeMounts {
 			if volumeMount.Name != volume.Name {
 				continue
@@ -29,16 +38,11 @@ func IsVolumeReadOnly(podSpec *corev1.PodSpec, volume *corev1.Volume) bool {
 	return mounted
 }
 
-func GetVolumeByClaimName(claimName string, podSpec *corev1.PodSpec) *corev1.Volume {
-	for index, volume := range podSpec.Volumes {
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
+func getContainers(podSpec *corev1.PodSpec) []corev1.Container {
+	containers := []corev1.Container{}
 
-		if volume.PersistentVolumeClaim.ClaimName == claimName {
-			return &podSpec.Volumes[index]
-		}
-	}
+	containers = append(containers, podSpec.Containers...)
+	containers = append(containers, podSpec.InitContainers...)
 
-	return nil
+	return containers
 }
