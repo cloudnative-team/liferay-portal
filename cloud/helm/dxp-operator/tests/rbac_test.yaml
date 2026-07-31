@@ -107,13 +107,16 @@ tests:
             value: ServiceAccount
         it: Omits the service account annotations by default
     -   asserts:
-            -   equal:
-                    path: rules[0].apiGroups
-                    value:
-                        -   licensing.liferay.com
-            -   lengthEqual:
+            -   contains:
+                    any: true
+                    content:
+                        apiGroups:
+                            -   licensing.liferay.com
                     count: 3
                     path: rules
+            -   lengthEqual:
+                    count: 1
+                    path: rules[?(@.apiGroups[0]=="licensing.liferay.com")].resources
         documentSelector:
             path: kind
             value: ClusterRole
