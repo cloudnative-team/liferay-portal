@@ -377,6 +377,12 @@ lpkg:
     enabled: false
     initScriptsVolumeName: liferay-init-scripts-default
     syncInterval: 600
+marketplace:
+    claimName: ""
+    enabled: false
+    size: 10Gi
+    storageClassName: ""
+    volumeName: liferay-lpkg
 nameOverride: ""
 network:
     annotations: {}

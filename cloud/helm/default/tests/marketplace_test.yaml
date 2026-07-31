@@ -1,0 +1,121 @@
+suite: Marketplace Volume
+templates:
+    -   templates/configmap.yaml
+    -   templates/liferay-init-scripts-cm.yaml
+    -   templates/liferay-network-cm.yaml
+    -   templates/liferayenvironment.yaml
+    -   templates/workloads.yaml
+tests:
+    -   asserts:
+            -   notContains:
+                    content:
+                        name: liferay-lpkg
+                        persistentVolumeClaim:
+                            claimName: liferay-default-marketplace
+                    path: spec.template.spec.volumes
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: Omits the marketplace volume by default
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        template: templates/liferayenvironment.yaml
+        it: Omits the LiferayEnvironment by default
+    -   asserts:
+            -   contains:
+                    any: true
+                    content:
+                        name: liferay-lpkg
+                        persistentVolumeClaim:
+                            claimName: liferay-default-marketplace
+                    path: spec.template.spec.volumes
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: Adds the marketplace volume when marketplace is enabled
+        set:
+            marketplace.enabled: true
+            marketplace.storageClassName: nfs-sc
+    -   asserts:
+            -   contains:
+                    any: true
+                    content:
+                        name: liferay-lpkg
+                        persistentVolumeClaim:
+                            claimName: liferay-lpkg
+                    path: spec.template.spec.volumes
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: Honors an explicit claim name
+        set:
+            marketplace.claimName: liferay-lpkg
+            marketplace.enabled: true
+            marketplace.storageClassName: nfs-sc
+    -   asserts:
+            -   equal:
+                    path: spec
+                    value:
+                        marketplaceVolume:
+                            claimName: liferay-default-marketplace
+                            size: 10Gi
+                            storageClassName: nfs-sc
+                        workloadRef:
+                            name: liferay-default
+        template: templates/liferayenvironment.yaml
+        it: Requests the configured marketplace volume through the LiferayEnvironment
+        set:
+            marketplace.enabled: true
+            marketplace.storageClassName: nfs-sc
+    -   asserts:
+            -   equal:
+                    path: metadata.labels.component
+                    value: liferay
+            -   equal:
+                    path: metadata.name
+                    value: liferay-default
+        template: templates/liferayenvironment.yaml
+        it: Names the LiferayEnvironment after the Liferay stateful set it selects
+        set:
+            marketplace.enabled: true
+            marketplace.storageClassName: nfs-sc
+    -   asserts:
+            -   failedTemplate:
+                    errorMessage:
+                        A ReadWriteMany storage class is required when marketplace.enabled is true. Set
+                        marketplace.storageClassName.
+        template: templates/liferayenvironment.yaml
+        it: Fails when marketplace is enabled without a storage class
+        set:
+            marketplace.enabled: true
+    -   asserts:
+            -   notExists:
+                    path: spec.template.spec.volumes
+        documentSelector:
+            path: spec.serviceName
+            skipEmptyTemplates: true
+            value: liferay-default-search
+        it: Keeps the marketplace volume off dependency stateful sets
+        set:
+            dependencies:
+                search:
+                    source: statefulset
+                    statefulset:
+                        autoscaling:
+                            enabled: false
+                        image:
+                            pullPolicy: IfNotPresent
+                            repository: opensearchproject/opensearch
+                            tag: "2.13.0"
+                        replicaCount: 1
+                        service:
+                            ports:
+                                -   name: http
+                                    port: 9200
+            marketplace.enabled: true
+            marketplace.storageClassName: nfs-sc
+        template: templates/workloads.yaml
