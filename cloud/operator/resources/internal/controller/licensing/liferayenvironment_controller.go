@@ -55,6 +55,22 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 	}
 
 	if liferayEnvironment.Status.ActivatedAt == nil {
+		if liferayEnvironment.Spec.ActivationCodeSecretRef.Name == "" {
+			meta.SetStatusCondition(
+				&liferayEnvironment.Status.Conditions,
+				metav1.Condition{
+					Message: "The activation code secret reference is not configured.",
+					Reason:  "ActivationCodeNotConfigured",
+					Status:  metav1.ConditionFalse,
+					Type:    "Activated",
+				},
+			)
+
+			liferayEnvironment.Status.Phase = "Pending"
+
+			return liferayEnvironmentReconciler.finish(context, liferayEnvironment)
+		}
+
 		publicKey, error := publicKeyBase64(privateKey)
 
 		if error != nil {

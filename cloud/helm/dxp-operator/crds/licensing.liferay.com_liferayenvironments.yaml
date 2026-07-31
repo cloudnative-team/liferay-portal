@@ -78,7 +78,6 @@ spec:
                                 -   name
                                 type: object
                         required:
-                        -   activationCodeSecretRef
                         -   workloadRef
                         type: object
                     status:
