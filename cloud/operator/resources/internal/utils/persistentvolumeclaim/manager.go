@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	errors "k8s.io/apimachinery/pkg/api/errors"
-	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
@@ -166,14 +165,6 @@ type PersistentVolumeClaimManager struct {
 type Result struct {
 	Phase corev1.PersistentVolumeClaimPhase
 	State State
-}
-
-type Spec struct {
-	AccessModes      []corev1.PersistentVolumeAccessMode
-	Name             string
-	Namespace        string
-	Size             resource.Quantity
-	StorageClassName string
 }
 
 type State string

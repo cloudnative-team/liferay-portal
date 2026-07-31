@@ -10,15 +10,13 @@ import (
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (volumeManager *VolumeManager) Reconcile(
+func (volumeManager *MarketplaceVolumeManager) Reconcile(
 	context context.Context,
 	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
 	statefulSet *appsv1.StatefulSet,
 ) ([]metav1.Condition, error) {
 	readyCondition, error := volumeManager.reconcileClaim(
-		context,
 		liferayEnvironment,
-		statefulSet,
 	)
 
 	if error != nil {
@@ -31,23 +29,12 @@ func (volumeManager *VolumeManager) Reconcile(
 	}, nil
 }
 
-func (volumeManager *VolumeManager) reconcileClaim(
-	context context.Context,
-	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
-	statefulSet *appsv1.StatefulSet,
-) (metav1.Condition, error) {
-	persistentVolumeClaimSpec := getPersistentVolumeClaimSpec(liferayEnvironment)
+func (volumeManager *MarketplaceVolumeManager) reconcileClaim(liferayEnvironment *licensingv1alpha1.LiferayEnvironment) (metav1.Condition, error) {
+	persistentVolumeClaimSpec := persistentvolumeclaim.GetPersistentVolumeClaimSpec(liferayEnvironment, "-marketplace")
 
 	liferayEnvironment.Status.MarketplaceVolume.ClaimName = persistentVolumeClaimSpec.Name
 
-	persistentVolumeClaimManager := &persistentvolumeclaim.PersistentVolumeClaimManager{
-		Client:  volumeManager.Client,
-		Context: context,
-		Spec:    persistentVolumeClaimSpec,
-		Owner:   statefulSet,
-	}
-
-	persistentVolumeClaimResult, error := persistentVolumeClaimManager.Ensure()
+	persistentVolumeClaimResult, error := volumeManager.PersistentVolumeClaimManager.Ensure()
 
 	if error != nil {
 		return metav1.Condition{}, error
@@ -60,6 +47,8 @@ func (volumeManager *VolumeManager) reconcileClaim(
 	return claimReadyCondition(persistentVolumeClaimResult, persistentVolumeClaimSpec), nil
 }
 
-type VolumeManager struct {
+type MarketplaceVolumeManager struct {
 	client.Client
+
+	*persistentvolumeclaim.PersistentVolumeClaimManager
 }

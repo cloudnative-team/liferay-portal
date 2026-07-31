@@ -1,33 +1,40 @@
-package marketplace
+package persistentvolumeclaim
 
 import (
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
-	"github.com/liferay/liferay-portal/cloud/operator/internal/utils/persistentvolumeclaim"
 	corev1 "k8s.io/api/core/v1"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
-const claimNameSuffix = "-marketplace"
-
-func getPersistentVolumeClaimSpec(
+func GetPersistentVolumeClaimSpec(
 	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
-) persistentvolumeclaim.Spec {
+	claimNameSuffix string,
+) Spec {
 	marketplaceVolumeSpec := liferayEnvironment.Spec.MarketplaceVolume
 
-	return persistentvolumeclaim.Spec{
+	return Spec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{
 			corev1.ReadWriteMany,
 		},
-		Name:             resolveClaimName(liferayEnvironment),
+		Name:             ResolveClaimName(liferayEnvironment, claimNameSuffix),
 		Namespace:        liferayEnvironment.Namespace,
 		Size:             marketplaceVolumeSpec.Size,
 		StorageClassName: marketplaceVolumeSpec.StorageClassName,
 	}
 }
 
-func resolveClaimName(liferayEnvironment *licensingv1alpha1.LiferayEnvironment) string {
+func ResolveClaimName(liferayEnvironment *licensingv1alpha1.LiferayEnvironment, claimNameSuffix string) string {
 	if liferayEnvironment.Spec.MarketplaceVolume.ClaimName != "" {
 		return liferayEnvironment.Spec.MarketplaceVolume.ClaimName
 	}
 
 	return liferayEnvironment.Spec.WorkloadRef.Name + claimNameSuffix
+}
+
+type Spec struct {
+	AccessModes      []corev1.PersistentVolumeAccessMode
+	Name             string
+	Namespace        string
+	Size             resource.Quantity
+	StorageClassName string
 }

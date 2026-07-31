@@ -9,6 +9,7 @@ import (
 
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
 	marketplace "github.com/liferay/liferay-portal/cloud/operator/internal/controllers/liferay/marketplace"
+	"github.com/liferay/liferay-portal/cloud/operator/internal/utils/persistentvolumeclaim"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
@@ -42,8 +43,16 @@ func (liferayStatefulSetReconciler *LiferayStatefulSetReconciler) Reconcile(
 
 	originalLiferayEnvironment := liferayEnvironment.DeepCopy()
 
-	marketplaceVolumeManager := &marketplace.VolumeManager{
+	persistentVolumeClaimSpec := persistentvolumeclaim.GetPersistentVolumeClaimSpec(liferayEnvironment, "-marketplace")
+
+	marketplaceVolumeManager := &marketplace.MarketplaceVolumeManager{
 		Client: liferayStatefulSetReconciler.Client,
+		PersistentVolumeClaimManager: &persistentvolumeclaim.PersistentVolumeClaimManager{
+			Client:  liferayStatefulSetReconciler.Client,
+			Context: context,
+			Spec:    persistentVolumeClaimSpec,
+			Owner:   statefulSet,
+		},
 	}
 
 	marketplaceConditions, error := marketplaceVolumeManager.Reconcile(

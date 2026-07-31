@@ -84,11 +84,11 @@ func mountCondition(
 	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
 	statefulSet *appsv1.StatefulSet,
 ) metav1.Condition {
-	claimName := resolveClaimName(liferayEnvironment)
+	claimName := persistentvolumeclaim.ResolveClaimName(liferayEnvironment, "-marketplace")
 
 	podSpec := &statefulSet.Spec.Template.Spec
 
-	volume := persistentvolumeclaim.ResolveVolume(claimName, podSpec)
+	volume := persistentvolumeclaim.GetVolumeByClaimName(claimName, podSpec)
 
 	if volume == nil {
 		return newCondition(
@@ -101,7 +101,7 @@ func mountCondition(
 		)
 	}
 
-	if !persistentvolumeclaim.MountedReadOnly(podSpec, volume) {
+	if !persistentvolumeclaim.IsVolumeReadOnly(podSpec, volume) {
 		return newCondition(
 			conditionTypeVolumeMounted,
 			fmt.Sprintf(

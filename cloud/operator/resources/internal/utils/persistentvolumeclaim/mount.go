@@ -4,7 +4,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func MountedReadOnly(podSpec *corev1.PodSpec, volume *corev1.Volume) bool {
+func IsVolumeReadOnly(podSpec *corev1.PodSpec, volume *corev1.Volume) bool {
 	containers := []corev1.Container{}
 
 	containers = append(containers, podSpec.Containers...)
@@ -29,7 +29,7 @@ func MountedReadOnly(podSpec *corev1.PodSpec, volume *corev1.Volume) bool {
 	return mounted
 }
 
-func ResolveVolume(claimName string, podSpec *corev1.PodSpec) *corev1.Volume {
+func GetVolumeByClaimName(claimName string, podSpec *corev1.PodSpec) *corev1.Volume {
 	for index, volume := range podSpec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
