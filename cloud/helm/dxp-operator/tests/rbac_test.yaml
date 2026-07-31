@@ -107,17 +107,37 @@ tests:
             value: ServiceAccount
         it: Omits the service account annotations by default
     -   asserts:
-            -   equal:
-                    path: rules[0].apiGroups
-                    value:
-                        -   licensing.liferay.com
             -   lengthEqual:
-                    count: 3
+                    count: 8
                     path: rules
         documentSelector:
             path: kind
             value: ClusterRole
-        it: Renders one rule per LiferayEnvironment resource in the licensing API group
+        it: Renders one rule per resource the controllers reconcile
+    -   asserts:
+            -   equal:
+                    path: rules[?(@.resources[0]=="persistentvolumeclaims")].verbs
+                    value:
+                        -   create
+                        -   get
+                        -   list
+                        -   watch
+            -   equal:
+                    path: rules[?(@.resources[0]=="statefulsets")].verbs
+                    value:
+                        -   get
+                        -   list
+                        -   watch
+            -   equal:
+                    path: rules[?(@.resources[0]=="storageclasses")].verbs
+                    value:
+                        -   get
+                        -   list
+                        -   watch
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Grants the verbs the marketplace volume needs
     -   asserts:
             -   hasDocuments:
                     count: 3
