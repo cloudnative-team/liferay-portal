@@ -7,6 +7,7 @@ import (
 	env "github.com/caarlos0/env/v11"
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
 	licensingcontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controller/licensing"
+	liferaycontroller "github.com/liferay/liferay-portal/cloud/operator/internal/controller/liferay"
 	provisioning "github.com/liferay/liferay-portal/cloud/operator/internal/provisioning"
 
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +67,17 @@ func main() {
 
 	if error := liferayEnvironmentReconciler.SetupWithManager(manager); error != nil {
 		setupLog.Error(error, "Unable to create liferayenvironment controller.")
+
+		os.Exit(1)
+	}
+
+	liferayStatefulSetReconciler := &liferaycontroller.LiferayStatefulSetReconciler{
+		Client:            manager.GetClient(),
+		HeartbeatInterval: config.HeartbeatInterval,
+	}
+
+	if error := liferayStatefulSetReconciler.SetupWithManager(manager); error != nil {
+		setupLog.Error(error, "Unable to create liferaystatefulset controller.")
 
 		os.Exit(1)
 	}
