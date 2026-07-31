@@ -58,6 +58,8 @@ k8s_resource(
         "liferay-dxp-operator:clusterrole",
         "liferay-dxp-operator:clusterrolebinding",
         "liferay-system:namespace",
+        "liferay-rwx:storageclass",
+        "liferay-rwx:persistentvolume",
     ],
 )
 
@@ -80,6 +82,34 @@ k8s_yaml(
         "kind: Namespace",
         "metadata:",
         "  name: liferay-system",
+    ]))
+)
+
+
+k8s_yaml(
+    blob("\n".join([
+        "apiVersion: storage.k8s.io/v1",
+        "kind: StorageClass",
+        "metadata:",
+        "  name: liferay-rwx",
+        "provisioner: kubernetes.io/no-provisioner",
+        "reclaimPolicy: Delete",
+        "volumeBindingMode: Immediate",
+        "---",
+        "apiVersion: v1",
+        "kind: PersistentVolume",
+        "metadata:",
+        "  name: liferay-rwx",
+        "spec:",
+        "  accessModes:",
+        "    - ReadWriteMany",
+        "  capacity:",
+        "    storage: 1Gi",
+        "  hostPath:",
+        "    path: /var/lib/liferay-marketplace",
+        "    type: DirectoryOrCreate",
+        "  persistentVolumeReclaimPolicy: Delete",
+        "  storageClassName: liferay-rwx",
     ]))
 )
 
@@ -108,6 +138,9 @@ k8s_yaml(
         "      name: dev-activation",
         "      key: activationCode",
         "    environmentName: \"Local dev\"",
+        "    marketplaceVolume:",
+        "      size: 1Gi",
+        "      storageClassName: liferay-rwx",
         "    workloadRef:",
         "      name: dev-liferay",
     ]))
