@@ -4,6 +4,10 @@
     {{- if eq .name "http" -}}{{- $backendPort = .port -}}{{- end -}}
 {{- end -}}
 {{- $suffix := ternary "" (printf "-%s" .name) (eq .name "") }}
+{{- $marketplace := .statefulset.marketplace | default dict }}
+{{- $marketplaceEnabled := and (eq .name "") $marketplace.enabled }}
+{{- $marketplaceClaimName := $marketplace.claimName | default (printf "%s-marketplace" (include "liferay.name" .root)) }}
+{{- $marketplaceVolumeName := $marketplace.volumeName | default "liferay-lpkg" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -167,13 +171,16 @@ spec:
             tolerations:
             {{- toYaml . | nindent 12 }}
             {{- end }}
-            {{- if or .statefulset.volumes .statefulset.customVolumes }}
+            {{- if or .statefulset.volumes .statefulset.customVolumes $marketplaceEnabled }}
             volumes:
                 {{- with .statefulset.volumes }}
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
                 {{- range $k, $v := .statefulset.customVolumes }}
                 {{- toYaml $v | nindent 16 }}
+                {{- end }}
+                {{- if $marketplaceEnabled }}
+                {{- list (dict "name" $marketplaceVolumeName "persistentVolumeClaim" (dict "claimName" $marketplaceClaimName)) | toYaml | nindent 16 }}
                 {{- end }}
             {{- end }}
     {{- with .statefulset.updateStrategy }}
