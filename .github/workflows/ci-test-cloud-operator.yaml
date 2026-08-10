@@ -10,4 +10,5 @@ on:
         paths:
             -   .github/workflows/ci-reusable-test-cloud-operator.yaml
             -   .github/workflows/ci-test-cloud-operator.yaml
+            -   cloud/helm/dxp-operator/**
             -   cloud/operator/**

@@ -84,6 +84,26 @@ Every `liferay-portal` shell script follows the delegated Bash Code Style. Scrip
  _execute "step-2"
 ```
 
+## Go
+
+Go files (`*.go`) are outside the portal source formatter's set of file types, so their automatic formatter is `gofmt`. The manual rules for Go are not listed below — they live in `.claude/rules/go-style.md`, which the harness attaches to any work touching a `*.go` file. Read that file and apply it in place of the manual rules in this document.
+
+The workflow mirrors the one above. Run `gofmt` across each Go module in scope — the directory that holds `go.mod` — apply the rules from `.claude/rules/go-style.md`, then rerun `gofmt` to absorb any fallout:
+
+```bash
+cd <go-module-root> && gofmt -w .
+```
+
+List the files that are not yet formatted without rewriting them:
+
+```bash
+cd <go-module-root> && gofmt -l .
+```
+
+When a rule and `gofmt` disagree, `gofmt` wins; leave the formatted code as it stands.
+
+Skip generated Go files, just as the automatic formatter skips `@generated` Java. A Go file is generated when it carries the canonical marker line `// Code generated ... DO NOT EDIT.` or a `zz_generated` name (controller-gen deepcopy, kubebuilder scaffolding). These are overwritten on the next `go generate`, so manual edits are lost and only pollute the diff.
+
 ## Rules
 
 ### Rule 1: Chained Method Call Ordering
