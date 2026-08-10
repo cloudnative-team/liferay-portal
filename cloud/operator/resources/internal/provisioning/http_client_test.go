@@ -9,7 +9,7 @@ func TestRedactSensitive(t *testing.T) {
 	testCases := map[string]struct {
 		assertContains    string
 		assertNotContains string
-		payload         string
+		payload           string
 	}{
 		"activationCode is redacted": {
 			assertContains:    `"activationCode":"[REDACTED]"`,
@@ -28,7 +28,7 @@ func TestRedactSensitive(t *testing.T) {
 			}`,
 		},
 		"manifest response redacts licenseXML": {
-			assertContains:    `"licenseXML": "[REDACTED]"`,
+			assertContains:    `"licenseXML":"[REDACTED]"`,
 			assertNotContains: "c2lnbmVkLWxpY2Vuc2U=",
 			payload: `{
 				"licenseXML": "c2lnbmVkLWxpY2Vuc2U=",
@@ -38,7 +38,7 @@ func TestRedactSensitive(t *testing.T) {
 		"non-JSON payload is returned as is": {
 			assertContains:    "not-a-json-token",
 			assertNotContains: "[REDACTED]",
-			payload:         "not-a-json-token",
+			payload:           "not-a-json-token",
 		},
 	}
 
