@@ -70,6 +70,7 @@ func main() {
 			Client:            manager.GetClient(),
 			GracePeriod:       config.GracePeriod,
 			HeartbeatInterval: config.HeartbeatInterval,
+			MarketplaceDir:    config.MarketplaceDir,
 			Provisioning:      provisioning.NewHTTPClient(config.ProvisioningBaseURL),
 			Recorder:          manager.GetEventRecorderFor("liferayenvironment-controller"),
 			RetryInitialDelay: config.RetryInitialDelay,
@@ -117,6 +118,7 @@ type config struct {
 	Debug               bool          `env:"DEBUG" envDefault:"false"`
 	GracePeriod         time.Duration `env:"GRACE_PERIOD" envDefault:"168h"`
 	HeartbeatInterval   time.Duration `env:"HEARTBEAT_INTERVAL" envDefault:"10m"`
+	MarketplaceDir      string        `env:"MARKETPLACE_DIR" envDefault:"/marketplace"`
 	MetricsAddress      string        `env:"METRICS_ADDRESS" envDefault:":8080"`
 	ProbeAddress        string        `env:"PROBE_ADDRESS" envDefault:":8081"`
 	ProvisioningBaseURL string        `env:"PROVISIONING_BASE_URL" envDefault:"https://webserver-lrprovisioning.lfr.cloud"`

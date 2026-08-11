@@ -17,9 +17,11 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"path/filepath"
 	"time"
 
 	licensingv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/licensing/v1alpha1"
+	addon "github.com/liferay/liferay-portal/cloud/operator/internal/addon"
 	license "github.com/liferay/liferay-portal/cloud/operator/internal/license"
 	provisioning "github.com/liferay/liferay-portal/cloud/operator/internal/provisioning"
 	appsv1 "k8s.io/api/apps/v1"
@@ -300,6 +302,30 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 			Type:   conditionLicenseValid,
 		},
 	)
+
+	apps, error := addon.Sync(
+		entitlements.AddOns,
+		context,
+		liferayEnvironmentReconciler.Provisioning,
+		environmentID,
+		liferayEnvironment.Status.Apps,
+		privateKey,
+		addon.NewFilesystemStore(
+			filepath.Join(
+				liferayEnvironmentReconciler.MarketplaceDir,
+				liferayEnvironment.Namespace,
+			),
+		),
+	)
+
+	liferayEnvironment.Status.Apps = apps
+
+	if error != nil {
+		logger.Error(
+			error, "Some add-ons were not downloaded", "environmentID",
+			environmentID,
+		)
+	}
 
 	if error := liferayEnvironmentReconciler.enforceReplicaCeiling(
 		context, liferayEnvironment, entitlements.MaxClusterNodes,
@@ -860,6 +886,7 @@ type LiferayEnvironmentReconciler struct {
 
 	GracePeriod       time.Duration
 	HeartbeatInterval time.Duration
+	MarketplaceDir    string
 	Provisioning      provisioning.Client
 	Recorder          record.EventRecorder
 	RetryInitialDelay time.Duration

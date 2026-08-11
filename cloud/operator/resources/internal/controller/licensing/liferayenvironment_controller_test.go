@@ -1,8 +1,11 @@
 package licensing
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"strings"
@@ -36,7 +39,11 @@ func (stubProvisioning *stubProvisioning) DownloadAddOn(
 	downloadRequest provisioning.DownloadRequest,
 	privateKey *rsa.PrivateKey,
 ) (io.ReadCloser, error) {
-	return nil, nil
+	if stubProvisioning.downloadError != nil {
+		return nil, stubProvisioning.downloadError
+	}
+
+	return io.NopCloser(bytes.NewReader(stubProvisioning.downloadBody)), nil
 }
 
 func (stubProvisioning *stubProvisioning) Manifest(
@@ -411,6 +418,50 @@ func TestReconcileIsNotBlockedByAddOns(t *testing.T) {
 
 	if length := len(getSecret("dev-entitlements", liferayEnvironmentReconciler, t).Data["add-ons.json"]); length == 0 {
 		t.Error("add-ons.json was not written to the entitlements secret")
+	}
+}
+
+func TestReconcileDownloadsAddOns(t *testing.T) {
+	body := []byte("PK\x03\x04 sample lpkg")
+
+	sum := sha256.Sum256(body)
+
+	entitlements := &provisioning.Entitlements{
+		AddOns: []provisioning.AddOn{
+			{
+				DownloadURL:    "https://example.com/marketplace/virtual-entry/77",
+				ProductName:    "Sample Add-on",
+				SHA256Checksum: hex.EncodeToString(sum[:]),
+				VirtualEntryID: 77,
+			},
+		},
+		LicenseXML:      []byte(virtualClusterLicenseXML("Friday, March 2, 2029 12:00:00 AM GMT", 3)),
+		MaxClusterNodes: 3,
+	}
+
+	liferayEnvironmentReconciler, _ := reconcileEnvironment(
+		&stubProvisioning{downloadBody: body, entitlements: entitlements}, t,
+		developmentObjects()...,
+	)
+
+	liferayEnvironment := getEnvironment(liferayEnvironmentReconciler, t)
+
+	if length := len(liferayEnvironment.Status.Apps); length != 1 {
+		t.Fatalf("Status.Apps length = %d, want 1", length)
+	}
+
+	appStatus := liferayEnvironment.Status.Apps[0]
+
+	if appStatus.Name != "Sample Add-on" {
+		t.Errorf("Name = %q, want Sample Add-on", appStatus.Name)
+	}
+
+	if appStatus.State != "Downloaded" {
+		t.Errorf("State = %q, want Downloaded", appStatus.State)
+	}
+
+	if appStatus.VirtualEntryID != 77 {
+		t.Errorf("VirtualEntryID = %d, want 77", appStatus.VirtualEntryID)
 	}
 }
 
@@ -799,6 +850,7 @@ func reconcileEnvironment(
 		Client:            newFakeClient(t, objects...),
 		GracePeriod:       7 * 24 * time.Hour,
 		HeartbeatInterval: 10 * time.Minute,
+		MarketplaceDir:    t.TempDir(),
 		Provisioning:      provisioningClient,
 		Recorder:          record.NewFakeRecorder(10),
 		RetryInitialDelay: 30 * time.Second,
@@ -834,6 +886,8 @@ func virtualClusterLicenseXML(expirationDate string, maxClusterNodes int32) stri
 
 type stubProvisioning struct {
 	activateError error
+	downloadBody  []byte
+	downloadError error
 	entitlements  *provisioning.Entitlements
 	manifestError error
 }
