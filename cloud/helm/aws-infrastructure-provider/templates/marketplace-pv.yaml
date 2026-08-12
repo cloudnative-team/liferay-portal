@@ -1,0 +1,45 @@
+{{- $dxpOperator := index .Values "liferay-dxp-operator" -}}
+{{- if and .Values.aws.efsFileSystemId $dxpOperator.enabled $dxpOperator.marketplace.enabled -}}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+    annotations:
+        argocd.argoproj.io/sync-wave: "-110"
+    labels:
+        app: liferay
+        component: storage
+    name: {{ $dxpOperator.marketplace.claimName }}
+spec:
+    accessModes:
+        -   ReadWriteMany
+    capacity:
+        storage: 10Gi
+    claimRef:
+        name: {{ $dxpOperator.marketplace.claimName }}
+        namespace: {{ $dxpOperator.namespaceOverride }}
+    csi:
+        driver: efs.csi.aws.com
+        volumeHandle: {{ .Values.aws.efsFileSystemId }}
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: ""
+    volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    annotations:
+        argocd.argoproj.io/sync-wave: "-110"
+    labels:
+        app: liferay
+        component: storage
+    name: {{ $dxpOperator.marketplace.claimName }}
+    namespace: {{ $dxpOperator.namespaceOverride }}
+spec:
+    accessModes:
+        -   ReadWriteMany
+    resources:
+        requests:
+            storage: 10Gi
+    storageClassName: ""
+    volumeName: {{ $dxpOperator.marketplace.claimName }}
+{{- end -}}

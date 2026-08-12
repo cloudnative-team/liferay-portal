@@ -1,4 +1,5 @@
-aws: {}
+aws:
+    efsFileSystemId: ""
 clusterBootstrap:
     image: alpine:3
     resources:
@@ -17,6 +18,10 @@ gateway:
 liferay-dxp-operator:
     enabled: true
     fullnameOverride: dxp-operator
+    marketplace:
+        claimName: dxp-operator-marketplace
+        enabled: true
+        mountPath: /marketplace
     namespaceOverride: dxp-operator-system
 liferay-subchart-backup-restore:
     enabled: true

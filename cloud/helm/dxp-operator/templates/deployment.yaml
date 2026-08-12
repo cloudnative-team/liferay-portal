@@ -31,6 +31,8 @@ spec:
                             value: {{ .Values.gracePeriod | quote }}
                         -   name: HEARTBEAT_INTERVAL
                             value: {{ .Values.heartbeatInterval | quote }}
+                        -   name: MARKETPLACE_DIR
+                            value: {{ .Values.marketplace.mountPath | quote }}
                         -   name: METRICS_ADDRESS
                             value: {{ printf ":%d" (int .Values.metrics.port) | quote }}
                         -   name: PROBE_ADDRESS
@@ -73,6 +75,10 @@ spec:
                         {{- toYaml . | nindent 24 }}
                     {{- end }}
                     volumeMounts:
+                        {{- if .Values.marketplace.enabled }}
+                        -   mountPath: {{ .Values.marketplace.mountPath }}
+                            name: marketplace
+                        {{- end }}
                         -   mountPath: /tmp/k8s-webhook-server/serving-certs
                             name: webhook-certs
                             readOnly: true
@@ -94,6 +100,11 @@ spec:
                 {{- toYaml . | nindent 16 }}
             {{- end }}
             volumes:
+                {{- if .Values.marketplace.enabled }}
+                -   name: marketplace
+                    persistentVolumeClaim:
+                        claimName: {{ .Values.marketplace.claimName }}
+                {{- end }}
                 -   name: webhook-certs
                     secret:
                         secretName: {{ include "dxp-operator.webhookServiceName" . }}
