@@ -270,6 +270,7 @@ customInitContainers:
                         -   mountPath: /lpkg
                             name: liferay-lpkg
                             readOnly: true
+                            subPath: {{ .namespace }}
                         -   mountPath: /opt/liferay
                             name: liferay-persistent-volume
                             subPath: liferay

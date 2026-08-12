@@ -1,0 +1,45 @@
+{{- $global := .Values.global | default dict }}
+{{- $aws := $global.aws | default dict }}
+{{- $efsFileSystemId := $aws.efsFileSystemId | default "" }}
+{{- if and .Values.marketplace.enabled $efsFileSystemId }}
+{{- $claimName := printf "%s-marketplace" (include "liferay.name" .) }}
+{{- $volumeName := printf "%s-marketplace" (include "liferay.namespace" .) }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+    labels:
+        app: {{ include "liferay.name" . }}
+        component: storage
+    name: {{ $volumeName }}
+spec:
+    accessModes:
+        -   ReadWriteMany
+    capacity:
+        storage: {{ .Values.marketplace.size }}
+    claimRef:
+        name: {{ $claimName }}
+        namespace: {{ include "liferay.namespace" . }}
+    csi:
+        driver: efs.csi.aws.com
+        volumeHandle: {{ $efsFileSystemId }}
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: ""
+    volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    labels:
+        app: {{ include "liferay.name" . }}
+        component: storage
+    name: {{ $claimName }}
+    namespace: {{ include "liferay.namespace" . }}
+spec:
+    accessModes:
+        -   ReadWriteMany
+    resources:
+        requests:
+            storage: {{ .Values.marketplace.size }}
+    storageClassName: ""
+    volumeName: {{ $volumeName }}
+{{- end }}
