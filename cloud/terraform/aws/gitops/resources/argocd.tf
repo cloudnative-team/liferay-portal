@@ -235,6 +235,10 @@ resource "kubernetes_manifest" "infrastructure_provider_application" {
 									value=local.cluster_name
 								},
 								{
+									name="aws.efsFileSystemId"
+									value=data.aws_efs_file_system.marketplace.file_system_id
+								},
+								{
 									name="aws.nodesSecurityGroupId"
 									value=data.aws_eks_cluster.cluster.vpc_config[0].cluster_security_group_id
 								},
@@ -389,6 +393,10 @@ resource "kubernetes_manifest" "liferay_applicationset" {
 										{
 											name="global.aws.accountId"
 											value=local.account_id
+										},
+										{
+											name="global.aws.efsFileSystemId"
+											value=data.aws_efs_file_system.marketplace.file_system_id
 										},
 										{
 											name="global.deploymentName"
