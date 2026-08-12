@@ -377,6 +377,10 @@ livenessProbe:
     periodSeconds: 30
     timeoutSeconds: 5
 marketplace:
+    csi:
+        driver: ""
+        volumeAttributes: {}
+        volumeHandle: ""
     enabled: false
     initScriptsVolumeName: liferay-init-scripts-default
     size: 10Gi

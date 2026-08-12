@@ -1,7 +1,4 @@
-{{- $global := .Values.global | default dict }}
-{{- $aws := $global.aws | default dict }}
-{{- $efsFileSystemId := $aws.efsFileSystemId | default "" }}
-{{- if and .Values.marketplace.enabled $efsFileSystemId }}
+{{- if and .Values.marketplace.enabled .Values.marketplace.csi.driver .Values.marketplace.csi.volumeHandle }}
 {{- $claimName := printf "%s-marketplace" (include "liferay.name" .) }}
 {{- $volumeName := printf "%s-marketplace" (include "liferay.namespace" .) }}
 apiVersion: v1
@@ -20,8 +17,12 @@ spec:
         name: {{ $claimName }}
         namespace: {{ include "liferay.namespace" . }}
     csi:
-        driver: efs.csi.aws.com
-        volumeHandle: {{ $efsFileSystemId }}
+        driver: {{ .Values.marketplace.csi.driver }}
+        volumeHandle: {{ .Values.marketplace.csi.volumeHandle }}
+        {{- with .Values.marketplace.csi.volumeAttributes }}
+        volumeAttributes:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
     persistentVolumeReclaimPolicy: Retain
     storageClassName: ""
     volumeMode: Filesystem

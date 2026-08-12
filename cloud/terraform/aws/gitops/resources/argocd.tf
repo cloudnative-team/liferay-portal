@@ -383,6 +383,10 @@ resource "kubernetes_manifest" "liferay_applicationset" {
 								helm={
 									parameters=[
 										{
+											name="${local.liferay_helm_chart_config.values_scope_prefix}marketplace.csi.volumeHandle"
+											value=data.aws_efs_file_system.marketplace.file_system_id
+										},
+										{
 											name="${local.liferay_helm_chart_config.values_scope_prefix}network.gatewayName"
 											value=local.gateway_name
 										},
@@ -393,10 +397,6 @@ resource "kubernetes_manifest" "liferay_applicationset" {
 										{
 											name="global.aws.accountId"
 											value=local.account_id
-										},
-										{
-											name="global.aws.efsFileSystemId"
-											value=data.aws_efs_file_system.marketplace.file_system_id
 										},
 										{
 											name="global.deploymentName"
