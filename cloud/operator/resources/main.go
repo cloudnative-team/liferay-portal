@@ -66,13 +66,14 @@ func main() {
 	if error := controller.SetupWithManager(
 		manager,
 		&licensing.LiferayEnvironmentReconciler{
-			Client:            manager.GetClient(),
-			GracePeriod:       config.GracePeriod,
-			HeartbeatInterval: config.HeartbeatInterval,
-			Provisioning:      provisioning.NewHTTPClient(config.ProvisioningBaseURL),
-			Recorder:          manager.GetEventRecorderFor("liferayenvironment-controller"),
-			RetryInitialDelay: config.RetryInitialDelay,
-			RetryMaxDelay:     config.RetryMaxDelay,
+			Client:                manager.GetClient(),
+			GracePeriod:           config.GracePeriod,
+			HeartbeatInterval:     config.HeartbeatInterval,
+			MarketplaceVolumePath: config.MarketplaceVolumePath,
+			Provisioning:          provisioning.NewHTTPClient(config.ProvisioningBaseURL),
+			Recorder:              manager.GetEventRecorderFor("liferayenvironment-controller"),
+			RetryInitialDelay:     config.RetryInitialDelay,
+			RetryMaxDelay:         config.RetryMaxDelay,
 		},
 	); error != nil {
 		controller.SetupLog.Error(error, "Unable to set up controllers")
@@ -110,14 +111,15 @@ func main() {
 }
 
 type config struct {
-	Debug               bool          `env:"DEBUG" envDefault:"false"`
-	GracePeriod         time.Duration `env:"GRACE_PERIOD" envDefault:"168h"`
-	HeartbeatInterval   time.Duration `env:"HEARTBEAT_INTERVAL" envDefault:"10m"`
-	MetricsAddress      string        `env:"METRICS_ADDRESS" envDefault:":8080"`
-	ProbeAddress        string        `env:"PROBE_ADDRESS" envDefault:":8081"`
-	ProvisioningBaseURL string        `env:"PROVISIONING_BASE_URL" envDefault:"https://api.one.liferay.com"`
-	RetryInitialDelay   time.Duration `env:"RETRY_INITIAL_DELAY" envDefault:"30s"`
-	RetryMaxDelay       time.Duration `env:"RETRY_MAX_DELAY" envDefault:"30m"`
+	Debug                 bool          `env:"DEBUG" envDefault:"false"`
+	GracePeriod           time.Duration `env:"GRACE_PERIOD" envDefault:"168h"`
+	HeartbeatInterval     time.Duration `env:"HEARTBEAT_INTERVAL" envDefault:"10m"`
+	MarketplaceVolumePath string        `env:"MARKETPLACE_VOLUME_PATH" envDefault:"/marketplace"`
+	MetricsAddress        string        `env:"METRICS_ADDRESS" envDefault:":8080"`
+	ProbeAddress          string        `env:"PROBE_ADDRESS" envDefault:":8081"`
+	ProvisioningBaseURL   string        `env:"PROVISIONING_BASE_URL" envDefault:"https://api.one.liferay.com"`
+	RetryInitialDelay     time.Duration `env:"RETRY_INITIAL_DELAY" envDefault:"30s"`
+	RetryMaxDelay         time.Duration `env:"RETRY_MAX_DELAY" envDefault:"30m"`
 }
 
 var scheme = runtime.NewScheme()

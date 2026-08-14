@@ -1,12 +1,15 @@
 package licensing
 
 import (
+	"archive/zip"
 	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -422,7 +425,7 @@ func TestReconcileIsNotBlockedByAddOns(t *testing.T) {
 	}
 }
 
-func TestReconcileOfflineAwaitsActivationBundle(t *testing.T) {
+func TestReconcileOfflineAwaitsOfflineActivationBundle(t *testing.T) {
 	environment := pendingEnvironment()
 	environment.Spec.Offline = true
 
@@ -480,6 +483,173 @@ func TestReconcileOfflineAwaitsActivationBundle(t *testing.T) {
 
 	if condition.Status != metav1.ConditionFalse {
 		t.Errorf("Activated condition status = %v, want False", condition.Status)
+	}
+}
+
+func TestReconcileOfflineAwaitsMissingBundleFile(t *testing.T) {
+	environment := pendingEnvironment()
+	environment.Spec.Offline = true
+	environment.Spec.OfflineActivationBundle = "bundle.zip"
+
+	liferayEnvironmentReconciler, result := reconcileOfflineActivationBundle(
+		t.TempDir(), t,
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "liferay-dev",
+				UID:  "dev-namespace-uid",
+			},
+		},
+		environment,
+	)
+
+	if result.RequeueAfter != 15*time.Second {
+		t.Errorf("RequeueAfter = %s, want 15s", result.RequeueAfter)
+	}
+
+	liferayEnvironment := getEnvironment(liferayEnvironmentReconciler, t)
+
+	if liferayEnvironment.Status.Phase != "Pending" {
+		t.Errorf("Phase = %q, want Pending", liferayEnvironment.Status.Phase)
+	}
+
+	condition := meta.FindStatusCondition(
+		liferayEnvironment.Status.Conditions, conditionActivated,
+	)
+
+	if condition == nil || condition.Reason != "AwaitingOfflineActivationBundle" {
+		t.Errorf(
+			"Activated condition = %v, want AwaitingOfflineActivationBundle", condition,
+		)
+	}
+}
+
+func TestReconcileOfflineLicensesFromBundle(t *testing.T) {
+	marketplaceVolumePath := t.TempDir()
+
+	licenseXML := virtualClusterLicenseXML("Friday, March 2, 2029 12:00:00 AM GMT", 3)
+
+	writeOfflineActivationBundle(
+		map[string]string{
+			"add-ons/app.lpkg": "PK-fake-lpkg",
+			"manifest.json": fmt.Sprintf(
+				`{"add-ons":[],"licenseXML":%q,"maxClusterNodes":3}`,
+				base64.StdEncoding.EncodeToString([]byte(licenseXML)),
+			),
+		},
+		filepath.Join(
+			marketplaceVolumePath, "liferay-dev", "dev-namespace-uid", "bundle.zip",
+		),
+		t,
+	)
+
+	environment := pendingEnvironment()
+	environment.Spec.Offline = true
+	environment.Spec.OfflineActivationBundle = "bundle.zip"
+
+	liferayEnvironmentReconciler, result := reconcileOfflineActivationBundle(
+		marketplaceVolumePath, t,
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "liferay-dev",
+				UID:  "dev-namespace-uid",
+			},
+		},
+		&appsv1.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dev-liferay",
+				Namespace: "liferay-dev",
+			},
+			Spec: appsv1.StatefulSetSpec{
+				Replicas: pointerInt32(3),
+			},
+		},
+		environment,
+	)
+
+	if result.RequeueAfter != 10*time.Minute {
+		t.Errorf("RequeueAfter = %s, want the heartbeat 10m", result.RequeueAfter)
+	}
+
+	liferayEnvironment := getEnvironment(liferayEnvironmentReconciler, t)
+
+	if liferayEnvironment.Status.Phase != "Ready" {
+		t.Errorf("Phase = %q, want Ready", liferayEnvironment.Status.Phase)
+	}
+
+	if liferayEnvironment.Status.ActivatedAt == nil {
+		t.Error("ActivatedAt = nil, want it set after licensing from the bundle")
+	}
+
+	if liferayEnvironment.Status.License.MaxClusterNodes != 3 {
+		t.Errorf(
+			"License.MaxClusterNodes = %d, want 3",
+			liferayEnvironment.Status.License.MaxClusterNodes,
+		)
+	}
+
+	if activated := meta.FindStatusCondition(
+		liferayEnvironment.Status.Conditions, conditionActivated,
+	); activated == nil || activated.Status != metav1.ConditionTrue {
+		t.Errorf("Activated condition = %v, want True", activated)
+	}
+
+	if licenseValid := meta.FindStatusCondition(
+		liferayEnvironment.Status.Conditions, conditionLicenseValid,
+	); licenseValid == nil || licenseValid.Status != metav1.ConditionTrue {
+		t.Errorf("LicenseValid condition = %v, want True", licenseValid)
+	}
+
+	if written := getLicenseXML(liferayEnvironmentReconciler, t); written != licenseXML {
+		t.Errorf("entitlements license.xml = %q, want the bundle license", written)
+	}
+}
+
+func TestReconcileOfflineRejectsInvalidBundle(t *testing.T) {
+	marketplaceVolumePath := t.TempDir()
+
+	writeOfflineActivationBundle(
+		map[string]string{
+			"add-ons/app.lpkg": "PK-fake-lpkg",
+		},
+		filepath.Join(
+			marketplaceVolumePath, "liferay-dev", "dev-namespace-uid", "bundle.zip",
+		),
+		t,
+	)
+
+	environment := pendingEnvironment()
+	environment.Spec.Offline = true
+	environment.Spec.OfflineActivationBundle = "bundle.zip"
+
+	liferayEnvironmentReconciler, result := reconcileOfflineActivationBundle(
+		marketplaceVolumePath, t,
+		&corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "liferay-dev",
+				UID:  "dev-namespace-uid",
+			},
+		},
+		environment,
+	)
+
+	if result.RequeueAfter != 15*time.Second {
+		t.Errorf("RequeueAfter = %s, want 15s", result.RequeueAfter)
+	}
+
+	liferayEnvironment := getEnvironment(liferayEnvironmentReconciler, t)
+
+	if liferayEnvironment.Status.Phase != "Degraded" {
+		t.Errorf("Phase = %q, want Degraded", liferayEnvironment.Status.Phase)
+	}
+
+	condition := meta.FindStatusCondition(
+		liferayEnvironment.Status.Conditions, conditionActivated,
+	)
+
+	if condition == nil || condition.Status != metav1.ConditionFalse ||
+		condition.Reason != "OfflineActivationBundleInvalid" {
+
+		t.Errorf("Activated condition = %v, want False/OfflineActivationBundleInvalid", condition)
 	}
 }
 
@@ -938,6 +1108,28 @@ func pointerInt32(value int32) *int32 {
 	return &value
 }
 
+func reconcile(
+	liferayEnvironmentReconciler *LiferayEnvironmentReconciler,
+	t *testing.T,
+) controllerruntime.Result {
+	t.Helper()
+
+	result, error := liferayEnvironmentReconciler.Reconcile(
+		context.Background(), controllerruntime.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      "dev",
+				Namespace: "liferay-dev",
+			},
+		},
+	)
+
+	if error != nil {
+		t.Fatalf("Unexpected reconcile error: %v", error)
+	}
+
+	return result
+}
+
 func reconcileEnvironment(
 	provisioningClient provisioning.Client,
 	t *testing.T,
@@ -955,20 +1147,25 @@ func reconcileEnvironment(
 		RetryMaxDelay:     30 * time.Minute,
 	}
 
-	result, error := liferayEnvironmentReconciler.Reconcile(
-		context.Background(), controllerruntime.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      "dev",
-				Namespace: "liferay-dev",
-			},
-		},
-	)
+	return liferayEnvironmentReconciler, reconcile(liferayEnvironmentReconciler, t)
+}
 
-	if error != nil {
-		t.Fatalf("Unexpected reconcile error: %v", error)
+func reconcileOfflineActivationBundle(
+	marketplaceVolumePath string,
+	t *testing.T,
+	objects ...client.Object,
+) (*LiferayEnvironmentReconciler, controllerruntime.Result) {
+	t.Helper()
+
+	liferayEnvironmentReconciler := &LiferayEnvironmentReconciler{
+		Client:                newFakeClient(t, objects...),
+		HeartbeatInterval:     10 * time.Minute,
+		MarketplaceVolumePath: marketplaceVolumePath,
+		Provisioning:          &stubProvisioning{},
+		Recorder:              record.NewFakeRecorder(10),
 	}
 
-	return liferayEnvironmentReconciler, result
+	return liferayEnvironmentReconciler, reconcile(liferayEnvironmentReconciler, t)
 }
 
 func virtualClusterLicenseXML(expirationDate string, maxClusterNodes int32) string {
@@ -980,6 +1177,40 @@ func virtualClusterLicenseXML(expirationDate string, maxClusterNodes int32) stri
 			"</license></licenses>",
 		expirationDate, maxClusterNodes,
 	)
+}
+
+func writeOfflineActivationBundle(files map[string]string, path string, t *testing.T) {
+	t.Helper()
+
+	if error := os.MkdirAll(filepath.Dir(path), 0o755); error != nil {
+		t.Fatalf("Unable to create the bundle directory: %v", error)
+	}
+
+	file, error := os.Create(path)
+
+	if error != nil {
+		t.Fatalf("Unable to create the bundle file: %v", error)
+	}
+
+	defer file.Close()
+
+	zipWriter := zip.NewWriter(file)
+
+	for name, content := range files {
+		writer, error := zipWriter.Create(name)
+
+		if error != nil {
+			t.Fatalf("Unable to add %q to the bundle: %v", name, error)
+		}
+
+		if _, error := writer.Write([]byte(content)); error != nil {
+			t.Fatalf("Unable to write %q to the bundle: %v", name, error)
+		}
+	}
+
+	if error := zipWriter.Close(); error != nil {
+		t.Fatalf("Unable to finalize the bundle: %v", error)
+	}
 }
 
 type stubProvisioning struct {
