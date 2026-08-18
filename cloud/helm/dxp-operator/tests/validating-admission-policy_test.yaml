@@ -15,6 +15,8 @@ tests:
             -   equal:
                     path: spec.paramRef.parameterNotFoundAction
                     value: Allow
+            -   notExists:
+                    path: metadata.namespace
         documentSelector:
             path: kind
             value: ValidatingAdmissionPolicyBinding
@@ -44,6 +46,8 @@ tests:
             -   matchRegex:
                     path: spec.matchConditions[0].expression
                     pattern: system:serviceaccount:my-namespace:my-release-liferay-dxp-operator
+            -   notExists:
+                    path: metadata.namespace
         documentSelector:
             path: kind
             value: ValidatingAdmissionPolicy
@@ -52,3 +56,13 @@ tests:
             -   hasDocuments:
                     count: 2
         it: Renders the policy and its binding
+    -   asserts:
+            -   equal:
+                    path: spec.paramRef.selector
+                    value: {}
+            -   notExists:
+                    path: spec.paramRef.namespace
+        documentSelector:
+            path: kind
+            value: ValidatingAdmissionPolicyBinding
+        it: Selects every LiferayEnvironment in the namespace of the admitted workload
