@@ -1,0 +1,123 @@
+suite: Marketplace Persistent Volume
+templates:
+    -   templates/marketplace-pv.yaml
+tests:
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Renders nothing when the marketplace is disabled
+        set:
+            marketplace.csi.driver: efs.csi.aws.com
+            marketplace.csi.volumeHandle: fs-0123456789abcdef0
+            marketplace.enabled: false
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Renders nothing when the CSI driver is unset
+        set:
+            marketplace.csi.driver: ""
+            marketplace.csi.volumeHandle: fs-0123456789abcdef0
+            marketplace.enabled: true
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Renders nothing when the CSI volume handle is unset
+        set:
+            marketplace.csi.driver: efs.csi.aws.com
+            marketplace.csi.volumeHandle: ""
+            marketplace.enabled: true
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   hasDocuments:
+                    count: 2
+        it: Renders the volume and the claim together
+        set:
+            marketplace.csi.driver: efs.csi.aws.com
+            marketplace.csi.volumeHandle: fs-0123456789abcdef0
+            marketplace.enabled: true
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   equal:
+                    path: metadata.name
+                    value: liferay-default-dev-marketplace
+            -   equal:
+                    path: spec.claimRef
+                    value:
+                        name: liferay-default-marketplace
+                        namespace: liferay-default-dev
+            -   equal:
+                    path: spec.persistentVolumeReclaimPolicy
+                    value: Retain
+            -   equal:
+                    path: spec.storageClassName
+                    value: ""
+        documentSelector:
+            path: kind
+            value: PersistentVolume
+        it: Binds the volume to the claim in its own namespace
+        set:
+            marketplace.csi.driver: efs.csi.aws.com
+            marketplace.csi.volumeHandle: fs-0123456789abcdef0
+            marketplace.enabled: true
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   equal:
+                    path: spec.csi.driver
+                    value: efs.csi.aws.com
+            -   equal:
+                    path: spec.csi.volumeHandle
+                    value: fs-0123456789abcdef0
+            -   notExists:
+                    path: spec.csi.volumeAttributes
+        documentSelector:
+            path: kind
+            value: PersistentVolume
+        it: Omits volume attributes when none are configured
+        set:
+            marketplace.csi.driver: efs.csi.aws.com
+            marketplace.csi.volumeHandle: fs-0123456789abcdef0
+            marketplace.enabled: true
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   equal:
+                    path: spec.csi.volumeAttributes
+                    value:
+                        protocol: NFS_V3
+                        volume: lpkg
+        documentSelector:
+            path: kind
+            value: PersistentVolume
+        it: Passes the configured volume attributes through
+        set:
+            marketplace.csi.driver: filestore.csi.storage.gke.io
+            marketplace.csi.volumeAttributes:
+                protocol: NFS_V3
+                volume: lpkg
+            marketplace.csi.volumeHandle: modeInstance/us-east1-b/greenwald-lpkg/lpkg
+            marketplace.enabled: true
+            namespaceOverride: liferay-default-dev
+    -   asserts:
+            -   equal:
+                    path: metadata.name
+                    value: liferay-default-marketplace
+            -   equal:
+                    path: spec.resources.requests.storage
+                    value: 20Gi
+            -   equal:
+                    path: spec.storageClassName
+                    value: ""
+            -   equal:
+                    path: spec.volumeName
+                    value: liferay-default-dev-marketplace
+        documentSelector:
+            path: kind
+            value: PersistentVolumeClaim
+        it: Requests the configured size from the named volume
+        set:
+            marketplace.csi.driver: efs.csi.aws.com
+            marketplace.csi.volumeHandle: fs-0123456789abcdef0
+            marketplace.enabled: true
+            marketplace.size: 20Gi
+            namespaceOverride: liferay-default-dev
