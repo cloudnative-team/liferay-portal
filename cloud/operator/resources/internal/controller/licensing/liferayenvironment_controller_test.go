@@ -910,7 +910,9 @@ func TestReconcileOfflineStoresRequestInIdentitySecret(t *testing.T) {
 
 func TestReconcileOrphansRemovedEntitlement(t *testing.T) {
 	entitlements := &provisioning.Entitlements{
-		LicenseXML:      []byte(virtualClusterLicenseXML("Friday, March 2, 2029 12:00:00 AM GMT", 3)),
+		LicenseXML: []byte(virtualClusterLicenseXML(
+			"Friday, March 2, 2029 12:00:00 AM GMT", 3, "dev-namespace-uid",
+		)),
 		MaxClusterNodes: 3,
 	}
 
@@ -1401,7 +1403,9 @@ func addOnEntitlements(checksum string) *provisioning.Entitlements {
 				VirtualEntryID: 77,
 			},
 		},
-		LicenseXML:      []byte(virtualClusterLicenseXML("Friday, March 2, 2029 12:00:00 AM GMT", 3)),
+		LicenseXML: []byte(virtualClusterLicenseXML(
+			"Friday, March 2, 2029 12:00:00 AM GMT", 3, "dev-namespace-uid",
+		)),
 		MaxClusterNodes: 3,
 	}
 }
