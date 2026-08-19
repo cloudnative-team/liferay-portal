@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,7 +168,7 @@ func TestEnforceReplicaCeiling(t *testing.T) {
 				},
 			}
 
-			objects := []client.Object{}
+			var objects []client.Object
 
 			if testCase.workloadExists {
 				objects = append(objects, &appsv1.StatefulSet{
@@ -230,6 +231,99 @@ func TestEnforceReplicaCeiling(t *testing.T) {
 				statefulSet.Spec.Replicas, testCase.expectedReplicas,
 				"statefulSet.spec.replicas", t,
 			)
+		})
+	}
+}
+
+func TestEnsureNamespaceEnvironmentLabel(t *testing.T) {
+	testCases := map[string]struct {
+		existingLabels map[string]string
+		expectedError  bool
+		expectedLabels map[string]string
+		namespaceName  string
+	}{
+		"adds the label alongside labels owned by other writers": {
+			existingLabels: map[string]string{
+				"liferay.com/observable":             "true",
+				"pod-security.kubernetes.io/enforce": "restricted",
+			},
+			expectedLabels: map[string]string{
+				environmentLabel:                     "true",
+				"liferay.com/observable":             "true",
+				"pod-security.kubernetes.io/enforce": "restricted",
+			},
+			namespaceName: "liferay-default-dev",
+		},
+		"adds the label when the namespace has no labels": {
+			existingLabels: nil,
+			expectedLabels: map[string]string{environmentLabel: "true"},
+			namespaceName:  "liferay-default-dev",
+		},
+		"fails when the namespace is missing": {
+			expectedError: true,
+			namespaceName: "liferay-missing-dev",
+		},
+		"leaves the label untouched when it is already set": {
+			existingLabels: map[string]string{environmentLabel: "true"},
+			expectedLabels: map[string]string{environmentLabel: "true"},
+			namespaceName:  "liferay-default-dev",
+		},
+		"restores the label when another writer changed its value": {
+			existingLabels: map[string]string{environmentLabel: "false"},
+			expectedLabels: map[string]string{environmentLabel: "true"},
+			namespaceName:  "liferay-default-dev",
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			objects := []client.Object{}
+
+			if !testCase.expectedError {
+				objects = append(objects, &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: testCase.existingLabels,
+						Name:   testCase.namespaceName,
+					},
+				})
+			}
+
+			liferayEnvironmentReconciler := &LiferayEnvironmentReconciler{
+				Client: newFakeClient(t, objects...),
+			}
+
+			error := liferayEnvironmentReconciler.ensureNamespaceEnvironmentLabel(
+				context.Background(), testCase.namespaceName,
+			)
+
+			if testCase.expectedError {
+				if error == nil {
+					t.Fatal("ensureNamespaceEnvironmentLabel = nil, want an error")
+				}
+
+				return
+			}
+
+			if error != nil {
+				t.Fatalf("ensureNamespaceEnvironmentLabel = %v, want nil", error)
+			}
+
+			namespace := &corev1.Namespace{}
+
+			if error := liferayEnvironmentReconciler.Get(
+				context.Background(),
+				types.NamespacedName{Name: testCase.namespaceName},
+				namespace,
+			); error != nil {
+				t.Fatalf("Unable to read back the namespace: %v", error)
+			}
+
+			if !maps.Equal(namespace.Labels, testCase.expectedLabels) {
+				t.Errorf(
+					"namespace.Labels = %v, want %v",
+					namespace.Labels, testCase.expectedLabels,
+				)
+			}
 		})
 	}
 }
