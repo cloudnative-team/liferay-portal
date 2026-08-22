@@ -48,6 +48,7 @@ const (
 	conditionReplicasCountValid    = "ReplicasCountValid"
 	entitlementsSecretSuffix       = "-entitlements"
 	environmentLabel               = "licensing.liferay.com/environment"
+	fieldOwner                     = "liferay-dxp-operator"
 	gracePeriodReplicaCeiling      = 1
 	identitySecretSuffix           = "-identity"
 )
@@ -529,7 +530,9 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceReplica
 
 		statefulSet.Spec.Replicas = &effectiveReplicas
 
-		if error := liferayEnvironmentReconciler.Update(context, statefulSet); error != nil {
+		if error := liferayEnvironmentReconciler.Update(
+			context, statefulSet, client.FieldOwner(fieldOwner),
+		); error != nil {
 			logger.Error(
 				error, "Unable to enforce the licensed replica ceiling",
 				"effectiveReplicas", effectiveReplicas,
