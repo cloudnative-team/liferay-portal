@@ -450,6 +450,11 @@ resource "kubernetes_manifest" "liferay_applicationset" {
 							kind="Secret"
 							name="liferay-default"
 						},
+						{
+							group="apps"
+							kind="StatefulSet"
+							managedFieldsManagers=["liferay-dxp-operator"]
+						},
 					]
 					syncPolicy={
 						automated={
