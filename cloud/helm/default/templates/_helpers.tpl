@@ -1,5 +1,5 @@
 {{- define "liferay.activationCodeSecretName" -}}
-{{- .Values.license.activationCodeSecretName | default (printf "%s-activation" (include "liferay.name" .)) }}
+{{- .Values.licensing.activationCodeSecretName | default (printf "%s-activation" (include "liferay.name" .)) }}
 {{- end }}
 
 {{- define "liferay.chart" -}}

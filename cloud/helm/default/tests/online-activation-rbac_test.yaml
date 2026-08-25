@@ -52,7 +52,7 @@ tests:
             value: Role
         it: Tracks a custom activation code secret name
         set:
-            license.activationCodeSecretName: custom-activation
+            licensing.activationCodeSecretName: custom-activation
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
