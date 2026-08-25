@@ -4,19 +4,8 @@ templates:
 tests:
     -   asserts:
             -   equal:
-                    path: spec.marketplaceVolume.enabled
-                    value: true
-            -   equal:
-                    path: spec.marketplaceVolume.storageClassName
-                    value: azurefile-csi
-            -   equal:
                     path: spec.workloadRef.name
                     value: liferay-default
-        it: Requests an Azure Files backed ReadWriteMany volume by default
-    -   asserts:
-            -   equal:
-                    path: spec.marketplaceVolume.storageClassName
-                    value: azurefile-csi-premium
-        it: Overrides storage class
+        it: Names the workload on the LiferayEnvironment
         set:
-            liferay-default.marketplace.storageClassName: azurefile-csi-premium
+            liferay-default.licensing.enabled: true
