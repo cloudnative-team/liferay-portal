@@ -1,0 +1,51 @@
+{{- if and .Values.licensing.enabled .Values.licensing.onlineActivationWorkflow.enabled -}}
+{{- $onlineActivationWorkflow := .Values.licensing.onlineActivationWorkflow -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+    labels:
+        {{- include "liferay.labels" . | nindent 8 }}
+    name: online-activation-role
+    namespace: {{ include "liferay.namespace" . }}
+rules:
+    -   apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["create"]
+    -   apiGroups: [""]
+        resourceNames:
+            -   {{ include "liferay.activationCodeSecretName" . }}
+        resources: ["secrets"]
+        verbs: ["get", "patch", "update"]
+    -   apiGroups: ["argoproj.io"]
+        resources: ["workflowtaskresults"]
+        verbs: ["create", "patch"]
+    -   apiGroups: ["licensing.liferay.com"]
+        resourceNames:
+            -   {{ include "liferay.name" . }}
+        resources: ["liferayenvironments"]
+        verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+    labels:
+        {{- include "liferay.labels" . | nindent 8 }}
+    name: online-activation-role-binding
+    namespace: {{ include "liferay.namespace" . }}
+roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: online-activation-role
+subjects:
+    -   kind: ServiceAccount
+        name: {{ $onlineActivationWorkflow.serviceAccountName }}
+        namespace: {{ include "liferay.namespace" . }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    labels:
+        {{- include "liferay.labels" . | nindent 8 }}
+    name: {{ $onlineActivationWorkflow.serviceAccountName }}
+    namespace: {{ include "liferay.namespace" . }}
+{{- end -}}
