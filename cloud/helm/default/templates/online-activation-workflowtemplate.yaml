@@ -21,7 +21,7 @@ spec:
                 value: {{ include "liferay.name" . }}
     entrypoint: main
     podGC:
-        strategy: OnPodCompletion
+        strategy: OnWorkflowSuccess
     securityContext:
         runAsNonRoot: true
         runAsUser: 8737
