@@ -1,0 +1,102 @@
+suite: Online Activation RBAC
+templates:
+    -   templates/online-activation-rbac.yaml
+tests:
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the RBAC when licensing is disabled
+        set:
+            licensing.enabled: false
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the RBAC when the online activation workflow is disabled
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: false
+    -   asserts:
+            -   hasDocuments:
+                    count: 3
+        it: Renders the service account, role, and role binding together
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: rules[0].resources
+                    value: ["secrets"]
+            -   equal:
+                    path: rules[0].verbs
+                    value: ["create"]
+            -   equal:
+                    path: rules[1].resourceNames
+                    value: ["liferay-default-activation"]
+            -   equal:
+                    path: rules[1].verbs
+                    value: ["get", "patch", "update"]
+        documentSelector:
+            path: kind
+            value: Role
+        it: Scopes the writable secret to the activation code secret the operator reads
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: rules[1].resourceNames
+                    value: ["custom-activation"]
+        documentSelector:
+            path: kind
+            value: Role
+        it: Tracks a custom activation code secret name
+        set:
+            license.activationCodeSecretName: custom-activation
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: rules[2].resources
+                    value: ["workflowtaskresults"]
+            -   equal:
+                    path: rules[2].verbs
+                    value: ["create", "patch"]
+        documentSelector:
+            path: kind
+            value: Role
+        it: Grants the workflow task results every Argo pod reports through
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: rules[3].resourceNames
+                    value: ["liferay-default"]
+            -   equal:
+                    path: rules[3].resources
+                    value: ["liferayenvironments"]
+            -   equal:
+                    path: rules[3].verbs
+                    value: ["get", "patch"]
+        documentSelector:
+            path: kind
+            value: Role
+        it: Scopes the custom resource access to this environment and withholds list and watch
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: roleRef.name
+                    value: online-activation-role
+            -   equal:
+                    path: subjects[0].name
+                    value: online-activation-service-account
+        documentSelector:
+            path: kind
+            value: RoleBinding
+        it: Binds the role to the workflow service account
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true

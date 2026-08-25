@@ -10,7 +10,7 @@ metadata:
 spec:
     activationCodeSecretRef:
         key: {{ .Values.license.activationCodeSecretKey }}
-        name: {{ .Values.license.activationCodeSecretName | default (printf "%s-activation" (include "liferay.name" .)) }}
+        name: {{ include "liferay.activationCodeSecretName" . }}
     {{- if not .Values.autoscaling.enabled }}
     desiredReplicas: {{ .Values.replicaCount }}
     {{- end }}
