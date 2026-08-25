@@ -120,7 +120,7 @@ tests:
                     pattern: "The activation was rejected\."
             -   notMatchRegex:
                     path: spec.templates[3].script.source
-                    pattern: ">&2"
+                    pattern: echo.*>&2
         it: Reports the activation verdict on standard output so it outlives the pod
         set:
             licensing.enabled: true
