@@ -44,7 +44,7 @@ function main {
 
 		if [ "${reason}" = "ActivationRejected" ]
 		then
-			echo "The activation was rejected. $(echo "${activated_condition}" | jq --raw-output ".message // \"\"")" >&2
+			echo "The activation was rejected. $(echo "${activated_condition}" | jq --raw-output ".message // \"\"")"
 
 			exit 1
 		fi
@@ -54,7 +54,7 @@ function main {
 		sleep 10
 	done
 
-	echo "The system timed out waiting for the environment ${liferay_environment_name} to activate." >&2
+	echo "The system timed out waiting for the environment ${liferay_environment_name} to activate."
 
 	exit 1
 }
