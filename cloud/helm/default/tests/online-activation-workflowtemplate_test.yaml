@@ -95,11 +95,11 @@ tests:
                     value: false
             -   equal:
                     path: spec.podGC.strategy
-                    value: OnPodCompletion
+                    value: OnWorkflowSuccess
             -   equal:
                     path: spec.ttlStrategy.secondsAfterCompletion
                     value: 3600
-        it: Discards the pods and the workflow that hold the activation code
+        it: Discards the workflow that holds the activation code but keeps a failed run readable
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
@@ -111,6 +111,17 @@ tests:
                     path: spec.templates[4].script.source
                     pattern: "\{\{workflow\.parameters\.liferay-environment-name\}\}"
         it: Leaves the Argo variables intact for the workflow controller to resolve
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   matchRegex:
+                    path: spec.templates[3].script.source
+                    pattern: "The activation was rejected\."
+            -   notMatchRegex:
+                    path: spec.templates[3].script.source
+                    pattern: echo.*>&2
+        it: Reports the activation verdict on standard output so it outlives the pod
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
