@@ -153,6 +153,18 @@ customInitContainers:
                                 cp --force --recursive --verbose /opt/liferay/glowroot/* /temp/liferay/glowroot
                             fi
 
+                            # The volume is mounted over a directory the image
+                            # populates, so without this the image's own modules
+                            # are hidden. The trial license ships here, which is
+                            # what lets an environment run before it is
+                            # activated. The directory is created above, so the
+                            # emptiness test has to ignore "." and "..".
+
+                            if [ -z "$(ls --almost-all /temp/osgi/modules)" ]
+                            then
+                                cp --force --recursive --verbose /opt/liferay/osgi/modules/. /temp/osgi/modules
+                            fi
+
                             if [ ! -f /temp/tomcat/conf/server.xml ]
                             then
                                 mkdir --parents /temp/tomcat/conf

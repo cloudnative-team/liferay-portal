@@ -1,0 +1,24 @@
+suite: Prepopulate Init Container
+templates:
+    -   templates/configmap.yaml
+    -   templates/liferay-init-scripts-cm.yaml
+    -   templates/workloads.yaml
+tests:
+    -   asserts:
+            -   matchRegex:
+                    path: spec.template.spec.initContainers[?(@.name=="liferay-prepopulate-data")].command[2]
+                    pattern: cp .* /opt/liferay/osgi/modules/\. /temp/osgi/modules
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: Seeds the modules the image ships, which the volume would otherwise hide
+    -   asserts:
+            -   matchRegex:
+                    path: spec.template.spec.initContainers[?(@.name=="liferay-prepopulate-data")].command[2]
+                    pattern: ls --almost-all /temp/osgi/modules
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: Tests the modules directory for emptiness in a way that ignores dot entries
