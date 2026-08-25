@@ -374,16 +374,31 @@ image:
     tag: 2026.q1.8-lts
 initContainers: []
 license:
-    activationCodeSecretKey: activationCode
-    activationCodeSecretName: ""
     enabled: false
     initScriptsVolumeName: liferay-init-scripts-default
     secretName: ""
     syncInterval: 60
 licensing:
+    activationCodeSecretKey: activationCode
+    activationCodeSecretName: ""
     enabled: false
     offline: false
     offlineActivationBundle: ""
+    onlineActivationWorkflow:
+        enabled: false
+        image:
+            repository: dtzar/helm-kubectl
+            tag: 4.1.1
+        resources:
+            limits:
+                cpu: 250m
+                memory: 256Mi
+            requests:
+                cpu: 100m
+                memory: 128Mi
+        serviceAccountName: online-activation-service-account
+        ttlSecondsAfterCompletion: 3600
+        waitTimeoutSeconds: 300
 livenessProbe:
     failureThreshold: 3
     httpGet:
