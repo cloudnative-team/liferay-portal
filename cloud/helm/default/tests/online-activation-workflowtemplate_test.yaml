@@ -106,10 +106,10 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: spec.templates[4].script.env[1].value
-                    pattern: '\{\{workflow\.parameters\.activation-code\}\}'
+                    pattern: "\{\{workflow\.parameters\.activation-code\}\}"
             -   matchRegex:
                     path: spec.templates[4].script.source
-                    pattern: '\{\{workflow\.parameters\.liferay-environment-name\}\}'
+                    pattern: "\{\{workflow\.parameters\.liferay-environment-name\}\}"
         it: Leaves the Argo variables intact for the workflow controller to resolve
         set:
             licensing.enabled: true
@@ -117,7 +117,7 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: spec.templates[3].script.source
-                    pattern: 'date \+%s\) \+ 45\)\)'
+                    pattern: "date \+%s\) \+ 45\)\)"
         it: Substitutes the configured wait timeout into the polling loop
         set:
             licensing.enabled: true
