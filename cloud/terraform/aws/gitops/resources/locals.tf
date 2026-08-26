@@ -54,6 +54,12 @@ locals {
 		"sidecar.opentelemetry.io/inject"="false"
 	}
 	dxp_operator_parameters=concat(
+		var.dxp_operator_config.download_poll_interval == null ? [] : [
+			{
+				name="liferay-dxp-operator.downloadPollInterval"
+				value=var.dxp_operator_config.download_poll_interval
+			}
+		],
 		var.dxp_operator_config.heartbeat_interval == null ? [] : [
 			{
 				name="liferay-dxp-operator.heartbeatInterval"
@@ -76,6 +82,12 @@ locals {
 			{
 				name="liferay-dxp-operator.provisioning.baseURL"
 				value=var.dxp_operator_config.provisioning_base_url
+			}
+		],
+		var.dxp_operator_config.retry_initial_delay == null ? [] : [
+			{
+				name="liferay-dxp-operator.retry.initialDelay"
+				value=var.dxp_operator_config.retry_initial_delay
 			}
 		],
 		var.dxp_operator_config.retry_max_delay == null ? [] : [

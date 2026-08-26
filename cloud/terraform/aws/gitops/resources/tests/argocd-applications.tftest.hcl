@@ -186,6 +186,20 @@ run "should_pass_the_configured_operator_settings_to_the_provider_application" {
 	assert {
 		condition=length([
 			for p in kubernetes_manifest.infrastructure_provider_application.manifest.spec.sources[0].helm.parameters : p
+			if p.name == "liferay-dxp-operator.downloadPollInterval" && p.value == "7s"
+		]) == 1
+		error_message="The infrastructure provider Application must pass the configured download poll interval as a Helm parameter"
+	}
+	assert {
+		condition=length([
+			for p in kubernetes_manifest.infrastructure_provider_application.manifest.spec.sources[0].helm.parameters : p
+			if p.name == "liferay-dxp-operator.retry.initialDelay" && p.value == "9s"
+		]) == 1
+		error_message="The infrastructure provider Application must pass the configured retry initial delay as a Helm parameter"
+	}
+	assert {
+		condition=length([
+			for p in kubernetes_manifest.infrastructure_provider_application.manifest.spec.sources[0].helm.parameters : p
 			if p.name == "liferay-dxp-operator.retry.maxDelay" && p.value == "4m"
 		]) == 1
 		error_message="The infrastructure provider Application must pass the configured retry maximum delay as a Helm parameter"
@@ -193,12 +207,14 @@ run "should_pass_the_configured_operator_settings_to_the_provider_application" {
 	command=plan
 	variables {
 		dxp_operator_config={
+			download_poll_interval="7s"
 			heartbeat_interval="90s"
 			image={
 				repository="registry.example.com/liferay-dxp-operator"
 				tag="1.2.3"
 			}
 			provisioning_base_url="https://provisioning.example.com"
+			retry_initial_delay="9s"
 			retry_max_delay="4m"
 		}
 	}

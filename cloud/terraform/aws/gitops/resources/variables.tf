@@ -50,6 +50,7 @@ variable "dxp_operator_config" {
 	default={}
 	type=object(
 		{
+			download_poll_interval=optional(string, null)
 			heartbeat_interval=optional(string, null)
 			image=optional(
 				object(
@@ -58,6 +59,7 @@ variable "dxp_operator_config" {
 						tag=optional(string, null)
 					}), {})
 			provisioning_base_url=optional(string, null)
+			retry_initial_delay=optional(string, null)
 			retry_max_delay=optional(string, null)
 		})
 }
