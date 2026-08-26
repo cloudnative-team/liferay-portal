@@ -1,14 +1,46 @@
-resource "google_project_iam_member" "cloudplatform_roles" {
-	for_each=toset(local.cloudplatform_roles)
-	member="serviceAccount:${google_service_account.cloudplatform_gsa.email}"
+resource "google_project_iam_custom_role" "crossplane_provider" {
+	for_each=local.crossplane_provider_iam
+	permissions=each.value.manage_permissions
 	project=var.project_id
-	role=each.key
+	provisioner "local-exec" {
+		command="gcloud iam roles delete ${self.role_id} --project ${self.project} --quiet"
+		on_failure=continue
+		when=destroy
+	}
+	role_id=replace("${var.deployment_name}_crossplane_${each.key}", "-", "_")
+	title="Liferay Crossplane ${each.key} Role"
 }
-resource "google_project_iam_member" "provider_direct_iam" {
-	for_each=local.direct_provider_ksas
-	member="${local.ksa_principal_base}/provider-gcp-${each.key}"
+resource "google_project_iam_custom_role" "crossplane_provider_provision" {
+	for_each={
+		for provider_name, provider_iam in local.crossplane_provider_iam :
+		provider_name => provider_iam
+		if length(provider_iam.provision_permissions) > 0
+	}
+	permissions=each.value.provision_permissions
 	project=var.project_id
-	role=each.value
+	provisioner "local-exec" {
+		command="gcloud iam roles delete ${self.role_id} --project ${self.project} --quiet"
+		on_failure=continue
+		when=destroy
+	}
+	role_id=replace("${var.deployment_name}_crossplane_${each.key}_provision", "-", "_")
+	title="Liferay Crossplane ${each.key} Provisioning Role"
+}
+resource "google_project_iam_member" "crossplane_provider" {
+	condition {
+		expression=each.value.condition_expression
+		title=each.value.condition_title
+	}
+	for_each=local.crossplane_provider_iam
+	member=each.value.member
+	project=var.project_id
+	role=google_project_iam_custom_role.crossplane_provider[each.key].name
+}
+resource "google_project_iam_member" "crossplane_provider_provision" {
+	for_each=google_project_iam_custom_role.crossplane_provider_provision
+	member=local.crossplane_provider_iam[each.key].member
+	project=var.project_id
+	role=each.value.name
 }
 resource "google_service_account" "cloudplatform_gsa" {
 	account_id="${var.deployment_name}-cp-iam"

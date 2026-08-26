@@ -9,16 +9,100 @@ locals {
 		"${local.secret_prefixes.certificates}${var.argocd_domain_config.tls_external_secret_name}"
 	)
 	argocd_tls_secret_name="argocd-server-tls"
-	cloudplatform_roles=[
-		"roles/iam.serviceAccountAdmin",
-		"roles/resourcemanager.projectIamAdmin",
-	]
 	common_labels={
 		"app.kubernetes.io/component"="gitops-infrastructure"
 		"app.kubernetes.io/managed-by"=local.terraform_manager_name
 		"app.kubernetes.io/part-of"="liferay-gitops"
 		"environment"="internal"
 		"liferay.com/project"="liferay-cloud-native"
+	}
+	crossplane_grantable_roles=[
+		"roles/cloudsql.admin",
+		"roles/cloudsql.client",
+		"roles/cloudsql.instanceUser",
+		"roles/iam.workloadIdentityUser",
+		"roles/storagetransfer.admin",
+	]
+	crossplane_provider_iam={
+		cloudplatform={
+			condition_expression="api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(${jsonencode(local.crossplane_grantable_roles)})"
+			condition_title="liferay_crossplane_cloudplatform_grants"
+			manage_permissions=[
+				"iam.serviceAccounts.create",
+				"iam.serviceAccounts.delete",
+				"iam.serviceAccounts.get",
+				"iam.serviceAccounts.getIamPolicy",
+				"iam.serviceAccounts.list",
+				"iam.serviceAccounts.setIamPolicy",
+				"iam.serviceAccounts.undelete",
+				"iam.serviceAccounts.update",
+				"resourcemanager.projects.get",
+				"resourcemanager.projects.getIamPolicy",
+				"resourcemanager.projects.setIamPolicy",
+			]
+			member="serviceAccount:${google_service_account.cloudplatform_gsa.email}"
+			provision_permissions=[]
+		}
+		kms={
+			condition_expression="(resource.type == 'cloudkms.googleapis.com/KeyRing' && resource.name.endsWith('-keyring')) || (resource.type == 'cloudkms.googleapis.com/CryptoKey' && resource.name.endsWith('-key'))"
+			condition_title="liferay_crossplane_kms_resources"
+			manage_permissions=[
+				"cloudkms.cryptoKeys.get",
+				"cloudkms.cryptoKeys.getIamPolicy",
+				"cloudkms.cryptoKeys.setIamPolicy",
+				"cloudkms.cryptoKeys.update",
+				"cloudkms.keyRings.get",
+			]
+			member="${local.ksa_principal_base}/provider-gcp-kms"
+			provision_permissions=[
+				"cloudkms.cryptoKeys.create",
+				"cloudkms.cryptoKeys.list",
+				"cloudkms.keyRings.create",
+				"cloudkms.keyRings.list",
+			]
+		}
+		sql={
+			condition_expression="resource.type == 'sqladmin.googleapis.com/Instance' && (resource.name.endsWith('-db-instance-blue') || resource.name.endsWith('-db-instance-green'))"
+			condition_title="liferay_crossplane_sql_resources"
+			manage_permissions=[
+				"cloudsql.databases.create",
+				"cloudsql.databases.delete",
+				"cloudsql.databases.get",
+				"cloudsql.databases.list",
+				"cloudsql.databases.update",
+				"cloudsql.instances.delete",
+				"cloudsql.instances.get",
+				"cloudsql.instances.update",
+				"cloudsql.users.create",
+				"cloudsql.users.delete",
+				"cloudsql.users.get",
+				"cloudsql.users.list",
+				"cloudsql.users.update",
+			]
+			member="${local.ksa_principal_base}/provider-gcp-sql"
+			provision_permissions=[
+				"cloudsql.instances.create",
+				"cloudsql.instances.list",
+			]
+		}
+		storage={
+			condition_expression="(resource.type == 'storage.googleapis.com/Bucket' && (resource.name.endsWith('-dl-blue') || resource.name.endsWith('-dl-green') || resource.name.endsWith('-vault') || resource.name.startsWith('projects/_/buckets/${var.deployment_name}-overlay-'))) || resource.type == 'storage.googleapis.com/Object'"
+			condition_title="liferay_crossplane_storage_resources"
+			manage_permissions=[
+				"storage.buckets.delete",
+				"storage.buckets.get",
+				"storage.buckets.getIamPolicy",
+				"storage.buckets.setIamPolicy",
+				"storage.buckets.update",
+				"storage.objects.delete",
+				"storage.objects.list",
+			]
+			member="${local.ksa_principal_base}/provider-gcp-storage"
+			provision_permissions=[
+				"storage.buckets.create",
+				"storage.buckets.list",
+			]
+		}
 	}
 	default_crossplane_container_security_context={
 		allowPrivilegeEscalation=false
@@ -43,12 +127,6 @@ locals {
 		"instrumentation.opentelemetry.io/inject-nodejs"="false"
 		"instrumentation.opentelemetry.io/inject-python"="false"
 		"sidecar.opentelemetry.io/inject"="false"
-	}
-	direct_provider_ksas={
-		compute="roles/compute.admin"
-		kms="roles/cloudkms.admin"
-		sql="roles/cloudsql.admin"
-		storage="roles/storage.admin"
 	}
 	gateway_class_name="liferay-gateway-class"
 	gateway_name="${var.infrastructure_git_repo_config.target.slugProjectId}-${var.infrastructure_git_repo_config.target.slugEnvironmentId}-gateway"
