@@ -162,6 +162,14 @@ locals {
 	)
 	liferay_namespace_pattern="liferay-*"
 	liferay_service_account_role_arn="arn:aws:iam::${local.account_id}:role/${local.liferay_service_account_role_name}"
+
+	// Naming the access point alongside the file system is what makes the
+	// driver mount through it. Mounting the file system alone hands back
+	// directories owned by root that the operator cannot write into.
+
+	marketplace_volume_handle=length(data.aws_efs_access_points.marketplace.ids) > 0 ? (
+		"${data.aws_efs_file_system.marketplace.file_system_id}::${data.aws_efs_access_points.marketplace.ids[0]}"
+	) : data.aws_efs_file_system.marketplace.file_system_id
 	liferay_service_account_role_name="${var.deployment_name}-irsa"
 	oidc_provider=replace(data.aws_eks_cluster.cluster.identity[0].oidc[0].issuer, "https://", "")
 	rds_exporter_role_arn=var.observability_config.enabled ? "arn:aws:iam::${local.account_id}:role/${var.deployment_name}-rds-exporter" : ""

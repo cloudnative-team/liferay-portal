@@ -1,5 +1,8 @@
 data "aws_caller_identity" "current" {
 }
+data "aws_efs_access_points" "marketplace" {
+	file_system_id=data.aws_efs_file_system.marketplace.file_system_id
+}
 data "aws_efs_file_system" "marketplace" {
 	creation_token="${var.deployment_name}-marketplace"
 }

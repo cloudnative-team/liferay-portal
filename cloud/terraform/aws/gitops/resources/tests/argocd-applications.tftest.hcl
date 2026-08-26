@@ -62,6 +62,29 @@ override_data {
 		cidr_block="10.0.0.0/16"
 	}
 }
+override_data {
+	target=data.aws_efs_access_points.marketplace
+	values={
+		ids=["fsap-0123456789abcdef0"]
+	}
+}
+run "should_mount_the_marketplace_through_its_access_point" {
+	assert {
+		condition=length([
+			for p in kubernetes_manifest.infrastructure_provider_application.manifest.spec.sources[0].helm.parameters : p
+			if p.name == "liferay-dxp-operator.marketplace.csi.volumeHandle" && endswith(p.value, "::fsap-0123456789abcdef0")
+		]) == 1
+		error_message="The operator must mount the marketplace through the access point, since the bare file system hands back directories it cannot write"
+	}
+	assert {
+		condition=length([
+			for p in kubernetes_manifest.liferay_applicationset.manifest.spec.template.spec.sources[0].helm.parameters : p
+			if endswith(p.name, "marketplace.csi.volumeHandle") && endswith(p.value, "::fsap-0123456789abcdef0")
+		]) == 1
+		error_message="The workloads must mount the same access point as the operator, or they read a different view of the volume"
+	}
+	command=plan
+}
 run "should_include_required_prefixes_for_the_marketplace_chart_to_gateway_name" {
 	assert {
 		condition=length([

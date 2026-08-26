@@ -1,3 +1,28 @@
+// Everything reaches the marketplace through this access point rather than the
+// file system root. Without one the driver presents the real identities, the
+// directories the kubelet makes for each environment belong to root, and the
+// operator, which may not run as root, cannot write the add-ons it downloads.
+// The access point remaps every caller to one identity and creates its root
+// directory owned by it, so the directories beneath are writable by design.
+
+resource "aws_efs_access_point" "marketplace" {
+	file_system_id=aws_efs_file_system.this.id
+	posix_user {
+		gid=local.marketplace_posix_id
+		uid=local.marketplace_posix_id
+	}
+	root_directory {
+		creation_info {
+			owner_gid=local.marketplace_posix_id
+			owner_uid=local.marketplace_posix_id
+			permissions="0775"
+		}
+		path="/marketplace"
+	}
+	tags={
+		Name="${var.deployment_name}-marketplace"
+	}
+}
 resource "aws_efs_file_system" "this" {
 	creation_token="${var.deployment_name}-marketplace"
 	encrypted=true

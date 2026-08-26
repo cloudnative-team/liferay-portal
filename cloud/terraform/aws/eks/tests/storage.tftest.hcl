@@ -70,6 +70,21 @@ run "should_create_the_gp3_default_storage_class" {
 	}
 	command=plan
 }
+run "should_reach_the_marketplace_through_an_access_point" {
+	assert {
+		condition=aws_efs_access_point.marketplace.posix_user[0].uid == 1000 && aws_efs_access_point.marketplace.posix_user[0].gid == 1000
+		error_message="Every caller must be remapped to the identity the workloads run as, or what the operator writes is unreadable where it is mounted"
+	}
+	assert {
+		condition=aws_efs_access_point.marketplace.root_directory[0].creation_info[0].owner_uid == 1000
+		error_message="The root directory must be created owned by that identity, since the kubelet would otherwise leave it to root"
+	}
+	assert {
+		condition=aws_efs_access_point.marketplace.root_directory[0].path != "/"
+		error_message="An access point cannot create the file system root, so it has to be rooted below it"
+	}
+	command=plan
+}
 variables {
 	deployment_name="liferay-test"
 	envoy_gateway_helm_chart_version="1.5.2"
