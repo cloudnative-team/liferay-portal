@@ -60,9 +60,6 @@ spec:
                                 value: {{ $layout.environmentId | quote }}
                             -   name: liferay-default.network.gatewayName
                                 value: {{ printf "%s-%s-gateway" $layout.projectId $layout.environmentId | quote }}
-                            {{- with .Values.liferay.parameters }}
-                            {{- toYaml . | nindent 28 }}
-                            {{- end }}
                         valueFiles:
                             -   $values/{{ $layout.base }}/{{ $layout.liferayValuesFilename }}
                             -   $values/{{ `{{path}}` }}/{{ $layout.liferayValuesFilename }}

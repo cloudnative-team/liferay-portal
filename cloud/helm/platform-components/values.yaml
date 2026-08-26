@@ -73,19 +73,16 @@ gitops:
         usernameProperty: git_machine_user_id
 infrastructure:
     enabled: true
-    parameters: []
     path: ""
     repoURL: ""
     targetRevision: ""
 infrastructureProvider:
     enabled: true
-    parameters: []
     path: ""
     repoURL: ""
     targetRevision: ""
 liferay:
     enabled: true
-    parameters: []
     path: ""
     repoURL: ""
     targetRevision: ""
