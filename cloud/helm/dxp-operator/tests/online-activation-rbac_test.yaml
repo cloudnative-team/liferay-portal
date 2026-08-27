@@ -45,10 +45,10 @@ tests:
                     value: ["liferayenvironments"]
             -   equal:
                     path: rules[2].verbs
-                    value: ["get", "list", "patch"]
+                    value: ["get", "patch"]
             -   lengthEqual:
                     count: 3
                     path: rules
-        it: Reports workflow task results and reads the environments in the bound namespace
+        it: Reports workflow task results and reads only the named environment
         set:
             onlineActivationWorkflow.enabled: true

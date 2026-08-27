@@ -14,6 +14,9 @@ spec:
             -   description:
                     The activation code issued for this environment.
                 name: activation-code
+            -   description:
+                    The LiferayEnvironment to activate in this namespace.
+                name: liferay-environment-name
     entrypoint: main
     podGC:
         strategy: OnWorkflowSuccess
@@ -26,104 +29,63 @@ spec:
     templates:
         -   name: main
             steps:
-                -   -   name: find-environment
-                        template: find-environment
+                -   -   name: read-environment
+                        template: read-environment
                 -   -   arguments:
                             parameters:
-                                -   name: liferay-environment-name
-                                    value: "{{ "{{" }}steps.find-environment.outputs.parameters.liferay-environment-name}}"
+                                -   name: secret-key
+                                    value: "{{ "{{" }}steps.read-environment.outputs.parameters.secret-key}}"
+                                -   name: secret-name
+                                    value: "{{ "{{" }}steps.read-environment.outputs.parameters.secret-name}}"
                         name: write-secret
                         template: write-secret
-                -   -   arguments:
-                            parameters:
-                                -   name: liferay-environment-name
-                                    value: "{{ "{{" }}steps.find-environment.outputs.parameters.liferay-environment-name}}"
-                        name: request-reconcile
+                -   -   name: request-reconcile
                         template: request-reconcile
-                -   -   arguments:
-                            parameters:
-                                -   name: liferay-environment-name
-                                    value: "{{ "{{" }}steps.find-environment.outputs.parameters.liferay-environment-name}}"
-                        name: wait
+                -   -   name: wait
                         template: wait
-        -   name: find-environment
+        -   name: read-environment
             outputs:
                 parameters:
-                    -   name: liferay-environment-name
+                    -   name: secret-key
                         valueFrom:
-                            path: /tmp/liferay-environment-name.txt
-            script:
-                command: [sh]
-                env:
-                    -   name: HOME
-                        value: /tmp
-                    -   name: LIFERAY_NAMESPACE
-                        value: "{{ "{{" }}workflow.namespace}}"
-                image: {{ $image | quote }}
-                resources:
-                    {{- $onlineActivationWorkflow.resources | toYaml | nindent 20 }}
-                securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                        drop:
-                            -   ALL
-                    runAsNonRoot: true
-                    runAsUser: 8737
-                    seccompProfile:
-                        type: RuntimeDefault
-                source: |-
-                    {{- tpl (.Files.Get "scripts/online-activation-find-environment.sh") . | nindent 20 }}
-        -   inputs:
-                parameters:
-                    -   name: liferay-environment-name
-            name: request-reconcile
-            script:
-                command: [sh]
-                env:
-                    -   name: HOME
-                        value: /tmp
-                    -   name: LIFERAY_WORKFLOW_NAME
-                        value: "{{ "{{" }}workflow.name}}"
-                image: {{ $image | quote }}
-                resources:
-                    {{- $onlineActivationWorkflow.resources | toYaml | nindent 20 }}
-                securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                        drop:
-                            -   ALL
-                    runAsNonRoot: true
-                    runAsUser: 8737
-                    seccompProfile:
-                        type: RuntimeDefault
-                source: |-
-                    {{- tpl (.Files.Get "scripts/online-activation-request-reconcile.sh") . | nindent 20 }}
-        -   inputs:
-                parameters:
-                    -   name: liferay-environment-name
+                            jsonPath: "{.spec.activationCodeSecretRef.key}"
+                    -   name: secret-name
+                        valueFrom:
+                            jsonPath: "{.spec.activationCodeSecretRef.name}"
+            resource:
+                action: get
+                failureCondition: status.activatedAt
+                manifest: |
+                    apiVersion: licensing.liferay.com/v1alpha1
+                    kind: LiferayEnvironment
+                    metadata:
+                        name: "{{ "{{" }}workflow.parameters.liferay-environment-name}}"
+        -   name: request-reconcile
+            resource:
+                action: patch
+                manifest: |
+                    apiVersion: licensing.liferay.com/v1alpha1
+                    kind: LiferayEnvironment
+                    metadata:
+                        annotations:
+                            licensing.liferay.com/activation-requested-at: "{{ "{{" }}workflow.creationTimestamp.RFC3339}}"
+                            licensing.liferay.com/activation-requested-by: "{{ "{{" }}workflow.name}}"
+                        name: "{{ "{{" }}workflow.parameters.liferay-environment-name}}"
+                mergeStrategy: merge
+        -   activeDeadlineSeconds: {{ $onlineActivationWorkflow.waitTimeoutSeconds }}
             name: wait
-            script:
-                command: [sh]
-                env:
-                    -   name: HOME
-                        value: /tmp
-                image: {{ $image | quote }}
-                resources:
-                    {{- $onlineActivationWorkflow.resources | toYaml | nindent 20 }}
-                securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                        drop:
-                            -   ALL
-                    runAsNonRoot: true
-                    runAsUser: 8737
-                    seccompProfile:
-                        type: RuntimeDefault
-                source: |-
-                    {{- tpl (.Files.Get "scripts/online-activation-wait.sh") . | nindent 20 }}
+            resource:
+                action: get
+                manifest: |
+                    apiVersion: licensing.liferay.com/v1alpha1
+                    kind: LiferayEnvironment
+                    metadata:
+                        name: "{{ "{{" }}workflow.parameters.liferay-environment-name}}"
+                successCondition: status.activatedAt
         -   inputs:
                 parameters:
-                    -   name: liferay-environment-name
+                    -   name: secret-key
+                    -   name: secret-name
             name: write-secret
             script:
                 command: [sh]

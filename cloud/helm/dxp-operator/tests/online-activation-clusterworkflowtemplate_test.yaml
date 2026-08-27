@@ -26,25 +26,23 @@ tests:
             -   equal:
                     path: spec.arguments.parameters[0].name
                     value: activation-code
+            -   equal:
+                    path: spec.arguments.parameters[1].name
+                    value: liferay-environment-name
+            -   lengthEqual:
+                    count: 2
+                    path: spec.arguments.parameters
             -   notExists:
                     path: spec.arguments.parameters[0].value
-        it: Requires the activation code to be supplied at submit time
-        set:
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   equal:
-                    path: spec.arguments.parameters[0].name
-                    value: activation-code
-            -   lengthEqual:
-                    count: 1
-                    path: spec.arguments.parameters
-        it: Asks the operator for nothing but the activation code
+            -   notExists:
+                    path: spec.arguments.parameters[1].value
+        it: Requires both the activation code and the environment name at submit time
         set:
             onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.templates[0].steps[0][0].name
-                    value: find-environment
+                    value: read-environment
             -   equal:
                     path: spec.templates[0].steps[1][0].name
                     value: write-secret
@@ -54,26 +52,68 @@ tests:
             -   equal:
                     path: spec.templates[0].steps[3][0].name
                     value: wait
-        it: Finds and validates the environment before writing the activation code
+        it: Reads the environment before writing the activation code and waiting on the outcome
         set:
             onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
-                    path: spec.templates[1].script.securityContext.allowPrivilegeEscalation
+                    path: spec.templates[1].resource.action
+                    value: get
+            -   equal:
+                    path: spec.templates[1].resource.failureCondition
+                    value: status.activatedAt
+            -   equal:
+                    path: spec.templates[1].outputs.parameters[0].valueFrom.jsonPath
+                    value: "{.spec.activationCodeSecretRef.key}"
+            -   equal:
+                    path: spec.templates[1].outputs.parameters[1].valueFrom.jsonPath
+                    value: "{.spec.activationCodeSecretRef.name}"
+        it: Refuses an activated environment and takes the secret reference from its spec
+        set:
+            onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.templates[2].resource.action
+                    value: patch
+            -   equal:
+                    path: spec.templates[2].resource.mergeStrategy
+                    value: merge
+            -   matchRegex:
+                    path: spec.templates[2].resource.manifest
+                    pattern: licensing.liferay.com/activation-requested-at
+            -   matchRegex:
+                    path: spec.templates[2].resource.manifest
+                    pattern: "\{\{workflow\.creationTimestamp\.RFC3339\}\}"
+        it: Annotates the environment with a value that changes on every submission
+        set:
+            onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.templates[3].activeDeadlineSeconds
+                    value: 45
+            -   equal:
+                    path: spec.templates[3].resource.successCondition
+                    value: status.activatedAt
+            -   notExists:
+                    path: spec.templates[3].resource.failureCondition
+        it: Waits on the activation timestamp so a rejected code can still be corrected
+        set:
+            onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.waitTimeoutSeconds: 45
+    -   asserts:
+            -   equal:
+                    path: spec.templates[4].script.env[1].name
+                    value: LIFERAY_ACTIVATION_CODE
+            -   equal:
+                    path: spec.templates[4].script.securityContext.allowPrivilegeEscalation
                     value: false
             -   equal:
-                    path: spec.templates[1].script.securityContext.capabilities.drop
+                    path: spec.templates[4].script.securityContext.capabilities.drop
                     value: ["ALL"]
-            -   equal:
-                    path: spec.templates[1].script.securityContext.runAsNonRoot
-                    value: true
-            -   equal:
-                    path: spec.templates[1].script.securityContext.seccompProfile.type
-                    value: RuntimeDefault
             -   equal:
                     path: spec.securityContext.runAsNonRoot
                     value: true
-        it: Hardens the steps for namespaces that enforce the restricted pod security standard
+        it: Passes the activation code through the environment rather than into a manifest
         set:
             onlineActivationWorkflow.enabled: true
     -   asserts:
@@ -89,67 +129,3 @@ tests:
         it: Discards the workflow that holds the activation code but keeps a failed run readable
         set:
             onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   matchRegex:
-                    path: spec.templates[4].script.env[1].value
-                    pattern: "\{\{workflow\.parameters\.activation-code\}\}"
-            -   matchRegex:
-                    path: spec.templates[4].script.source
-                    pattern: "\{\{inputs\.parameters\.liferay-environment-name\}\}"
-        it: Leaves the Argo variables intact for the workflow controller to resolve
-        set:
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   equal:
-                    path: spec.templates[1].outputs.parameters[0].valueFrom.path
-                    value: /tmp/liferay-environment-name.txt
-            -   equal:
-                    path: spec.templates[0].steps[1][0].arguments.parameters[0].value
-                    value: "{{steps.find-environment.outputs.parameters.liferay-environment-name}}"
-        it: Passes the discovered environment to every step that follows
-        set:
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   matchRegex:
-                    path: spec.templates[1].script.source
-                    pattern: holds no LiferayEnvironment resource to activate
-            -   matchRegex:
-                    path: spec.templates[1].script.source
-                    pattern: but activation requires exactly one
-            -   matchRegex:
-                    path: spec.templates[1].script.source
-                    pattern: Re-activation is not supported
-        it: Refuses to act unless the namespace holds exactly one environment to activate
-        set:
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   matchRegex:
-                    path: spec.templates[1].script.source
-                    pattern: The code submitted now will be retried
-            -   matchRegex:
-                    path: spec.templates[1].script.source
-                    pattern: has no phase yet
-            -   notMatchRegex:
-                    path: spec.templates[1].script.source
-                    pattern: activation requires the phase
-        it: Retries after a rejected code and tolerates an environment the operator has not reconciled
-        set:
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   matchRegex:
-                    path: spec.templates[3].script.source
-                    pattern: "The activation was rejected\."
-            -   notMatchRegex:
-                    path: spec.templates[3].script.source
-                    pattern: echo.*>&2
-        it: Reports the activation verdict on standard output so it outlives the pod
-        set:
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   matchRegex:
-                    path: spec.templates[3].script.source
-                    pattern: "date \+%s\) \+ 45\)\)"
-        it: Substitutes the configured wait timeout into the polling loop
-        set:
-            onlineActivationWorkflow.enabled: true
-            onlineActivationWorkflow.waitTimeoutSeconds: 45

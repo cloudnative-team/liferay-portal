@@ -5,7 +5,8 @@ set -o nounset
 set -o pipefail
 
 function main {
-	local liferay_environment_name="{{ "{{" }}inputs.parameters.liferay-environment-name}}"
+	local secret_key="{{ "{{" }}inputs.parameters.secret-key}}"
+	local secret_name="{{ "{{" }}inputs.parameters.secret-name}}"
 
 	if [ -z "${LIFERAY_ACTIVATION_CODE}" ]
 	then
@@ -14,27 +15,9 @@ function main {
 		exit 1
 	fi
 
-	local secret_key
-
-	secret_key=$( \
-		kubectl \
-			get \
-			liferayenvironment \
-			"${liferay_environment_name}" \
-			--output jsonpath="{.spec.activationCodeSecretRef.key}")
-
-	local secret_name
-
-	secret_name=$( \
-		kubectl \
-			get \
-			liferayenvironment \
-			"${liferay_environment_name}" \
-			--output jsonpath="{.spec.activationCodeSecretRef.name}")
-
 	if [ -z "${secret_key}" ] || [ -z "${secret_name}" ]
 	then
-		echo "The environment ${liferay_environment_name} does not reference an activation code secret." >&2
+		echo "The environment does not reference an activation code secret." >&2
 
 		exit 1
 	fi

@@ -14,5 +14,5 @@ rules:
         verbs: ["create", "patch"]
     -   apiGroups: ["licensing.liferay.com"]
         resources: ["liferayenvironments"]
-        verbs: ["get", "list", "patch"]
+        verbs: ["get", "patch"]
 {{- end -}}
