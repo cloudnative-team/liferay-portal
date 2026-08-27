@@ -20,10 +20,8 @@ rules:
         resources: ["workflowtaskresults"]
         verbs: ["create", "patch"]
     -   apiGroups: ["licensing.liferay.com"]
-        resourceNames:
-            -   {{ include "liferay.name" . }}
         resources: ["liferayenvironments"]
-        verbs: ["get", "patch"]
+        verbs: ["get", "list", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

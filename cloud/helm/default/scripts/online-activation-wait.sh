@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 function main {
-	local liferay_environment_name="{{ "{{" }}workflow.parameters.liferay-environment-name}}"
+	local liferay_environment_name="{{ "{{" }}inputs.parameters.liferay-environment-name}}"
 
 	local timeout
 

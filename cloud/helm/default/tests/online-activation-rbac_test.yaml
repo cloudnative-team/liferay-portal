@@ -71,18 +71,17 @@ tests:
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
-                    path: rules[3].resourceNames
-                    value: ["liferay-default"]
-            -   equal:
                     path: rules[3].resources
                     value: ["liferayenvironments"]
             -   equal:
                     path: rules[3].verbs
-                    value: ["get", "patch"]
+                    value: ["get", "list", "patch"]
+            -   notExists:
+                    path: rules[3].resourceNames
         documentSelector:
             path: kind
             value: Role
-        it: Scopes the custom resource access to this environment and withholds list and watch
+        it: Lists the environments in this namespace to discover the one to activate, and withholds watch
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true

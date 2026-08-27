@@ -43,19 +43,19 @@ tests:
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
-                    path: spec.arguments.parameters[1].name
-                    value: liferay-environment-name
-            -   equal:
-                    path: spec.arguments.parameters[1].value
-                    value: liferay-default
-        it: Defaults the environment parameter to the environment the chart renders
+                    path: spec.arguments.parameters[0].name
+                    value: activation-code
+            -   lengthEqual:
+                    count: 1
+                    path: spec.arguments.parameters
+        it: Asks the operator for nothing but the activation code
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.templates[0].steps[0][0].name
-                    value: verify-pending
+                    value: find-environment
             -   equal:
                     path: spec.templates[0].steps[1][0].name
                     value: write-secret
@@ -65,7 +65,7 @@ tests:
             -   equal:
                     path: spec.templates[0].steps[3][0].name
                     value: wait
-        it: Guards against re-activation before writing the activation code
+        it: Finds and validates the environment before writing the activation code
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
@@ -109,8 +109,33 @@ tests:
                     pattern: "\{\{workflow\.parameters\.activation-code\}\}"
             -   matchRegex:
                     path: spec.templates[4].script.source
-                    pattern: "\{\{workflow\.parameters\.liferay-environment-name\}\}"
+                    pattern: "\{\{inputs\.parameters\.liferay-environment-name\}\}"
         it: Leaves the Argo variables intact for the workflow controller to resolve
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.templates[1].outputs.parameters[0].valueFrom.path
+                    value: /tmp/liferay-environment-name.txt
+            -   equal:
+                    path: spec.templates[0].steps[1][0].arguments.parameters[0].value
+                    value: "{{steps.find-environment.outputs.parameters.liferay-environment-name}}"
+        it: Passes the discovered environment to every step that follows
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: "holds no LiferayEnvironment resource to activate"
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: "but activation requires exactly one"
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: "activation requires the phase"
+        it: Refuses to act unless the namespace holds exactly one environment awaiting activation
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
