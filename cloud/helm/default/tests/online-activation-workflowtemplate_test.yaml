@@ -128,13 +128,13 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: spec.templates[1].script.source
-                    pattern: "holds no LiferayEnvironment resource to activate"
+                    pattern: holds no LiferayEnvironment resource to activate
             -   matchRegex:
                     path: spec.templates[1].script.source
-                    pattern: "but activation requires exactly one"
+                    pattern: but activation requires exactly one
             -   matchRegex:
                     path: spec.templates[1].script.source
-                    pattern: "activation requires the phase"
+                    pattern: activation requires the phase
         it: Refuses to act unless the namespace holds exactly one environment awaiting activation
         set:
             licensing.enabled: true
