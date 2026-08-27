@@ -33,6 +33,22 @@ function main {
 
 	local liferay_environment_name="${names}"
 
+	local activated_at
+
+	activated_at=$( \
+		kubectl \
+			get \
+			liferayenvironment \
+			"${liferay_environment_name}" \
+			--output jsonpath="{.status.activatedAt}")
+
+	if [ -n "${activated_at}" ]
+	then
+		echo "The environment ${liferay_environment_name} was already activated on ${activated_at}. Re-activation is not supported." >&2
+
+		exit 1
+	fi
+
 	local phase
 
 	phase=$( \
@@ -42,39 +58,17 @@ function main {
 			"${liferay_environment_name}" \
 			--output jsonpath="{.status.phase}")
 
-	if [ "${phase}" != "Pending" ]
+	if [ "${phase}" = "Degraded" ]
 	then
-		local activated_at
-
-		activated_at=$( \
-			kubectl \
-				get \
-				liferayenvironment \
-				"${liferay_environment_name}" \
-				--output jsonpath="{.status.activatedAt}")
-
-		if [ -n "${activated_at}" ]
-		then
-			echo "The environment ${liferay_environment_name} was already activated on ${activated_at}. Re-activation is not supported." >&2
-
-			exit 1
-		fi
-
-		if [ -z "${phase}" ]
-		then
-			echo "The environment ${liferay_environment_name} has no phase yet, which means the operator has not reconciled it. Activation requires the phase \"Pending\"." >&2
-
-			exit 1
-		fi
-
-		echo "The environment ${liferay_environment_name} is in the phase \"${phase}\", but activation requires the phase \"Pending\"." >&2
-
-		exit 1
+		echo "The environment ${liferay_environment_name} failed an earlier activation. The code submitted now will be retried."
+	elif [ -z "${phase}" ]
+	then
+		echo "The environment ${liferay_environment_name} has no phase yet, because the operator has not reconciled it. Activation will proceed."
+	else
+		echo "The environment ${liferay_environment_name} is awaiting activation."
 	fi
 
 	printf "%s" "${liferay_environment_name}" > /tmp/liferay-environment-name.txt
-
-	echo "The environment ${liferay_environment_name} is awaiting activation."
 }
 
 main

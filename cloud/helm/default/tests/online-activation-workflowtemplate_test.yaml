@@ -134,8 +134,22 @@ tests:
                     pattern: but activation requires exactly one
             -   matchRegex:
                     path: spec.templates[1].script.source
+                    pattern: Re-activation is not supported
+        it: Refuses to act unless the namespace holds exactly one environment to activate
+        set:
+            licensing.enabled: true
+            licensing.onlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: The code submitted now will be retried
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: has no phase yet
+            -   notMatchRegex:
+                    path: spec.templates[1].script.source
                     pattern: activation requires the phase
-        it: Refuses to act unless the namespace holds exactly one environment awaiting activation
+        it: Retries after a rejected code and tolerates an environment the operator has not reconciled
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
