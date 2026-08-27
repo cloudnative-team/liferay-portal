@@ -27,37 +27,28 @@ tests:
                     value: ["secrets"]
             -   equal:
                     path: rules[0].verbs
-                    value: ["create"]
-            -   equal:
-                    path: rules[1].resourceNames
-                    value: ["liferay-default-activation"]
-            -   equal:
-                    path: rules[1].verbs
-                    value: ["get", "patch", "update"]
-        it: Withholds every secret but the activation code secret from later writes
+                    value: ["create", "get", "patch", "update"]
+            -   notExists:
+                    path: rules[0].resourceNames
+        it: Writes secrets only inside the namespace its binding confines it to
         set:
             onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
-                    path: rules[1].resourceNames
-                    value: ["custom-activation"]
-        it: Tracks a custom activation code secret name
-        set:
-            onlineActivationWorkflow.activationCodeSecretName: custom-activation
-            onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   equal:
-                    path: rules[2].resources
+                    path: rules[1].resources
                     value: ["workflowtaskresults"]
             -   equal:
-                    path: rules[2].verbs
+                    path: rules[1].verbs
                     value: ["create", "patch"]
             -   equal:
-                    path: rules[3].resources
+                    path: rules[2].resources
                     value: ["liferayenvironments"]
             -   equal:
-                    path: rules[3].verbs
+                    path: rules[2].verbs
                     value: ["get", "list", "patch"]
+            -   lengthEqual:
+                    count: 3
+                    path: rules
         it: Reports workflow task results and reads the environments in the bound namespace
         set:
             onlineActivationWorkflow.enabled: true

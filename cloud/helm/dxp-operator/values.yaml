@@ -25,7 +25,6 @@ nameOverride: ""
 namespaceOverride: ""
 nodeSelector: {}
 onlineActivationWorkflow:
-    activationCodeSecretName: liferay-default-activation
     enabled: false
     image:
         repository: dtzar/helm-kubectl
