@@ -1,0 +1,182 @@
+{
+  "base_commit": "0a25b71989c1728130967278dfd3039ccac4aeac",
+  "bootstraps": {
+    "aws": {
+      "sha256": "3a13ae8af5d181aafdbb019df9c571f0921b6b315738679d261f78cd7a48df54",
+      "version": "2.0.0"
+    },
+    "azure": {
+      "sha256": "fdfd92c42f1fdef8d9a209a55634cec2427b139dd13d8d14f857bcfc42646191",
+      "version": "0.1.0"
+    },
+    "gcp": {
+      "sha256": "3e56aaf5feaf58c8f843e56ef805404a09aeec04f9ee10f906f7d40ab3b91273",
+      "version": "2.0.0"
+    }
+  },
+  "charts": {
+    "liferay-aws": {
+      "digest": "sha256:9d3014868ce13275628f8ea5688f191584d536bb34cba5fce9bc6cb32df9430f",
+      "version": "2.0.0"
+    },
+    "liferay-aws-infrastructure": {
+      "digest": "sha256:4e569b3f6ab4f1acebc6222627f55770aca5c19e80a1e08644c5aaf034dcc655",
+      "version": "2.0.0"
+    },
+    "liferay-aws-infrastructure-provider": {
+      "digest": "sha256:da2cf726ea69451479b42f5fcb2d87cfc8d753f6481cdd12b295f4ea0e9d347f",
+      "version": "1.1.0"
+    },
+    "liferay-azure": {
+      "digest": "sha256:5754d312b87b6185f8cbfde2d60371a8f189901ba71b583f7be992a345bf5046",
+      "version": "0.1.0"
+    },
+    "liferay-azure-infrastructure-provider": {
+      "digest": "sha256:87d4dd5ed8aa48947e57fb1716f38a504e9405faef273742e9d52c81624cb9b4",
+      "version": "0.1.0"
+    },
+    "liferay-default": {
+      "digest": "sha256:bad07735cf3288db4bf53930d0ef7f42fe4b98047c997982d86d911a3f4d8907",
+      "version": "2.0.0"
+    },
+    "liferay-dxp-operator": {
+      "digest": "sha256:154ff151ed027da364c4c1e708562717f9e3626a950a2331831c876507675f35",
+      "version": "0.1.0"
+    },
+    "liferay-gcp": {
+      "digest": "sha256:c34f27ee51d9e1827e78e2289defb40177f42d17df150f6141fe25824113d188",
+      "version": "2.0.0"
+    },
+    "liferay-gcp-infrastructure": {
+      "digest": "sha256:2697614f4c7ad0073136513dba5f006357588bca3386e4d350c31108a88ab57b",
+      "version": "2.0.0"
+    },
+    "liferay-gcp-infrastructure-provider": {
+      "digest": "sha256:fb9f3e42717025e214dc3b5beec2d6b05d3d2aefc3278f4b4eb907991b0a7ab9",
+      "version": "1.1.0"
+    },
+    "liferay-infrastructure": {
+      "digest": "sha256:77c18f884b807b4b54a76997be8bd0f9fb25cb9161409cfe0388730f6c6d9d2d",
+      "version": "0.1.0"
+    },
+    "liferay-platform": {
+      "digest": "sha256:dfb7e8d3a0a2e5bb9e1a56f64eb940633bc50e402a92e973164d4daa39e5b2d2",
+      "version": "0.1.0"
+    },
+    "liferay-platform-components": {
+      "digest": "sha256:9d11d6d5d2bbeef96a056edf3a5119d22a51fe96a6e6b7ebdeb9ef03b9126574",
+      "version": "0.1.0"
+    },
+    "observability": {
+      "digest": "sha256:891be1fbd6e84056fae63057f569e7bc84155f9897a4efc6665742c505dceb7b",
+      "version": "1.1.0"
+    }
+  },
+  "images": {
+    "liferay-dxp-operator": {
+      "digest": "sha256:7449b073d653544c848f3f30f142a6a2629a2966c12fd579e83bd20139b9292e",
+      "version": "0.1.0"
+    }
+  },
+  "included_lcd_tickets": [
+    "LCD-49900",
+    "LCD-50255",
+    "LCD-50284",
+    "LCD-52163",
+    "LCD-52251",
+    "LCD-52380",
+    "LCD-52407",
+    "LCD-52530",
+    "LCD-52534",
+    "LCD-52540",
+    "LCD-52550",
+    "LCD-52551",
+    "LCD-52558",
+    "LCD-52560",
+    "LCD-52563",
+    "LCD-52564",
+    "LCD-52581",
+    "LCD-52584",
+    "LCD-52601",
+    "LCD-52685",
+    "LCD-52702",
+    "LCD-52703",
+    "LCD-52715",
+    "LCD-52723",
+    "LCD-52725",
+    "LCD-52726",
+    "LCD-52741",
+    "LCD-52746",
+    "LCD-52752",
+    "LCD-52769",
+    "LCD-52770",
+    "LCD-52771",
+    "LCD-52772",
+    "LCD-52778",
+    "LCD-52781",
+    "LCD-52782",
+    "LCD-52783",
+    "LCD-52784",
+    "LCD-52785",
+    "LCD-52787",
+    "LCD-52809",
+    "LCD-52839",
+    "LCD-52845",
+    "LCD-52849",
+    "LCD-52857",
+    "LCD-52858",
+    "LCD-52859",
+    "LCD-52873",
+    "LCD-52880",
+    "LCD-52882",
+    "LCD-52889",
+    "LCD-52890",
+    "LCD-52891",
+    "LCD-52903",
+    "LCD-52915",
+    "LCD-52933",
+    "LCD-52934",
+    "LCD-52935",
+    "LCD-52952",
+    "LCD-52954",
+    "LCD-52955",
+    "LCD-52956",
+    "LCD-52958",
+    "LCD-52966",
+    "LCD-52967",
+    "LCD-52968",
+    "LCD-52971",
+    "LCD-52993",
+    "LCD-53003",
+    "LCD-53004",
+    "LCD-53005",
+    "LCD-53007",
+    "LCD-53010",
+    "LCD-53012",
+    "LCD-53015",
+    "LCD-53016",
+    "LCD-53029",
+    "LCD-53038",
+    "LCD-53041",
+    "LCD-53042",
+    "LCD-53048",
+    "LCD-53049",
+    "LCD-53050",
+    "LCD-53052",
+    "LCD-53057",
+    "LCD-53058",
+    "LCD-53078",
+    "LCD-53080",
+    "LCD-53081",
+    "LCD-53085",
+    "LCD-53087",
+    "LCD-53129",
+    "LCD-53141",
+    "LCD-53142",
+    "LCD-53145",
+    "LCD-53162"
+  ],
+  "release_id": "release-2026-08-27T22-04-43Z",
+  "release_ticket": "LCD-53194",
+  "source_branch": "release/LCD-53194"
+}
