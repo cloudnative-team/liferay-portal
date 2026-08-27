@@ -17,6 +17,7 @@ spec:
             -   description:
                     The LiferayEnvironment to activate in this namespace.
                 name: liferay-environment-name
+                value: {{ $onlineActivationWorkflow.defaultEnvironmentName }}
     entrypoint: main
     podGC:
         strategy: OnWorkflowSuccess
