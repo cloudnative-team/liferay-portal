@@ -373,20 +373,9 @@ licensing:
     offline: false
     offlineActivationBundle: ""
     onlineActivationWorkflow:
+        clusterRoleName: online-activation-cluster-role
         enabled: false
-        image:
-            repository: dtzar/helm-kubectl
-            tag: 4.1.1
-        resources:
-            limits:
-                cpu: 250m
-                memory: 256Mi
-            requests:
-                cpu: 100m
-                memory: 128Mi
         serviceAccountName: online-activation-service-account
-        ttlSecondsAfterCompletion: 3600
-        waitTimeoutSeconds: 300
 livenessProbe:
     failureThreshold: 3
     httpGet:

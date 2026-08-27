@@ -9,7 +9,7 @@ function main {
 
 	local timeout
 
-	timeout=$(($(date +%s) + {{ .Values.licensing.onlineActivationWorkflow.waitTimeoutSeconds }}))
+	timeout=$(($(date +%s) + {{ .Values.onlineActivationWorkflow.waitTimeoutSeconds }}))
 
 	while [ "$(date +%s)" -lt "${timeout}" ]
 	do

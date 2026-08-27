@@ -1,36 +1,27 @@
-suite: Online Activation WorkflowTemplate
+suite: Online Activation ClusterWorkflowTemplate
 templates:
-    -   templates/online-activation-workflowtemplate.yaml
+    -   templates/online-activation-clusterworkflowtemplate.yaml
 tests:
     -   asserts:
             -   hasDocuments:
                     count: 0
-        it: Omits the workflow template when licensing is disabled
+        it: Omits the cluster workflow template unless the online activation workflow is enabled
         set:
-            licensing.enabled: false
-            licensing.onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   hasDocuments:
-                    count: 0
-        it: Omits the workflow template when the online activation workflow is disabled
-        set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: false
+            onlineActivationWorkflow.enabled: false
     -   asserts:
             -   equal:
                     path: metadata.name
-                    value: online-activation-workflow-template
+                    value: online-activation-cluster-workflow-template
             -   equal:
                     path: spec.serviceAccountName
                     value: online-activation-service-account
             -   hasDocuments:
                     count: 1
             -   isKind:
-                    of: WorkflowTemplate
-        it: Renders the workflow template when licensing and the workflow are both enabled
+                    of: ClusterWorkflowTemplate
+        it: Renders one cluster scoped template the whole cluster shares
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.arguments.parameters[0].name
@@ -39,8 +30,7 @@ tests:
                     path: spec.arguments.parameters[0].value
         it: Requires the activation code to be supplied at submit time
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.arguments.parameters[0].name
@@ -50,8 +40,7 @@ tests:
                     path: spec.arguments.parameters
         it: Asks the operator for nothing but the activation code
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.templates[0].steps[0][0].name
@@ -67,8 +56,7 @@ tests:
                     value: wait
         it: Finds and validates the environment before writing the activation code
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.templates[1].script.securityContext.allowPrivilegeEscalation
@@ -87,8 +75,7 @@ tests:
                     value: true
         it: Hardens the steps for namespaces that enforce the restricted pod security standard
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.archiveLogs
@@ -101,8 +88,7 @@ tests:
                     value: 3600
         it: Discards the workflow that holds the activation code but keeps a failed run readable
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   matchRegex:
                     path: spec.templates[4].script.env[1].value
@@ -112,8 +98,7 @@ tests:
                     pattern: "\{\{inputs\.parameters\.liferay-environment-name\}\}"
         it: Leaves the Argo variables intact for the workflow controller to resolve
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.templates[1].outputs.parameters[0].valueFrom.path
@@ -123,8 +108,7 @@ tests:
                     value: "{{steps.find-environment.outputs.parameters.liferay-environment-name}}"
         it: Passes the discovered environment to every step that follows
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   matchRegex:
                     path: spec.templates[1].script.source
@@ -137,8 +121,7 @@ tests:
                     pattern: Re-activation is not supported
         it: Refuses to act unless the namespace holds exactly one environment to activate
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   matchRegex:
                     path: spec.templates[1].script.source
@@ -151,8 +134,7 @@ tests:
                     pattern: activation requires the phase
         it: Retries after a rejected code and tolerates an environment the operator has not reconciled
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   matchRegex:
                     path: spec.templates[3].script.source
@@ -162,14 +144,12 @@ tests:
                     pattern: echo.*>&2
         it: Reports the activation verdict on standard output so it outlives the pod
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   matchRegex:
                     path: spec.templates[3].script.source
                     pattern: "date \+%s\) \+ 45\)\)"
         it: Substitutes the configured wait timeout into the polling loop
         set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
-            licensing.onlineActivationWorkflow.waitTimeoutSeconds: 45
+            onlineActivationWorkflow.enabled: true
+            onlineActivationWorkflow.waitTimeoutSeconds: 45

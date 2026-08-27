@@ -1,3 +1,6 @@
+release:
+    name: liferay-default
+    namespace: liferay-acme-prd
 suite: Online Activation RBAC
 templates:
     -   templates/online-activation-rbac.yaml
@@ -18,84 +21,54 @@ tests:
             licensing.onlineActivationWorkflow.enabled: false
     -   asserts:
             -   hasDocuments:
-                    count: 3
-        it: Renders the service account, role, and role binding together
+                    count: 2
+        it: Renders only the identity the workflow needs in this namespace
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
-                    path: rules[0].resources
-                    value: ["secrets"]
+                    path: metadata.name
+                    value: online-activation-service-account
             -   equal:
-                    path: rules[0].verbs
-                    value: ["create"]
-            -   equal:
-                    path: rules[1].resourceNames
-                    value: ["liferay-default-activation"]
-            -   equal:
-                    path: rules[1].verbs
-                    value: ["get", "patch", "update"]
+                    path: metadata.namespace
+                    value: liferay-acme-prd
         documentSelector:
             path: kind
-            value: Role
-        it: Scopes the writable secret to the activation code secret the operator reads
+            value: ServiceAccount
+        it: Creates the service account in the environment namespace, where the workflow pod runs
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
-                    path: rules[1].resourceNames
-                    value: ["custom-activation"]
+                    path: roleRef.kind
+                    value: ClusterRole
+            -   equal:
+                    path: roleRef.name
+                    value: online-activation-cluster-role
+            -   equal:
+                    path: subjects[0].name
+                    value: online-activation-service-account
+            -   equal:
+                    path: subjects[0].namespace
+                    value: liferay-acme-prd
         documentSelector:
             path: kind
-            value: Role
-        it: Tracks a custom activation code secret name
-        set:
-            licensing.activationCodeSecretName: custom-activation
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   equal:
-                    path: rules[2].resources
-                    value: ["workflowtaskresults"]
-            -   equal:
-                    path: rules[2].verbs
-                    value: ["create", "patch"]
-        documentSelector:
-            path: kind
-            value: Role
-        it: Grants the workflow task results every Argo pod reports through
-        set:
-            licensing.enabled: true
-            licensing.onlineActivationWorkflow.enabled: true
-    -   asserts:
-            -   equal:
-                    path: rules[3].resources
-                    value: ["liferayenvironments"]
-            -   equal:
-                    path: rules[3].verbs
-                    value: ["get", "list", "patch"]
-            -   notExists:
-                    path: rules[3].resourceNames
-        documentSelector:
-            path: kind
-            value: Role
-        it: Lists the environments in this namespace to discover the one to activate, and withholds watch
+            value: RoleBinding
+        it: Confines the shared cluster role to this namespace through a namespaced binding
         set:
             licensing.enabled: true
             licensing.onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: roleRef.name
-                    value: online-activation-role
-            -   equal:
-                    path: subjects[0].name
-                    value: online-activation-service-account
+                    value: custom-cluster-role
         documentSelector:
             path: kind
             value: RoleBinding
-        it: Binds the role to the workflow service account
+        it: Tracks a custom cluster role name
         set:
             licensing.enabled: true
+            licensing.onlineActivationWorkflow.clusterRoleName: custom-cluster-role
             licensing.onlineActivationWorkflow.enabled: true

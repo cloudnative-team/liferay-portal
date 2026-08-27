@@ -1,13 +1,12 @@
-{{- if and .Values.licensing.enabled .Values.licensing.onlineActivationWorkflow.enabled -}}
-{{- $onlineActivationWorkflow := .Values.licensing.onlineActivationWorkflow -}}
+{{- if .Values.onlineActivationWorkflow.enabled -}}
+{{- $onlineActivationWorkflow := .Values.onlineActivationWorkflow -}}
 {{- $image := printf "%s:%s" $onlineActivationWorkflow.image.repository (toString $onlineActivationWorkflow.image.tag) -}}
 apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
+kind: ClusterWorkflowTemplate
 metadata:
     labels:
-        {{- include "liferay.labels" . | nindent 8 }}
-    name: online-activation-workflow-template
-    namespace: {{ include "liferay.namespace" . }}
+        {{- include "dxp-operator.labels" . | nindent 8 }}
+    name: online-activation-cluster-workflow-template
 spec:
     archiveLogs: false
     arguments:
