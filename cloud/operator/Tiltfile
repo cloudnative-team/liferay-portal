@@ -1,7 +1,7 @@
 load("ext://restart_process", "docker_build_with_restart")
 load("ext://uibutton", "cmd_button", "text_input")
 
-ARGO_WORKFLOWS_VERSION = "1.0.10"
+ARGO_WORKFLOWS_VERSION = "2.0.3"
 
 context = k8s_context()
 
