@@ -114,6 +114,15 @@ tests:
                     path: spec.templates[4].script.env[1].name
                     value: LIFERAY_ACTIVATION_CODE
             -   equal:
+                    path: spec.templates[4].script.env[2].name
+                    value: LIFERAY_SECRET_KEY
+            -   equal:
+                    path: spec.templates[4].script.env[3].name
+                    value: LIFERAY_SECRET_NAME
+            -   notMatchRegex:
+                    path: spec.templates[4].script.source
+                    pattern: "\{\{"
+            -   equal:
                     path: spec.templates[4].script.securityContext.allowPrivilegeEscalation
                     value: false
             -   equal:
@@ -122,7 +131,7 @@ tests:
             -   equal:
                     path: spec.securityContext.runAsNonRoot
                     value: true
-        it: Passes the activation code through the environment rather than into a manifest
+        it: Passes every submitted value through the environment, never into the script
         set:
             onlineActivationWorkflow.enabled: true
     -   asserts:

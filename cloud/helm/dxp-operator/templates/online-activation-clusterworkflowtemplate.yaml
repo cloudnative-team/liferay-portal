@@ -95,6 +95,10 @@ spec:
                         value: /tmp
                     -   name: LIFERAY_ACTIVATION_CODE
                         value: "{{ "{{" }}workflow.parameters.activation-code}}"
+                    -   name: LIFERAY_SECRET_KEY
+                        value: "{{ "{{" }}inputs.parameters.secret-key}}"
+                    -   name: LIFERAY_SECRET_NAME
+                        value: "{{ "{{" }}inputs.parameters.secret-name}}"
                 image: {{ $image | quote }}
                 resources:
                     {{- $onlineActivationWorkflow.resources | toYaml | nindent 20 }}

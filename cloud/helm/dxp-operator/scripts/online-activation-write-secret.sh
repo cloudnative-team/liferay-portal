@@ -5,9 +5,6 @@ set -o nounset
 set -o pipefail
 
 function main {
-	local secret_key="{{ "{{" }}inputs.parameters.secret-key}}"
-	local secret_name="{{ "{{" }}inputs.parameters.secret-name}}"
-
 	if [ -z "${LIFERAY_ACTIVATION_CODE}" ]
 	then
 		echo "The activation code is empty." >&2
@@ -15,7 +12,7 @@ function main {
 		exit 1
 	fi
 
-	if [ -z "${secret_key}" ] || [ -z "${secret_name}" ]
+	if [ -z "${LIFERAY_SECRET_KEY}" ] || [ -z "${LIFERAY_SECRET_NAME}" ]
 	then
 		echo "The environment does not reference an activation code secret." >&2
 
@@ -26,9 +23,9 @@ function main {
 		create \
 		secret \
 		generic \
-		"${secret_name}" \
+		"${LIFERAY_SECRET_NAME}" \
 		--dry-run=client \
-		--from-literal="${secret_key}=${LIFERAY_ACTIVATION_CODE}" \
+		--from-literal="${LIFERAY_SECRET_KEY}=${LIFERAY_ACTIVATION_CODE}" \
 		--output yaml | \
 		kubectl \
 			apply \
@@ -37,7 +34,7 @@ function main {
 			--force-conflicts \
 			--server-side
 
-	echo "The activation code was written to the secret ${secret_name}."
+	echo "The activation code was written to the secret ${LIFERAY_SECRET_NAME}."
 }
 
 main
