@@ -154,6 +154,12 @@ for name, values in environments.items():
 
 k8s_resource(
     labels=["activation"],
+    links=[
+        link(
+            "http://localhost:2746/cluster-workflow-templates",
+            "Submit online activation",
+        ),
+    ],
     new_name="online-activation",
     objects=[
         "online-activation-cluster-role:clusterrole",
@@ -276,10 +282,94 @@ local_resource(
     labels=["activation"],
 )
 
+k8s_resource(
+    labels=["activation"],
+    new_name="argo-workflows-login",
+    objects=[
+        "argo-workflows-ui:clusterrole",
+        "argo-workflows-ui:clusterrolebinding",
+        "argo-workflows-ui:serviceaccount:argo-workflows-system",
+        "argo-workflows-ui.service-account-token:secret:argo-workflows-system",
+    ],
+    resource_deps=["argo-workflows"],
+)
+
+k8s_yaml(
+    blob(
+        "\n".join(
+            [
+                "apiVersion: v1",
+                "kind: ServiceAccount",
+                "metadata:",
+                "    name: argo-workflows-ui",
+                "    namespace: argo-workflows-system",
+                "---",
+                "apiVersion: v1",
+                "kind: Secret",
+                "metadata:",
+                "    annotations:",
+                "        kubernetes.io/service-account.name: argo-workflows-ui",
+                "    name: argo-workflows-ui.service-account-token",
+                "    namespace: argo-workflows-system",
+                "type: kubernetes.io/service-account-token",
+                "---",
+                "apiVersion: rbac.authorization.k8s.io/v1",
+                "kind: ClusterRole",
+                "metadata:",
+                "    name: argo-workflows-ui",
+                "rules:",
+                "    -   apiGroups: [\"\"]",
+                "        resources: [\"namespaces\"]",
+                "        verbs: [\"get\", \"list\", \"watch\"]",
+                "    -   apiGroups: [\"\"]",
+                "        resources: [\"pods\", \"pods/log\"]",
+                "        verbs: [\"get\", \"list\", \"watch\"]",
+                "    -   apiGroups: [\"argoproj.io\"]",
+                "        resources: [\"clusterworkflowtemplates\", \"workflowtemplates\"]",
+                "        verbs: [\"get\", \"list\", \"watch\"]",
+                "    -   apiGroups: [\"argoproj.io\"]",
+                "        resources: [\"workflows\"]",
+                "        verbs: [\"create\", \"delete\", \"get\", \"list\", \"watch\"]",
+                "---",
+                "apiVersion: rbac.authorization.k8s.io/v1",
+                "kind: ClusterRoleBinding",
+                "metadata:",
+                "    name: argo-workflows-ui",
+                "roleRef:",
+                "    apiGroup: rbac.authorization.k8s.io",
+                "    kind: ClusterRole",
+                "    name: argo-workflows-ui",
+                "subjects:",
+                "    -   kind: ServiceAccount",
+                "        name: argo-workflows-ui",
+                "        namespace: argo-workflows-system",
+            ]
+        )
+    )
+)
+
+local_resource(
+    "argo-workflows-token",
+    cmd=" ".join(
+        [
+            "until kubectl get secret argo-workflows-ui.service-account-token",
+            "--namespace argo-workflows-system",
+            "--output jsonpath=\"{.data.token}\" 2> /dev/null | grep --quiet .;",
+            "do sleep 1; done;",
+            "printf \"\\nPaste this into the Argo UI login:\\n\\nBearer %s\\n\\n\"",
+            "\"$(kubectl get secret argo-workflows-ui.service-account-token",
+            "--namespace argo-workflows-system",
+            "--output jsonpath=\"{.data.token}\" | base64 --decode)\"",
+        ]
+    ),
+    labels=["activation"],
+    resource_deps=["argo-workflows-login"],
+)
+
 local_resource(
     "argo-workflows-ui",
     labels=["activation"],
-    links=["http://localhost:2746"],
+    links=[link("http://localhost:2746", "Argo Workflows UI")],
     resource_deps=["argo-workflows"],
     serve_cmd=" ".join(
         [
