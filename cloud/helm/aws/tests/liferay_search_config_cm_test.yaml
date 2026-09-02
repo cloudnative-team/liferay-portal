@@ -21,6 +21,12 @@ tests:
                     pattern: com.liferay.portal.search.elasticsearch7.impl
             -   matchRegex:
                     path: data["com.liferay.portal.bundle.blacklist.internal.configuration.BundleBlacklistConfiguration.config"]
+                    pattern: com.liferay.portal.search.elasticsearch8.api
+            -   matchRegex:
+                    path: data["com.liferay.portal.bundle.blacklist.internal.configuration.BundleBlacklistConfiguration.config"]
+                    pattern: com.liferay.portal.search.elasticsearch8.impl
+            -   matchRegex:
+                    path: data["com.liferay.portal.bundle.blacklist.internal.configuration.BundleBlacklistConfiguration.config"]
                     pattern: com.liferay.portal.search.learning.to.rank.api
         it: Blacklists the Elasticsearch bundles through the loop when the engine is opensearch
         set:
