@@ -64,6 +64,16 @@ function bump_modified_charts {
 
 	for chart_dir in "${chart_dirs[@]}"
 	do
+		#
+		# A dependency cascade can record a chart before the outdated version
+		# check reaches it, so skip whatever already owns a new version.
+		#
+
+		if has_array_element "${chart_dir}" "${_BUMPED_CHART_DIRS[@]}"
+		then
+			continue
+		fi
+
 		bump_chart_version "${chart_dir}"
 	done
 }
