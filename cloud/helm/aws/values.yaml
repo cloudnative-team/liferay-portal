@@ -204,7 +204,7 @@ liferay-default:
             -   configMap:
                     name: liferay-search-config-aws
                 name: liferay-search-config-aws
-    license:
+    licensing:
         enabled: true
     marketplace:
         csi:

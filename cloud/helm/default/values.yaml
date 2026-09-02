@@ -361,8 +361,6 @@ image:
     repository: liferay/dxp
     tag: 2026.q1.8-lts
 initContainers: []
-license:
-    secretName: ""
 licensing:
     activationCodeSecretKey: activationCode
     activationCodeSecretName: ""
@@ -374,6 +372,7 @@ licensing:
         clusterRoleName: online-activation-cluster-role
         enabled: true
         serviceAccountName: online-activation-service-account
+    secretName: ""
     syncInterval: 60
 livenessProbe:
     failureThreshold: 3

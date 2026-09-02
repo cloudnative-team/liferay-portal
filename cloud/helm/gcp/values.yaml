@@ -127,7 +127,7 @@ liferay-default:
                     defaultMode: 0755
                     name: liferay-init-scripts-gcp
                 name: liferay-init-scripts-gcp
-    license:
+    licensing:
         enabled: true
     marketplace:
         csi:

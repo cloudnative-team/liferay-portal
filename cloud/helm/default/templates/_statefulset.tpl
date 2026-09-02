@@ -4,7 +4,7 @@
     {{- if eq .name "http" -}}{{- $backendPort = .port -}}{{- end -}}
 {{- end -}}
 {{- $suffix := ternary "" (printf "-%s" .name) (eq .name "") }}
-{{- $license := .statefulset.license | default dict }}
+{{- $licensing := .statefulset.licensing | default dict }}
 {{- $licenseSecretName := $licensing.secretName | default (printf "%s-entitlements" (include "liferay.name" .root)) }}
 {{- $licenseVolumeName := "liferay-license" }}
 {{- $marketplace := .statefulset.marketplace | default dict }}
