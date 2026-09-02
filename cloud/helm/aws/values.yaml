@@ -204,8 +204,6 @@ liferay-default:
             -   configMap:
                     name: liferay-search-config-aws
                 name: liferay-search-config-aws
-    licensing:
-        enabled: true
     marketplace:
         csi:
             driver: efs.csi.aws.com
