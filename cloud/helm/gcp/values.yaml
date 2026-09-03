@@ -133,7 +133,6 @@ liferay-default:
             volumeAttributes:
                 protocol: NFS_V3
                 volume: marketplace
-        enabled: true
         size: 10Gi
     network:
         enabled: true

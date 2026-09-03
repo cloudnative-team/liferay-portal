@@ -207,7 +207,6 @@ liferay-default:
     marketplace:
         csi:
             driver: efs.csi.aws.com
-        enabled: true
         size: 10Gi
     network:
         enabled: true
