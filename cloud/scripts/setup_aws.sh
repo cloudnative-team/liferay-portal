@@ -106,9 +106,10 @@ function _check_utils {
 }
 
 function _configure_s3_bucket {
-	local alias_name="alias/tfstate-${bucket_name}"
 	local bucket_name="${1}"
 	local region="${2}"
+
+	local alias_name="alias/tfstate-${bucket_name}"
 
 	local account_id
 
