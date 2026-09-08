@@ -198,3 +198,18 @@ variables {
 	liferay_helm_chart_version="0.4.20"
 	region="us-east-1"
 }
+run "should_retry_a_sync_that_lost_a_race_with_the_infrastructure_provider" {
+	assert {
+		condition=kubernetes_manifest.liferay_applicationset.manifest.spec.template.spec.syncPolicy.retry.limit == 10
+		error_message="The Liferay ApplicationSet template must retry a failed sync, since ArgoCD does not retry a revision whose sync already failed"
+	}
+	assert {
+		condition=kubernetes_manifest.liferay_applicationset.manifest.spec.template.spec.syncPolicy.retry.backoff.maxDuration == "5m"
+		error_message="The Liferay ApplicationSet template must cap the retry backoff, so a custom resource definition that arrives late is still picked up"
+	}
+	assert {
+		condition=!contains(kubernetes_manifest.liferay_applicationset.manifest.spec.template.spec.syncPolicy.syncOptions, "SkipDryRunOnMissingResource=true")
+		error_message="The Liferay ApplicationSet template must keep the dry run for every resource, since tolerating a missing resource belongs on the one resource that needs it"
+	}
+	command=plan
+}
