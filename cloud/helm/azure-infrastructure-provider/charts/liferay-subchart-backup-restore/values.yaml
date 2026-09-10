@@ -8,6 +8,7 @@ azureBackupService:
     restoreWaitTimeoutSeconds: 7200
 images:
     azureCli:
+        dataprotectionExtensionVersion: 1.11.3
         repository: mcr.microsoft.com/azure-cli
         tag: 2.64.0
     helmKubectl:
