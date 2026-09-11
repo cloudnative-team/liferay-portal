@@ -109,6 +109,16 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
+                    pattern: "composition-resource-name: liferay-backup-restore-database-\\{\\{ \\$dataPlane \\}\\}"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "principalId: \\{\\{ \\$backupRestoreIdentityPrincipalId \\}\\}\\s+principalType: ServicePrincipal\\s+roleDefinitionName: Reader\\s+scope: [^\\n]+Microsoft.DBforPostgreSQL/flexibleServers/"
+        it: Grants the restore identity read on each plane database server
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
                     pattern: \{\{- if \$backupRestoreIdentityPrincipalId \}\}
             -   documentIndex: 0
                 matchRegex:
