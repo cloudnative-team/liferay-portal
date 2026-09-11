@@ -100,7 +100,7 @@ spec:
                 backoff:
                     duration: 30s
                     factor: 2
-                    maxDuration: 10m
+                    maxDuration: 20m
                 limit: 5
                 retryPolicy: OnFailure
             script:
@@ -135,7 +135,7 @@ spec:
                         --auth-mode login \
                         --name document-library >/dev/null
 
-                    timeout=$(($(date +%s) + 600))
+                    timeout=$(($(date +%s) + 300))
 
                     while [ $(date +%s) -lt ${timeout} ]
                     do
@@ -145,9 +145,10 @@ spec:
                                 --auth-mode login \
                                 --name document-library \
                                 --output tsv \
-                                --query exists)
+                                --query exists \
+                                | tr "[:upper:]" "[:lower:]")
 
-                        if [ "${exists}" = "False" ]
+                        if [ "${exists}" = "false" ]
                         then
                             echo "The document-library container was deleted from ${storage_account_name}."
 

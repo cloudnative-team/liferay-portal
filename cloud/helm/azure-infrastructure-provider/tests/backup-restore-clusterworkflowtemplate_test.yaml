@@ -160,4 +160,13 @@ tests:
             -   equal:
                     path: spec.templates[3].retryStrategy.limit
                     value: 5
+            -   matchRegex:
+                    path: spec.templates[3].script.source
+                    pattern: ":lower:"
+            -   matchRegex:
+                    path: spec.templates[3].script.source
+                    pattern: "exists}\" = \"false\""
+            -   equal:
+                    path: spec.templates[3].retryStrategy.backoff.maxDuration
+                    value: 20m
         it: Waits only for the storage account and retries past role assignment propagation
