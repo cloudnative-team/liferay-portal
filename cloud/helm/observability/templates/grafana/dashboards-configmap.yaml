@@ -4,7 +4,7 @@
 {{- $namespace := include "observability.namespace" . -}}
 {{- $esNamespaceSuffix := "" -}}
 {{- $nsLabel := "namespace" -}}
-{{- if eq .Values.cloudProvider "gcp" -}}
+{{- if or (eq .Values.cloudProvider "gcp") (eq .Values.cloudProvider "azure") -}}
 {{- $esNamespaceSuffix = "-elasticsearch" -}}
 {{- $nsLabel = "exported_namespace" -}}
 {{- end -}}
