@@ -41,6 +41,9 @@ tests:
                         name: AZURE_EXTENSION_DIR
                         value: /tmp/azure-extensions
                     path: spec.templates[3].script.env
+            -   equal:
+                    path: spec.templates[3].script.image
+                    value: mcr.microsoft.com/azure-cli:2.89.1
         it: Pins the dataprotection extension and logs in before any az command
     -   asserts:
             -   equal:
