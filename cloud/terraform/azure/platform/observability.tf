@@ -11,6 +11,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "recording_rules" {
 	location=data.azurerm_resource_group.liferay.location
 	name="${var.deployment_name}-recording-rules"
 	resource_group_name=local.resource_group_name
+	rule_group_enabled=true
 	scopes=[azurerm_monitor_workspace.main[0].id]
 	tags=local.tags
 }
