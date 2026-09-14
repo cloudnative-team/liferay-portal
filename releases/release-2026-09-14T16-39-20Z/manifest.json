@@ -1,0 +1,122 @@
+{
+  "base_commit": "b637f3004da686e4b060e2e0fdf49bb6aab8f4c9",
+  "bootstraps": {
+    "aws": {
+      "sha256": "3b9f3da5016e9d043b1b0a6317134bfbf272c6c6576ecf633121777c908660c8",
+      "version": "2.0.1"
+    },
+    "azure": {
+      "sha256": "60500fff3cc1f21ab243da1161a3a1cdc4e813b39697c6ab86129b821a04bc72",
+      "version": "0.1.1"
+    },
+    "gcp": {
+      "sha256": "e9cef7dbbc47a9e7685c181c0ab32a58d02442091222b131eaf77099a932db67",
+      "version": "2.0.1"
+    }
+  },
+  "charts": {
+    "liferay-aws": {
+      "digest": "sha256:53b0e471778f1e6b85150f401d9de8ccb2fb54316a941d654b065a6e9a6b47bb",
+      "version": "2.0.1"
+    },
+    "liferay-aws-infrastructure": {
+      "digest": "sha256:84a253570471439f032032ab546c70a817114950bdfc2d82a84aa758cf7f0297",
+      "version": "2.0.1"
+    },
+    "liferay-aws-infrastructure-provider": {
+      "digest": "sha256:5bb6d1aec8e2b4275cf889058b79312ed2449d1114144dc404a5bcd113cc3910",
+      "version": "1.1.2"
+    },
+    "liferay-azure": {
+      "digest": "sha256:c2c7a64dab10690bc819e248cd2b4977b08f801270e9aa212c42a9012fed0e7a",
+      "version": "0.1.1"
+    },
+    "liferay-azure-infrastructure-provider": {
+      "digest": "sha256:1dd20476976d2fa8a8c9460ac4a03b3c5beb22742dbc2e75e2729c571eb7dff3",
+      "version": "0.1.1"
+    },
+    "liferay-default": {
+      "digest": "sha256:12d61b6499949f35053ca9ac31463460e0f9100c9748e527a36177fb8ae87ce9",
+      "version": "2.0.1"
+    },
+    "liferay-dxp-operator": {
+      "digest": "sha256:6dc6db6dc4c571f0d0e9a0221ddca1a283d60e7b25da52d6ec70224fdf946fce",
+      "version": "0.1.2"
+    },
+    "liferay-gcp": {
+      "digest": "sha256:a3036ba7d7c489d8fd43dd396006d93aeb31dae59395cde70c312a8e6956008b",
+      "version": "2.0.1"
+    },
+    "liferay-gcp-infrastructure": {
+      "digest": "sha256:45021fcf2ca80de848d72098b67c31c15a3eaa4467adacf7214152b6a52aa288",
+      "version": "2.0.1"
+    },
+    "liferay-gcp-infrastructure-provider": {
+      "digest": "sha256:4f22b2a3b6729510185a3f1cd9eb847c688bd991179efc6aa7c8aede514b67f1",
+      "version": "1.1.2"
+    },
+    "liferay-infrastructure": {
+      "digest": "sha256:5006cb8c9b291a0d230b38873cae1fa1ea32adc7b93a13ff6ba7074339978700",
+      "version": "0.1.1"
+    },
+    "liferay-platform": {
+      "digest": "sha256:01eb012b58b9ad3029369344bda516f22b44c14bb2dfe81b0d824772c047d277",
+      "version": "0.1.2"
+    },
+    "liferay-platform-components": {
+      "digest": "sha256:cce960be3fab72f4f2634db5127c2eaabafcbe3ae16057b1c4514d502121b1c0",
+      "version": "0.1.2"
+    },
+    "observability": {
+      "digest": "sha256:7406b964026148fd23ec5a9ec565f201196fa3f21ccad415362e352b96ccbdd3",
+      "version": "1.1.1"
+    }
+  },
+  "images": {
+    "liferay-dxp-operator": {
+      "digest": "sha256:ccdbe93f5df56d75aada696a8f11de23c72ec09bab2f19f1eacf91eef1531405",
+      "version": "0.1.1"
+    }
+  },
+  "included_lcd_tickets": [
+    "LCD-52972",
+    "LCD-53084",
+    "LCD-53086",
+    "LCD-53111",
+    "LCD-53114",
+    "LCD-53127",
+    "LCD-53132",
+    "LCD-53135",
+    "LCD-53140",
+    "LCD-53153",
+    "LCD-53154",
+    "LCD-53156",
+    "LCD-53176",
+    "LCD-53192",
+    "LCD-53194",
+    "LCD-53211",
+    "LCD-53212",
+    "LCD-53217",
+    "LCD-53227",
+    "LCD-53231",
+    "LCD-53255",
+    "LCD-53256",
+    "LCD-53270",
+    "LCD-53280",
+    "LCD-53283",
+    "LCD-53290",
+    "LCD-53291",
+    "LCD-53320",
+    "LCD-53321",
+    "LCD-53329",
+    "LCD-53348",
+    "LCD-53349",
+    "LCD-53350",
+    "LCD-53351",
+    "LCD-53353",
+    "LCD-53354"
+  ],
+  "release_id": "release-2026-09-14T16-39-20Z",
+  "release_ticket": "LCD-53325",
+  "source_branch": "release/LCD-53325"
+}
