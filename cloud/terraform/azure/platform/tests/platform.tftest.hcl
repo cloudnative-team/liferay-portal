@@ -231,6 +231,10 @@ run "should_disable_ingestion_by_default" {
 		error_message="No data collection resources must be created when observability is disabled"
 	}
 	assert {
+		condition=length(azurerm_monitor_alert_prometheus_rule_group.recording_rules) == 0
+		error_message="No Prometheus rule group must be created when observability is disabled"
+	}
+	assert {
 		condition=output.prometheus_data_collection_rule_id == "" && output.prometheus_metrics_ingestion_endpoint == ""
 		error_message="Remote write outputs must be empty when observability is disabled"
 	}
@@ -434,6 +438,42 @@ run "should_omit_the_keda_identity_when_observability_is_disabled" {
 	command=plan
 	variables {
 		keda_config={
+			enabled=true
+		}
+	}
+}
+run "should_record_the_container_utilization_ratios_in_the_workspace" {
+	assert {
+		condition=length(azurerm_monitor_alert_prometheus_rule_group.recording_rules) == 1
+		error_message="A Prometheus rule group must be created when observability is enabled"
+	}
+	assert {
+		condition=azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].name == "liferay-test-recording-rules"
+		error_message="The Prometheus rule group name must be derived from deployment_name"
+	}
+	assert {
+		condition=one(azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].scopes) == azurerm_monitor_workspace.main[0].id
+		error_message="The Prometheus rule group must be scoped to the Azure Monitor workspace so the rules evaluate against the ingested metrics"
+	}
+	assert {
+		condition=azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].location == data.azurerm_resource_group.liferay.location
+		error_message="The Prometheus rule group must sit in the same region as the Azure Monitor workspace it scopes"
+	}
+	assert {
+		condition=join(",", [for rule in azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].rule : rule.record]) == "liferay:container_cpu_limit_utilization:ratio,liferay:container_memory_limit_utilization:ratio"
+		error_message="The Prometheus rule group must record exactly the cloud agnostic ratios that the Grafana alert rules query"
+	}
+	assert {
+		condition=alltrue([for rule in azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].rule : strcontains(rule.expression, "kube_pod_container_resource_limits")])
+		error_message="Every recorded ratio must divide the observed usage by the container resource limit"
+	}
+	assert {
+		condition=azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].interval == "PT1M"
+		error_message="The Prometheus rule group must evaluate every minute to match the recording rule interval on AWS and GCP"
+	}
+	command=plan
+	variables {
+		observability_config={
 			enabled=true
 		}
 	}
