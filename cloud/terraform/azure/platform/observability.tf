@@ -1,3 +1,19 @@
+resource "azurerm_monitor_alert_prometheus_rule_group" "recording_rules" {
+	count=var.observability_config.enabled ? 1 : 0
+	dynamic "rule" {
+		content {
+			expression=rule.value.expression
+			record=rule.value.record
+		}
+		for_each=local.prometheus_recording_rules
+	}
+	interval="PT1M"
+	location=data.azurerm_resource_group.liferay.location
+	name="${var.deployment_name}-recording-rules"
+	resource_group_name=local.resource_group_name
+	scopes=[azurerm_monitor_workspace.main[0].id]
+	tags=local.tags
+}
 resource "azurerm_monitor_data_collection_endpoint" "main" {
 	count=var.observability_config.enabled ? 1 : 0
 	kind="Linux"
