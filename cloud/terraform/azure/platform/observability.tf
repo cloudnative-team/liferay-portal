@@ -2,6 +2,7 @@ resource "azurerm_monitor_alert_prometheus_rule_group" "recording_rules" {
 	count=var.observability_config.enabled ? 1 : 0
 	dynamic "rule" {
 		content {
+			enabled=true
 			expression=rule.value.expression
 			record=rule.value.record
 		}

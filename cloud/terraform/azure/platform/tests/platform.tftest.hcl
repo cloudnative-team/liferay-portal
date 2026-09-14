@@ -475,6 +475,10 @@ run "should_record_the_container_utilization_ratios_in_the_workspace" {
 		condition=azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].rule_group_enabled
 		error_message="The Prometheus rule group must be enabled, because the provider sends false when the argument is omitted"
 	}
+	assert {
+		condition=alltrue([for rule in azurerm_monitor_alert_prometheus_rule_group.recording_rules[0].rule : rule.enabled])
+		error_message="Every rule must be enabled, because the provider sends false when the argument is omitted"
+	}
 	command=plan
 	variables {
 		observability_config={
