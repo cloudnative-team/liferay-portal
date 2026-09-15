@@ -191,7 +191,7 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: \{\{- if and \$backupRoleId \(not \$isDoclibRestoreTarget\) \}\}
+                    pattern: \{\{- if and \$backupRoleId \(or \(eq \$dataPlane \$activeDataPlane\) \(has \$dataPlane \$observedBackupDataPlanes\)\) \}\}
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
@@ -217,11 +217,11 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "if and \\$backupRoleId \\(not \\$isDoclibRestoreTarget\\)"
+                    pattern: "if and \\$backupRoleId \\(or \\(eq \\$dataPlane \\$activeDataPlane\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)\\)"
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "if or \\(and \\(has \\$dataPlane \\$dataPlanes\\) \\(not \\$isDoclibRestoreTarget\\)\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)"
+                    pattern: "if or \\(eq \\$dataPlane \\$activeDataPlane\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)"
         it: Holds protection off the restore target until it is promoted
     -   asserts:
             -   equal:
@@ -387,7 +387,7 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "or \\(and \\(has \\$dataPlane \\$dataPlanes\\) \\(not \\$isDoclibRestoreTarget\\)\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)"
+                    pattern: "or \\(eq \\$dataPlane \\$activeDataPlane\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)"
         it: Orders the storage account deletion behind its backup instance
     -   asserts:
             -   documentIndex: 0
@@ -543,6 +543,12 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: "sourceServerId: "
         it: Restores the inactive plane to a point in time through initProvider
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "range \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+\\{\\{- \\$backupRoleId := dig"
+        it: Retains each backup instance once created so a promotion never soft deletes one
     -   asserts:
             -   documentIndex: 0
                 matchRegex:

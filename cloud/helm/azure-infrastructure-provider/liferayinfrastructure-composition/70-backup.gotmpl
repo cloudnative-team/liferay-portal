@@ -156,10 +156,9 @@ spec:
         name: iam
 ---
 {{- end }}
-{{- range $dataPlane := $dataPlanes }}
+{{- range $dataPlane := list "blue" "green" }}
 {{- $backupRoleId := dig (printf "liferay-backup-vault-storage-%s" $dataPlane) "resource" "status" "atProvider" "id" "" $observedResources }}
-{{- $isDoclibRestoreTarget := and (eq $restorePhase "provisioning") (eq $dataPlane $targetActiveDataPlane) }}
-{{- if and $backupRoleId (not $isDoclibRestoreTarget) }}
+{{- if and $backupRoleId (or (eq $dataPlane $activeDataPlane) (has $dataPlane $observedBackupDataPlanes)) }}
 apiVersion: dataprotection.azure.m.upbound.io/v1beta1
 kind: BackupInstanceBlobStorage
 metadata:
@@ -322,8 +321,7 @@ spec:
         kind: ClusterProviderConfig
         name: iam
 {{- range $dataPlane := list "blue" "green" }}
-{{- $isDoclibRestoreTarget := and (eq $restorePhase "provisioning") (eq $dataPlane $targetActiveDataPlane) }}
-{{- if or (and (has $dataPlane $dataPlanes) (not $isDoclibRestoreTarget)) (has $dataPlane $observedBackupDataPlanes) }}
+{{- if or (eq $dataPlane $activeDataPlane) (has $dataPlane $observedBackupDataPlanes) }}
 ---
 apiVersion: protection.crossplane.io/v1beta1
 kind: Usage
