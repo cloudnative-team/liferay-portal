@@ -51,6 +51,44 @@ resource "kubernetes_manifest" "argo_workflows_gateway" {
 		}
 	}
 }
+resource "kubernetes_manifest" "argo_workflows_gateway_authorization" {
+	count=var.access_control_config.enabled && var.argo_workflows_domain_config.hostname != null ? 1 : 0
+	depends_on=[kubernetes_manifest.argo_workflows_gateway]
+	manifest={
+		apiVersion="gateway.envoyproxy.io/v1alpha1"
+		kind="SecurityPolicy"
+		metadata={
+			labels=merge(
+				local.common_labels,
+				{
+					"app.kubernetes.io/name"="${local.argo_workflows_gateway_name}-authorization"
+				})
+			name="${local.argo_workflows_gateway_name}-authorization"
+			namespace=var.argo_workflows_namespace
+		}
+		spec={
+			authorization={
+				defaultAction="Deny"
+				rules=[
+					{
+						action="Allow"
+						name="allowed-cidrs"
+						principal={
+							clientCIDRs=local.argo_workflows_source_ranges
+						}
+					},
+				]
+			}
+			targetRefs=[
+				{
+					group="gateway.networking.k8s.io"
+					kind="Gateway"
+					name=local.argo_workflows_gateway_name
+				},
+			]
+		}
+	}
+}
 resource "kubernetes_manifest" "argo_workflows_gateway_class" {
 	count=var.argo_workflows_domain_config.hostname != null ? 1 : 0
 	manifest={
