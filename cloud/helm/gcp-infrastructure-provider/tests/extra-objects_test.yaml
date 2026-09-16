@@ -1,0 +1,100 @@
+release:
+    name: my-release
+    namespace: liferay-system
+suite: Extra Objects
+templates:
+    -   templates/extra-objects.yaml
+tests:
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the extra objects when none are declared
+    -   asserts:
+            -   hasDocuments:
+                    count: 1
+            -   isKind:
+                    of: ConfigMap
+            -   equal:
+                    path: metadata.name
+                    value: declared-as-a-mapping
+        it: Renders an entry declared as a mapping
+        set:
+            extraObjects:
+                -   apiVersion: v1
+                    kind: ConfigMap
+                    metadata:
+                        name: declared-as-a-mapping
+    -   asserts:
+            -   hasDocuments:
+                    count: 1
+            -   isKind:
+                    of: ConfigMap
+            -   equal:
+                    path: metadata.name
+                    value: declared-as-a-string
+        it: Renders an entry declared as a string
+        set:
+            extraObjects:
+                -   |
+                    apiVersion: v1
+                    kind: ConfigMap
+                    metadata:
+                        name: declared-as-a-string
+    -   asserts:
+            -   hasDocuments:
+                    count: 1
+            -   isKind:
+                    of: SecurityPolicy
+            -   equal:
+                    path: spec.authorization.rules[0].principal.clientCIDRs
+                    value:
+                        -   200.150.10.0/24
+                        -   91.121.0.0/16
+            -   equal:
+                    path: spec.targetRefs[0].name
+                    value: argocd-server-gateway
+        it: Resolves values a rendered entry refers to
+        set:
+            accessControl:
+                allowedCIDRs:
+                    -   200.150.10.0/24
+                    -   91.121.0.0/16
+                enabled: true
+            extraObjects:
+                -   |
+                    {{- $accessControl := .Values.accessControl | default dict }}
+                    {{- if dig "enabled" false $accessControl }}
+                    apiVersion: gateway.envoyproxy.io/v1alpha1
+                    kind: SecurityPolicy
+                    metadata:
+                        name: argocd-gateway-authorization
+                        namespace: argo-system
+                    spec:
+                        authorization:
+                            defaultAction: Deny
+                            rules:
+                                -   action: Allow
+                                    name: allowed-cidrs
+                                    principal:
+                                        clientCIDRs:
+                                            {{- range dig "allowedCIDRs" (list) $accessControl }}
+                                            -   {{ . | quote }}
+                                            {{- end }}
+                        targetRefs:
+                            -   group: gateway.networking.k8s.io
+                                kind: Gateway
+                                name: argocd-server-gateway
+                    {{- end }}
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Skips a rendered entry whose guard is false
+        set:
+            extraObjects:
+                -   |
+                    {{- if dig "enabled" false (.Values.accessControl | default dict) }}
+                    apiVersion: v1
+                    kind: ConfigMap
+                    metadata:
+                        name: should-not-render
+                    {{- end }}
