@@ -1,3 +1,18 @@
+variable "access_control_config" {
+	default={}
+	type=object({
+		allowed_cidr_blocks=optional(list(string), [])
+		enabled=optional(bool, false)
+	})
+	validation {
+		condition=alltrue([for cidr in var.access_control_config.allowed_cidr_blocks : can(cidrhost(cidr, 0))])
+		error_message="The variable \"access_control_config.allowed_cidr_blocks\" must contain valid CIDR blocks."
+	}
+	validation {
+		condition=!var.access_control_config.enabled || length(var.access_control_config.allowed_cidr_blocks) > 0
+		error_message="The variable \"access_control_config.allowed_cidr_blocks\" must not be empty when \"access_control_config.enabled\" is true."
+	}
+}
 variable "argo_workflows_domain_config" {
 	default={}
 	type=object({
