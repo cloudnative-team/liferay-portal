@@ -51,6 +51,44 @@ resource "kubernetes_manifest" "argocd_gateway" {
 		}
 	}
 }
+resource "kubernetes_manifest" "argocd_gateway_authorization" {
+	count=var.access_control_config.enabled && var.argocd_domain_config.hostname != null ? 1 : 0
+	depends_on=[kubernetes_manifest.argocd_gateway]
+	manifest={
+		apiVersion="gateway.envoyproxy.io/v1alpha1"
+		kind="SecurityPolicy"
+		metadata={
+			labels=merge(
+				local.common_labels,
+				{
+					"app.kubernetes.io/name"="${local.argocd_gateway_name}-authorization"
+				})
+			name="${local.argocd_gateway_name}-authorization"
+			namespace=var.argocd_namespace
+		}
+		spec={
+			authorization={
+				defaultAction="Deny"
+				rules=[
+					{
+						action="Allow"
+						name="allowed-cidrs"
+						principal={
+							clientCIDRs=var.access_control_config.allowed_cidr_blocks
+						}
+					},
+				]
+			}
+			targetRefs=[
+				{
+					group="gateway.networking.k8s.io"
+					kind="Gateway"
+					name=local.argocd_gateway_name
+				},
+			]
+		}
+	}
+}
 resource "kubernetes_manifest" "argocd_gateway_class" {
 	manifest={
 		apiVersion="gateway.networking.k8s.io/v1"
