@@ -386,6 +386,22 @@ licensing:
     initScriptsVolumeName: liferay-init-scripts-default
     offline: false
     offlineActivationBundle: ""
+    offlineActivationWorkflow:
+        bundleName: offline-activation-bundle.zip
+        clusterRoleName: offline-activation-cluster-role
+        clusterWorkflowTemplateName: offline-activation-cluster-workflow-template
+        enabled: false
+        marketplaceVolumeName: marketplace
+        requestClusterWorkflowTemplateName: offline-activation-request-cluster-workflow-template
+        requestWorkflowTemplateName: offline-activation-request-workflow-template
+        serviceAccountAnnotations: {}
+        serviceAccountName: offline-activation-service-account
+        ttlSecondsAfterCompletion: 3600
+        userAccess:
+            roleName: offline-activation-user-role
+            serviceAccountName: offline-activation-user-service-account
+            tokenSecretName: offline-activation-user-token
+        workflowTemplateName: offline-activation-workflow-template
     onlineActivationWorkflow:
         clusterRoleName: online-activation-cluster-role
         clusterWorkflowTemplateName: online-activation-cluster-workflow-template

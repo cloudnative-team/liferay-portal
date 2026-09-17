@@ -1,0 +1,118 @@
+resource "aws_iam_role" "argo_workflows_artifacts" {
+	assume_role_policy=jsonencode(
+		{
+			Statement=[
+				{
+					Action="sts:AssumeRoleWithWebIdentity"
+					Condition={
+						StringEquals={
+							"${local.oidc_provider}:aud"="sts.amazonaws.com"
+							"${local.oidc_provider}:sub"="system:serviceaccount:${var.argo_workflows_namespace}:${local.argo_workflows_server_service_account_name}"
+						}
+					}
+					Effect="Allow"
+					Principal={
+						Federated="arn:aws:iam::${local.account_id}:oidc-provider/${local.oidc_provider}"
+					}
+				},
+			]
+			Version="2012-10-17"
+		})
+	name="${local.cluster_name}-argo-workflows-artifacts"
+}
+resource "aws_iam_role" "offline_activation_artifacts" {
+	assume_role_policy=jsonencode(
+		{
+			Statement=[
+				{
+					Action="sts:AssumeRoleWithWebIdentity"
+					Condition={
+						StringEquals={
+							"${local.oidc_provider}:aud"="sts.amazonaws.com"
+						}
+						StringLike={
+							"${local.oidc_provider}:sub"="system:serviceaccount:${local.liferay_namespace_pattern}:${local.offline_activation_service_account_name}"
+						}
+					}
+					Effect="Allow"
+					Principal={
+						Federated="arn:aws:iam::${local.account_id}:oidc-provider/${local.oidc_provider}"
+					}
+				},
+			]
+			Version="2012-10-17"
+		})
+	name="${local.cluster_name}-offline-activation-artifacts"
+}
+resource "aws_iam_role_policy" "argo_workflows_artifacts" {
+	name="${local.cluster_name}-argo-workflows-artifacts-policy"
+	policy=jsonencode(
+		{
+			Statement=[
+				{
+					Action=[
+						"s3:AbortMultipartUpload",
+						"s3:DeleteObject",
+						"s3:GetObject",
+						"s3:PutObject",
+					]
+					Effect="Allow"
+					Resource="arn:aws:s3:::${local.argo_artifacts_bucket_name}/*"
+					Sid="AllowArtifactObjectAccess"
+				},
+				{
+					Action=[
+						"s3:ListBucket",
+					]
+					Effect="Allow"
+					Resource="arn:aws:s3:::${local.argo_artifacts_bucket_name}"
+					Sid="AllowArtifactBucketListing"
+				},
+			]
+			Version="2012-10-17"
+		})
+	role=aws_iam_role.argo_workflows_artifacts.id
+}
+resource "aws_iam_role_policy" "offline_activation_artifacts" {
+	name="${local.cluster_name}-offline-activation-artifacts-policy"
+	policy=jsonencode(
+		{
+			Statement=[
+				{
+					Action=[
+						"s3:GetObject",
+					]
+					Effect="Allow"
+					Resource="arn:aws:s3:::${local.argo_artifacts_bucket_name}/uploads/*"
+					Sid="AllowUploadedBundleRead"
+				},
+				{
+					Action=[
+						"s3:ListBucket",
+					]
+					Condition={
+						StringLike={
+							"s3:prefix"="uploads/*"
+						}
+					}
+					Effect="Allow"
+					Resource="arn:aws:s3:::${local.argo_artifacts_bucket_name}"
+					Sid="AllowUploadPrefixListing"
+				},
+			]
+			Version="2012-10-17"
+		})
+	role=aws_iam_role.offline_activation_artifacts.id
+}
+resource "kubernetes_annotations" "argo_workflows_server_service_account" {
+	annotations={
+		"eks.amazonaws.com/role-arn"=aws_iam_role.argo_workflows_artifacts.arn
+	}
+	api_version="v1"
+	force=true
+	kind="ServiceAccount"
+	metadata {
+		name=local.argo_workflows_server_service_account_name
+		namespace=var.argo_workflows_namespace
+	}
+}

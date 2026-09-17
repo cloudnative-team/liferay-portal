@@ -1,3 +1,7 @@
+variable "argo_artifacts_retention_days" {
+	default=7
+	type=number
+}
 variable "arn_partition" {
 	default="aws"
 	type=string

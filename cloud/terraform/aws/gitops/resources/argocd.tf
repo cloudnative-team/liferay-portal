@@ -424,6 +424,10 @@ resource "kubernetes_manifest" "liferay_applicationset" {
 											value=local.liferay_service_account_role_arn
 										},
 										{
+											name="${local.liferay_helm_chart_config.values_scope_prefix}licensing.offlineActivationWorkflow.serviceAccountAnnotations.eks\\.amazonaws\\.com/role-arn"
+											value=aws_iam_role.offline_activation_artifacts.arn
+										},
+										{
 											name="global.liferayServiceAccount.create"
 											value=true
 										},

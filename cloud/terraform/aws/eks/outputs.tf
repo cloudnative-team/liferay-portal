@@ -1,6 +1,9 @@
 output "alloy_role_arn" {
 	value=try(module.alloy_role.iam_role_arn, "")
 }
+output "argo_artifacts_bucket_name" {
+	value=aws_s3_bucket.argo_artifacts.bucket
+}
 output "arn_partition" {
 	value=var.arn_partition
 }

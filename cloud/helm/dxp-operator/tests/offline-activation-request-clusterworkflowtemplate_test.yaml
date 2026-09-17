@@ -1,0 +1,66 @@
+suite: Offline Activation Request ClusterWorkflowTemplate
+templates:
+    -   templates/offline-activation-request-clusterworkflowtemplate.yaml
+tests:
+    -   asserts:
+            -   equal:
+                    path: spec.templates[0].steps[0][0].arguments.parameters[0].name
+                    value: identity-secret-name
+            -   equal:
+                    path: spec.templates[0].steps[0][0].arguments.parameters[0].value
+                    value: "{{workflow.parameters.liferay-environment-name}}-identity"
+        it: Derives the identity secret name from the environment the operator names it after
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.arguments.parameters[0].name
+                    value: liferay-environment-name
+            -   equal:
+                    path: spec.arguments.parameters[0].value
+                    value: liferay-default
+            -   lengthEqual:
+                    count: 1
+                    path: spec.arguments.parameters
+            -   notExists:
+                    path: spec.arguments.artifacts
+        it: Needs no upload, because the request is what the customer is here to collect
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the cluster workflow template unless the offline activation workflow is enabled
+        set:
+            offlineActivationWorkflow.enabled: false
+    -   asserts:
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: base64 --decode
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: "jsonpath=\\{.data\\['offline-request'\\]\\}"
+        it: Prints the decoded request, because the secret holds it base64 encoded
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: metadata.name
+                    value: offline-activation-request-cluster-workflow-template
+            -   equal:
+                    path: spec.serviceAccountName
+                    value: offline-activation-service-account
+            -   hasDocuments:
+                    count: 1
+            -   isKind:
+                    of: ClusterWorkflowTemplate
+        it: Renders one cluster scoped template the whole cluster shares
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: exit 1
+        it: Tells the customer to check offline mode when the operator has published nothing
+        set:
+            offlineActivationWorkflow.enabled: true

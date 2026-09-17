@@ -1,3 +1,6 @@
+output "argo_artifacts_bucket_name" {
+	value=google_storage_bucket.argo_artifacts.name
+}
 output "cluster_name" {
 	value=google_container_cluster.primary.name
 }

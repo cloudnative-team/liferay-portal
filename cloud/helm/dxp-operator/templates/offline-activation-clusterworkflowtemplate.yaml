@@ -1,0 +1,109 @@
+{{- if .Values.offlineActivationWorkflow.enabled -}}
+{{- $offlineActivationWorkflow := .Values.offlineActivationWorkflow -}}
+{{- $image := printf "%s:%s" $offlineActivationWorkflow.image.repository (toString $offlineActivationWorkflow.image.tag) -}}
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+    labels:
+        {{- include "dxp-operator.labels" . | nindent 8 }}
+    name: offline-activation-cluster-workflow-template
+spec:
+    archiveLogs: false
+    arguments:
+        artifacts:
+            -   description:
+                    The offline activation bundle Liferay issued for this environment.
+                name: offline-activation-bundle
+        parameters:
+            -   description:
+                    The name the offline activation bundle takes on the marketplace volume.
+                name: bundle-name
+                value: {{ $offlineActivationWorkflow.bundleName }}
+            -   description:
+                    The LiferayEnvironment to activate in this namespace.
+                name: liferay-environment-name
+                value: {{ $offlineActivationWorkflow.defaultEnvironmentName }}
+    entrypoint: main
+    podGC:
+        strategy: OnWorkflowSuccess
+    serviceAccountName: {{ $offlineActivationWorkflow.serviceAccountName }}
+    templates:
+        -   inputs:
+                artifacts:
+                    -   name: offline-activation-bundle
+            name: main
+            steps:
+                -   -   arguments:
+                            artifacts:
+                                -   from: "{{ "{{" }}inputs.artifacts.offline-activation-bundle}}"
+                                    name: offline-activation-bundle
+                            parameters:
+                                -   name: bundle-name
+                                    value: "{{ "{{" }}workflow.parameters.bundle-name}}"
+                                -   name: marketplace-path
+                                    value: {{ $offlineActivationWorkflow.marketplacePath | quote }}
+                        name: place-bundle
+                        template: place-bundle
+                -   -   arguments:
+                            parameters:
+                                -   name: bundle-name
+                                    value: "{{ "{{" }}workflow.parameters.bundle-name}}"
+                        name: set-bundle
+                        template: set-bundle
+                -   -   name: wait
+                        template: wait
+        -   inputs:
+                artifacts:
+                    -   name: offline-activation-bundle
+                        path: /tmp/offline-activation-bundle
+                parameters:
+                    -   name: bundle-name
+                    -   name: marketplace-path
+            name: place-bundle
+            script:
+                command: [sh]
+                env:
+                    -   name: POD_NAMESPACE
+                        valueFrom:
+                            fieldRef:
+                                fieldPath: metadata.namespace
+                image: {{ $image | quote }}
+                resources:
+                    {{- $offlineActivationWorkflow.resources | toYaml | nindent 20 }}
+                source: |-
+                    {{- tpl (.Files.Get "scripts/offline-activation-place-bundle.sh") . | nindent 20 }}
+                volumeMounts:
+                    -   mountPath: {{ $offlineActivationWorkflow.marketplacePath }}
+                        name: {{ $offlineActivationWorkflow.marketplaceVolumeName }}
+                        subPathExpr: $(POD_NAMESPACE)
+        -   inputs:
+                parameters:
+                    -   name: bundle-name
+            name: set-bundle
+            resource:
+                action: patch
+                manifest: |
+                    apiVersion: licensing.liferay.com/v1alpha1
+                    kind: LiferayEnvironment
+                    metadata:
+                        annotations:
+                            licensing.liferay.com/activation-requested-at: "{{ "{{" }}workflow.creationTimestamp.RFC3339}}"
+                            licensing.liferay.com/activation-requested-by: "{{ "{{" }}workflow.name}}"
+                        name: "{{ "{{" }}workflow.parameters.liferay-environment-name}}"
+                    spec:
+                        offlineActivationBundle: "{{ "{{" }}inputs.parameters.bundle-name}}"
+                mergeStrategy: merge
+        -   activeDeadlineSeconds: {{ $offlineActivationWorkflow.waitTimeoutSeconds }}
+            name: wait
+            resource:
+                action: get
+                failureCondition: status.phase == Degraded
+                manifest: |
+                    apiVersion: licensing.liferay.com/v1alpha1
+                    kind: LiferayEnvironment
+                    metadata:
+                        name: "{{ "{{" }}workflow.parameters.liferay-environment-name}}"
+                successCondition: status.activatedAt
+    ttlStrategy:
+        secondsAfterCompletion: {{ $offlineActivationWorkflow.ttlSecondsAfterCompletion }}
+{{- end -}}

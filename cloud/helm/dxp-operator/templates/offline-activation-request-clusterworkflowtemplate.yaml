@@ -1,0 +1,44 @@
+{{- if .Values.offlineActivationWorkflow.enabled -}}
+{{- $offlineActivationWorkflow := .Values.offlineActivationWorkflow -}}
+{{- $image := printf "%s:%s" $offlineActivationWorkflow.image.repository (toString $offlineActivationWorkflow.image.tag) -}}
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+    labels:
+        {{- include "dxp-operator.labels" . | nindent 8 }}
+    name: offline-activation-request-cluster-workflow-template
+spec:
+    archiveLogs: false
+    arguments:
+        parameters:
+            -   description:
+                    The LiferayEnvironment whose offline activation request is read.
+                name: liferay-environment-name
+                value: {{ $offlineActivationWorkflow.defaultEnvironmentName }}
+    entrypoint: main
+    podGC:
+        strategy: OnWorkflowSuccess
+    serviceAccountName: {{ $offlineActivationWorkflow.serviceAccountName }}
+    templates:
+        -   name: main
+            steps:
+                -   -   arguments:
+                            parameters:
+                                -   name: identity-secret-name
+                                    value: "{{ "{{" }}workflow.parameters.liferay-environment-name}}-identity"
+                        name: read-request
+                        template: read-request
+        -   inputs:
+                parameters:
+                    -   name: identity-secret-name
+            name: read-request
+            script:
+                command: [sh]
+                image: {{ $image | quote }}
+                resources:
+                    {{- $offlineActivationWorkflow.resources | toYaml | nindent 20 }}
+                source: |-
+                    {{- tpl (.Files.Get "scripts/offline-activation-read-request.sh") . | nindent 20 }}
+    ttlStrategy:
+        secondsAfterCompletion: {{ $offlineActivationWorkflow.ttlSecondsAfterCompletion }}
+{{- end -}}

@@ -1,6 +1,10 @@
 locals {
+	argo_artifacts_bucket_name="${var.deployment_name}-argo-artifacts"
+	argo_artifacts_pool_principal_set="principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${var.project_id}.svc.id.goog/*"
+	argo_artifacts_server_principal="principal://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${var.project_id}.svc.id.goog/subject/ns/${var.argo_workflows_namespace}/sa/${local.argo_workflows_server_service_account_name}"
 	argo_workflows_gateway_class_name="argo-workflows-gateway-class"
 	argo_workflows_gateway_name="argo-workflows-gateway"
+	argo_workflows_server_service_account_name="argo-workflows-server"
 	argo_workflows_tls_enabled=var.argo_workflows_domain_config.hostname != null && var.argo_workflows_domain_config.tls_external_secret_name != null
 	argo_workflows_tls_external_secret_name=var.argo_workflows_domain_config.tls_external_secret_name == null ? null : (
 		startswith(var.argo_workflows_domain_config.tls_external_secret_name, local.secret_prefixes.certificates) ?

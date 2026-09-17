@@ -41,6 +41,21 @@ run "should_configure_argo_workflows_with_defaults" {
 	}
 	command=plan
 }
+run "should_configure_the_artifact_repository" {
+	assert {
+		condition=yamldecode(helm_release.argo_workflows.values[0]).controller.artifactRepository.s3.bucket == "liferay-test-argo-artifacts"
+		error_message="The artifact repository must point at the bucket the cluster module creates"
+	}
+	assert {
+		condition=yamldecode(helm_release.argo_workflows.values[0]).controller.artifactRepository.archiveLogs == false
+		error_message="The artifact repository must stay opt-in per workflow rather than archiving every log"
+	}
+	assert {
+		condition=yamldecode(helm_release.argo_workflows.values[0]).server.serviceAccount.name == "argo-workflows-server"
+		error_message="The Argo Server service account name must be pinned, because the upload identity is bound to it"
+	}
+	command=plan
+}
 run "should_honor_a_custom_argo_workflows_namespace" {
 	assert {
 		condition=helm_release.argo_workflows.namespace == "workflows" && kubernetes_namespace.argo_workflows.metadata[0].name == "workflows"

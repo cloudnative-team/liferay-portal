@@ -11,6 +11,13 @@ resource "helm_release" "argo_workflows" {
 		yamlencode(
 			{
 				controller={
+					artifactRepository={
+						archiveLogs=false
+						gcs={
+							bucket=local.argo_artifacts_bucket_name
+							keyFormat="artifacts/{{workflow.namespace}}/{{workflow.name}}/{{pod.name}}"
+						}
+					}
 					resources={
 						limits={
 							memory="512Mi"
@@ -120,6 +127,9 @@ resource "helm_release" "argo_workflows" {
 							cpu="15m"
 							memory="128Mi"
 						}
+					}
+					serviceAccount={
+						name=local.argo_workflows_server_service_account_name
 					}
 				}
 			}),

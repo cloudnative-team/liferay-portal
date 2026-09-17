@@ -1,8 +1,10 @@
 locals {
 	account_id=data.aws_caller_identity.current.account_id
 	alloy_role_arn=var.observability_config.enabled ? "arn:aws:iam::${local.account_id}:role/${var.deployment_name}-alloy" : ""
+	argo_artifacts_bucket_name="${var.deployment_name}-argo-artifacts"
 	argo_workflows_gateway_class_name="argo-workflows-gateway-class"
 	argo_workflows_gateway_name="argo-workflows-gateway"
+	argo_workflows_server_service_account_name="argo-workflows-server"
 	argo_workflows_source_ranges=distinct(concat([data.aws_vpc.current.cidr_block], var.argo_workflows_additional_allowed_cidr_blocks))
 	argo_workflows_tls_enabled=var.argo_workflows_domain_config.hostname != null && var.argo_workflows_domain_config.tls_external_secret_name != null
 	argo_workflows_tls_external_secret_name=var.argo_workflows_domain_config.tls_external_secret_name == null ? null : (
@@ -167,6 +169,7 @@ locals {
 	liferay_service_account_role_name="${var.deployment_name}-irsa"
 	marketplace_posix_id=1000
 	marketplace_volume_handle="${data.aws_efs_file_system.marketplace.id}::${aws_efs_access_point.marketplace.id}"
+	offline_activation_service_account_name="offline-activation-service-account"
 	oidc_provider=replace(data.aws_eks_cluster.cluster.identity[0].oidc[0].issuer, "https://", "")
 	rds_exporter_role_arn=var.observability_config.enabled ? "arn:aws:iam::${local.account_id}:role/${var.deployment_name}-rds-exporter" : ""
 	secret_prefixes={

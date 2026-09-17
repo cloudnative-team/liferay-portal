@@ -40,6 +40,25 @@ override_module {
 	}
 	target=module.vpc
 }
+run "should_create_the_argo_artifacts_bucket" {
+	assert {
+		condition=aws_s3_bucket.argo_artifacts.bucket == "liferay-test-argo-artifacts"
+		error_message="The Argo artifacts bucket name must be derived from deployment_name"
+	}
+	assert {
+		condition=aws_s3_bucket_public_access_block.argo_artifacts.block_public_acls && aws_s3_bucket_public_access_block.argo_artifacts.block_public_policy && aws_s3_bucket_public_access_block.argo_artifacts.ignore_public_acls && aws_s3_bucket_public_access_block.argo_artifacts.restrict_public_buckets
+		error_message="The Argo artifacts bucket must block every form of public access"
+	}
+	assert {
+		condition=one(aws_s3_bucket_server_side_encryption_configuration.argo_artifacts.rule).apply_server_side_encryption_by_default[0].sse_algorithm == "aws:kms"
+		error_message="The Argo artifacts bucket must be encrypted with KMS"
+	}
+	assert {
+		condition=output.argo_artifacts_bucket_name == "liferay-test-argo-artifacts"
+		error_message="The Argo artifacts bucket name must be exposed for the platform module to configure the artifact repository"
+	}
+	command=plan
+}
 run "should_create_the_ebs_csi_driver_role_and_policy" {
 	assert {
 		condition=aws_iam_role.ebs_csi_driver.name == "liferay-test-ebs_csi_driver"
@@ -69,6 +88,24 @@ run "should_create_the_gp3_default_storage_class" {
 		error_message="The gp3 storage class must bind volumes on the first consumer"
 	}
 	command=plan
+}
+run "should_expire_abandoned_argo_artifact_uploads" {
+	assert {
+		condition=one([for rule in aws_s3_bucket_lifecycle_configuration.argo_artifacts.rule : rule if rule.id == "expire-abandoned-uploads"]).filter[0].prefix == "uploads/"
+		error_message="The expiry rule must be confined to the prefix the Argo Server uploads into"
+	}
+	assert {
+		condition=one([for rule in aws_s3_bucket_lifecycle_configuration.argo_artifacts.rule : rule if rule.id == "expire-abandoned-uploads"]).expiration[0].days == 3
+		error_message="A custom argo_artifacts_retention_days must drive the upload expiry"
+	}
+	assert {
+		condition=one([for rule in aws_s3_bucket_lifecycle_configuration.argo_artifacts.rule : rule if rule.id == "abort-incomplete-uploads"]).abort_incomplete_multipart_upload[0].days_after_initiation == 1
+		error_message="An interrupted upload must not linger as a billable multipart upload"
+	}
+	command=plan
+	variables {
+		argo_artifacts_retention_days=3
+	}
 }
 variables {
 	deployment_name="liferay-test"

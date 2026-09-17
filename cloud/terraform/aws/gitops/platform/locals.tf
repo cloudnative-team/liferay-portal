@@ -1,5 +1,7 @@
 locals {
 	account_id=data.aws_caller_identity.current.account_id
+	argo_artifacts_bucket_name="${var.deployment_name}-argo-artifacts"
+	argo_workflows_server_service_account_name="argo-workflows-server"
 	cluster_name="${var.deployment_name}-eks"
 	common_labels={
 		"app.kubernetes.io/managed-by"=local.terraform_manager_name

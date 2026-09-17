@@ -1,0 +1,160 @@
+suite: Offline Activation ClusterWorkflowTemplate
+templates:
+    -   templates/offline-activation-clusterworkflowtemplate.yaml
+tests:
+    -   asserts:
+            -   equal:
+                    path: spec.archiveLogs
+                    value: false
+            -   equal:
+                    path: spec.podGC.strategy
+                    value: OnWorkflowSuccess
+            -   equal:
+                    path: spec.ttlStrategy.secondsAfterCompletion
+                    value: 3600
+        it: Discards a successful run but keeps a failed one readable
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.templates[3].activeDeadlineSeconds
+                    value: 45
+            -   equal:
+                    path: spec.templates[3].resource.failureCondition
+                    value: status.phase == Degraded
+            -   equal:
+                    path: spec.templates[3].resource.successCondition
+                    value: status.activatedAt
+        it: Fails fast on a rejected bundle rather than waiting out the timeout
+        set:
+            offlineActivationWorkflow.enabled: true
+            offlineActivationWorkflow.waitTimeoutSeconds: 45
+    -   asserts:
+            -   equal:
+                    path: spec.templates[1].inputs.artifacts[0].name
+                    value: offline-activation-bundle
+            -   equal:
+                    path: spec.templates[1].inputs.artifacts[0].path
+                    value: /tmp/offline-activation-bundle
+            -   matchRegex:
+                    path: spec.templates[1].script.source
+                    pattern: mv .*staged_path.*marketplace_path
+        it: Lands the upload under a staged name and renames it into place in one step
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the cluster workflow template unless the offline activation workflow is enabled
+        set:
+            offlineActivationWorkflow.enabled: false
+    -   asserts:
+            -   equal:
+                    path: spec.templates[0].inputs.artifacts[0].name
+                    value: offline-activation-bundle
+            -   equal:
+                    path: spec.templates[0].steps[0][0].arguments.artifacts[0].from
+                    value: "{{inputs.artifacts.offline-activation-bundle}}"
+            -   equal:
+                    path: spec.templates[0].steps[0][0].name
+                    value: place-bundle
+            -   equal:
+                    path: spec.templates[0].steps[1][0].name
+                    value: set-bundle
+            -   equal:
+                    path: spec.templates[0].steps[2][0].name
+                    value: wait
+        it: Places the uploaded bundle before naming it on the environment and waiting
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: metadata.name
+                    value: offline-activation-cluster-workflow-template
+            -   equal:
+                    path: spec.serviceAccountName
+                    value: offline-activation-service-account
+            -   hasDocuments:
+                    count: 1
+            -   isKind:
+                    of: ClusterWorkflowTemplate
+        it: Renders one cluster scoped template the whole cluster shares
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.arguments.artifacts[0].name
+                    value: offline-activation-bundle
+            -   lengthEqual:
+                    count: 1
+                    path: spec.arguments.artifacts
+            -   notExists:
+                    path: spec.arguments.artifacts[0].gcs
+            -   notExists:
+                    path: spec.arguments.artifacts[0].s3
+        it: Requires an uploaded bundle and leaves its location to the default artifact repository
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.arguments.parameters[0].name
+                    value: bundle-name
+            -   equal:
+                    path: spec.arguments.parameters[0].value
+                    value: offline-activation-bundle.zip
+            -   equal:
+                    path: spec.arguments.parameters[1].name
+                    value: liferay-environment-name
+            -   equal:
+                    path: spec.arguments.parameters[1].value
+                    value: liferay-default
+            -   lengthEqual:
+                    count: 2
+                    path: spec.arguments.parameters
+        it: Requires no typing from the customer, because both parameters are prefilled
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.templates[2].resource.action
+                    value: patch
+            -   equal:
+                    path: spec.templates[2].resource.mergeStrategy
+                    value: merge
+            -   matchRegex:
+                    path: spec.templates[2].resource.manifest
+                    pattern: "offlineActivationBundle: .*inputs.parameters.bundle-name"
+            -   matchRegex:
+                    path: spec.templates[2].resource.manifest
+                    pattern: licensing.liferay.com/activation-requested-by
+        it: Restamps the annotations so an unchanged bundle name still triggers a reconcile
+        set:
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.arguments.parameters[0].value
+                    value: some-other-bundle.zip
+            -   equal:
+                    path: spec.arguments.parameters[1].value
+                    value: some-other-environment
+        it: Tracks a different bundle name and conventional environment name
+        set:
+            offlineActivationWorkflow.bundleName: some-other-bundle.zip
+            offlineActivationWorkflow.defaultEnvironmentName: some-other-environment
+            offlineActivationWorkflow.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.templates[1].script.env[0].valueFrom.fieldRef.fieldPath
+                    value: metadata.namespace
+            -   equal:
+                    path: spec.templates[1].script.volumeMounts[0].mountPath
+                    value: /marketplace
+            -   equal:
+                    path: spec.templates[1].script.volumeMounts[0].name
+                    value: marketplace
+            -   equal:
+                    path: spec.templates[1].script.volumeMounts[0].subPathExpr
+                    value: $(POD_NAMESPACE)
+        it: Writes into the namespace subdirectory the operator reads the bundle back from
+        set:
+            offlineActivationWorkflow.enabled: true

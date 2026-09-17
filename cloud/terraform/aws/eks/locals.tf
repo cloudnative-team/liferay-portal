@@ -1,4 +1,5 @@
 locals {
+	argo_artifacts_bucket_name="${var.deployment_name}-argo-artifacts"
 	az_count=min(length(data.aws_availability_zones.available.names), var.max_availability_zones)
 	cluster_name="${var.deployment_name}-eks"
 	default_private_subnets=[for i in range(local.az_count) : cidrsubnet(var.vpc_cidr, 8, i + 1)]
