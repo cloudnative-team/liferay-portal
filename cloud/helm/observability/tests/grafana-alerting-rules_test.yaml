@@ -1,0 +1,81 @@
+suite: Grafana alert rules
+templates:
+    -   templates/grafana/alerting/rules.yaml
+tests:
+    -   asserts:
+            -   hasDocuments:
+                    count: 4
+            -   equal:
+                    path: metadata.labels["grafana_alert"]
+                    value: "true"
+            -   matchRegex:
+                    path: metadata.name
+                    pattern: -alert-cpu-limit-utilization$
+                documentIndex: 0
+            -   matchRegex:
+                    path: metadata.name
+                    pattern: -alert-frequent-pod-restarts$
+                documentIndex: 1
+            -   matchRegex:
+                    path: metadata.name
+                    pattern: -alert-memory-limit-utilization$
+                documentIndex: 2
+            -   matchRegex:
+                    path: metadata.name
+                    pattern: -alert-zero-ready-replicas$
+                documentIndex: 3
+        it: Renders every alert rule on Azure
+        set:
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["cpu-limit-utilization.yaml"]
+                    pattern: "liferay:container_cpu_limit_utilization:ratio"
+                documentIndex: 0
+            -   matchRegex:
+                    path: data["memory-limit-utilization.yaml"]
+                    pattern: "liferay:container_memory_limit_utilization:ratio"
+                documentIndex: 2
+        it: Queries the recording rules that the Azure platform module provisions
+        set:
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["cpu-limit-utilization.yaml"]
+                    pattern: "kube_namespace_labels\\{label_liferay_com_observable=\"true\"\\}"
+                documentIndex: 0
+            -   matchRegex:
+                    path: data["frequent-pod-restarts.yaml"]
+                    pattern: "kube_namespace_labels\\{label_liferay_com_observable=\"true\"\\}"
+                documentIndex: 1
+            -   matchRegex:
+                    path: data["memory-limit-utilization.yaml"]
+                    pattern: "kube_namespace_labels\\{label_liferay_com_observable=\"true\"\\}"
+                documentIndex: 2
+            -   matchRegex:
+                    path: data["zero-ready-replicas.yaml"]
+                    pattern: "kube_namespace_labels\\{label_liferay_com_observable=\"true\"\\}"
+                documentIndex: 3
+        it: Restricts every alert rule to the observable namespaces
+        set:
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["cpu-limit-utilization.yaml"]
+                    pattern: "datasourceUid: \"managed-prometheus\""
+                documentIndex: 0
+        it: Targets the data source that the Azure Monitor workspace publishes
+        set:
+            cloudProvider: azure
+    -   asserts:
+            -   hasDocuments:
+                    count: 4
+        it: Renders every alert rule on AWS
+        set:
+            cloudProvider: aws
+    -   asserts:
+            -   hasDocuments:
+                    count: 4
+        it: Renders every alert rule on GCP
+        set:
+            cloudProvider: gcp
