@@ -16,6 +16,18 @@ tests:
                     value: Daily
                 template: templates/crossplane-xrd-liferayinfrastructure.yaml
             -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.retainedDatabaseServerDays.default
+                    value: 7
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.retainedDatabaseServerDays.maximum
+                    value: 35
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.retainedDatabaseServerDays.minimum
+                    value: 1
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
                     path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.retentionDays.default
                     value: 30
                 template: templates/crossplane-xrd-liferayinfrastructure.yaml
@@ -81,6 +93,10 @@ tests:
                     value: string
                 template: templates/crossplane-xrd-liferayinfrastructure.yaml
             -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.retainedDatabaseServerDays.type
+                    value: integer
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
                     path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.retentionDays.type
                     value: integer
                 template: templates/crossplane-xrd-liferayinfrastructure.yaml
@@ -129,6 +145,46 @@ tests:
                     path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.restorePoint
                 template: templates/crossplane-xrd-liferayinfrastructure.yaml
         it: Declares the restore point as a timestamp the restore workflow writes
+    -   asserts:
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.restoreSourceServerId.minLength
+                    value: 1
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.restoreSourceServerId.nullable
+                    value: true
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.restoreSourceServerId.type
+                    value: string
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   notContains:
+                    content: restoreSourceServerId
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.required
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+        it: Declares the restore source server as an identifier the restore workflow writes
+    -   asserts:
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.retainedDatabaseServers.additionalProperties.pattern
+                    value: ^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.retainedDatabaseServers.additionalProperties.type
+                    value: string
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.retainedDatabaseServers.default
+                    value: {}
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.retainedDatabaseServers.type
+                    value: object
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   notContains:
+                    content: retainedDatabaseServers
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.required
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+        it: Declares the retained database servers as deadlines keyed by server name
     -   asserts:
             -   isKind:
                     of: CompositeResourceDefinition

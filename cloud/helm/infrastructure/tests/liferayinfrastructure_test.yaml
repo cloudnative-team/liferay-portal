@@ -16,6 +16,9 @@ tests:
                     path: spec.backup.frequency
                     value: Daily
             -   equal:
+                    path: spec.backup.retainedDatabaseServerDays
+                    value: 7
+            -   equal:
                     path: spec.backup.retentionDays
                     value: 30
             -   equal:
@@ -58,6 +61,9 @@ tests:
                     path: spec.backup.frequency
                     value: Weekly
             -   equal:
+                    path: spec.backup.retainedDatabaseServerDays
+                    value: 3
+            -   equal:
                     path: spec.backup.retentionDays
                     value: 7
             -   equal:
@@ -75,6 +81,7 @@ tests:
                 dayOfWeek: Saturday
                 enabled: true
                 frequency: Weekly
+                retainedDatabaseServerDays: 3
                 retentionDays: 7
                 timeOfDay: 23:30
                 timeZone: America/New_York
@@ -114,9 +121,13 @@ tests:
             -   notExists:
                     path: spec.database.restorePointInTime
             -   notExists:
+                    path: spec.database.restoreSourceServerId
+            -   notExists:
                     path: spec.database.rootPasswordSecretName
             -   notExists:
                     path: spec.restorePhase
+            -   notExists:
+                    path: spec.retainedDatabaseServers
             -   notExists:
                     path: spec.targetActiveDataPlane
         it: Withholds the fields the provider and restore controller own
