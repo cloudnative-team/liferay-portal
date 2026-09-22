@@ -46,6 +46,17 @@ function main {
 		--selector "dataPlane=${data_plane_active}" \
 		> /tmp/database-server-name-active.txt
 
+	local database_server_names_retained
+
+	database_server_names_retained=$( \
+		kubectl get flexibleservers.dbforpostgresql.azure.m.upbound.io \
+			--output jsonpath="{.items[*].metadata.name}" \
+			--selector "retainedDatabaseServer=true")
+
+	echo "$(cat /tmp/database-server-name-active.txt) ${database_server_names_retained}" \
+		| jq --compact-output --raw-input 'split(" ") | map(select(. != ""))' \
+		> /tmp/database-server-names.txt
+
 	kubectl get flexibleservers.dbforpostgresql.azure.m.upbound.io \
 		--output jsonpath="{.items[0].spec.forProvider.resourceGroupName}" \
 		--selector "dataPlane=${data_plane_active}" \

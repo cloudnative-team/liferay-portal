@@ -63,38 +63,70 @@ function main {
 		exit 1
 	fi
 
-	local earliest_restore_date
-
-	earliest_restore_date=$( \
-		az postgres flexible-server show \
-			--name "{{ "{{" }}inputs.parameters.database-server-name}}" \
-			--output tsv \
-			--query backup.earliestRestoreDate \
-			--resource-group "${resource_group_name}")
-
-	if [ -z "${earliest_restore_date}" ]
-	then
-		echo "The server {{ "{{" }}inputs.parameters.database-server-name}} reports no earliest restore date, so its point in time window has not opened yet." >&2
-
-		exit 1
-	fi
-
 	local recovery_point_second
 
 	recovery_point_second=$(echo "${recovery_point_time}" | cut --characters=1-19)
 
-	local earliest_restore_second
+	local restore_source_earliest_restore_second
 
-	earliest_restore_second=$(echo "${earliest_restore_date}" | cut --characters=1-19)
+	restore_source_earliest_restore_second=""
 
-	if [ "$(printf "%s\n%s\n" "${earliest_restore_second}" "${recovery_point_second}" | sort | head --lines=1)" != "${earliest_restore_second}" ]
+	local restore_source_server_id
+
+	restore_source_server_id=""
+
+	for database_server_name in $(echo '{{ "{{" }}inputs.parameters.database-server-names}}' | jq --raw-output ".[]")
+	do
+		local database_server_details
+
+		database_server_details=$( \
+			az postgres flexible-server show \
+				--name "${database_server_name}" \
+				--output tsv \
+				--query "{earliestRestoreDate: backup.earliestRestoreDate, id: id}" \
+				--resource-group "${resource_group_name}")
+
+		local earliest_restore_date
+
+		earliest_restore_date=$(echo "${database_server_details}" | cut --fields=1)
+
+		if [ -z "${earliest_restore_date}" ]
+		then
+			echo "The server ${database_server_name} reports no earliest restore date, so its point in time window has not opened yet."
+
+			continue
+		fi
+
+		local earliest_restore_second
+
+		earliest_restore_second=$(echo "${earliest_restore_date}" | cut --characters=1-19)
+
+		if [ "$(printf "%s\n%s\n" "${earliest_restore_second}" "${recovery_point_second}" | sort | head --lines=1)" != "${earliest_restore_second}" ]
+		then
+			echo "The server ${database_server_name} opened its point in time window at ${earliest_restore_date}, after the recovery point time ${recovery_point_time}."
+
+			continue
+		fi
+
+		if [ "$(printf "%s\n%s\n" "${earliest_restore_second}" "${restore_source_earliest_restore_second}" | sort | tail --lines=1)" == "${earliest_restore_second}" ]
+		then
+			restore_source_earliest_restore_second="${earliest_restore_second}"
+			restore_source_server_id=$(echo "${database_server_details}" | cut --fields=2)
+		fi
+	done
+
+	if [ -z "${restore_source_server_id}" ]
 	then
-		echo "The recovery point time ${recovery_point_time} falls before the earliest restore date ${earliest_restore_date}, so the database cannot be paired with it." >&2
+		echo "No database server holds the recovery point time ${recovery_point_time} in its point in time window, so the database cannot be paired with it." >&2
 
 		exit 1
 	fi
 
+	echo "The database is restored from ${restore_source_server_id}."
+
 	echo "${recovery_point_time}" > /tmp/recovery-point-time.txt
+
+	echo "${restore_source_server_id}" > /tmp/restore-source-server-id.txt
 }
 
 main
