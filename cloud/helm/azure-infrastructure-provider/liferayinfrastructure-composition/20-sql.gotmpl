@@ -10,6 +10,7 @@
 {{- range $i, $dataPlane := $dataPlanes }}
 {{- $databaseServerName := index $databaseServerNames $dataPlane }}
 {{- $isDatabaseRestoreTarget := and (eq $restorePhase "provisioning") (eq $dataPlane $targetActiveDataPlane) }}
+{{- $isDemotedDataPlane := eq $dataPlane $demotedDataPlane }}
 {{- if $i }}
 ---
 {{- end }}
@@ -71,7 +72,7 @@ spec:
         pointInTimeRestoreTimeInUtc: {{ $databaseSpec.restorePointInTime }}
         sourceServerId: {{ $databaseSpec.restoreSourceServerId }}
     {{- end }}
-    managementPolicies: {{ $managementPolicies }}
+    managementPolicies: {{ $isDemotedDataPlane | ternary $demotedManagementPolicies $managementPolicies }}
 ---
 apiVersion: dbforpostgresql.azure.m.upbound.io/v1beta1
 kind: FlexibleServerDatabase
@@ -92,6 +93,56 @@ spec:
             matchLabels:
                 dataPlane: {{ $dataPlane }}
     managementPolicies: ["Create", "Observe", "Update"]
+{{- end }}
+{{- range $retainedDatabaseServerName, $retainedUntil := $retainedDatabaseServers }}
+{{- if not (has $retainedDatabaseServerName $renderedDatabaseServerNames) }}
+---
+apiVersion: dbforpostgresql.azure.m.upbound.io/v1beta1
+kind: FlexibleServer
+metadata:
+    annotations:
+        crossplane.io/external-name: {{ $retainedDatabaseServerName }}
+        gotemplating.fn.crossplane.io/composition-resource-name: database-retained-{{ $retainedDatabaseServerName }}
+    labels:
+        {{- $tags | toYaml | nindent 8 }}
+        retainedDatabaseServer: "true"
+    name: {{ $retainedDatabaseServerName }}-retained
+spec:
+    forProvider:
+        administratorLogin: liferay_database_admin
+        administratorPasswordSecretRef:
+            key: password
+            name: database-admin-password
+        authentication:
+            activeDirectoryAuthEnabled: true
+            passwordAuthEnabled: true
+            tenantId: {{ $env.tenantId }}
+        autoGeneratePassword: true
+        autoGrowEnabled: true
+        backupRetentionDays: {{ $backupRetentionDays }}
+        {{- if $cmkEnabled }}
+        customerManagedKey:
+            keyVaultKeyId: {{ $cmkKeyVaultKeyId }}
+            primaryUserAssignedIdentityId: {{ $cmkIdentityId }}
+        {{- end }}
+        delegatedSubnetId: {{ $env.databaseSubnetId }}
+        {{- if $cmkEnabled }}
+        identity:
+            identityIds:
+                -   {{ $cmkIdentityId }}
+            type: UserAssigned
+        {{- end }}
+        location: {{ $region }}
+        privateDnsZoneId: {{ $env.databasePrivateDnsZoneId }}
+        publicNetworkAccessEnabled: false
+        resourceGroupName: {{ $env.resourceGroupName }}
+        skuName: {{ $databaseSpec.instanceType | default "GP_Standard_D2s_v3" }}
+        tags:
+            {{- $backupTargetTags | toYaml | nindent 12 }}
+            active: "false"
+            retained-until: {{ $retainedUntil | quote }}
+    managementPolicies: {{ $managementPolicies }}
+{{- end }}
 {{- end }}
 {{- range $dataPlane := list "blue" "green" }}
 {{- if or (has $dataPlane $dataPlanes) (has $dataPlane $observedDatabaseDataPlanes) }}
