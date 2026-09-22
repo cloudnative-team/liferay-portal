@@ -1,0 +1,29 @@
+{{- if and .Values.enabled .Values.backup.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+    labels:
+        component: backup-restore-platform
+    name: backup-restore-release-cron-workflow
+    namespace: {{ .Release.Namespace }}
+spec:
+    concurrencyPolicy: Forbid
+    schedules:
+        -   0 * * * *
+    startingDeadlineSeconds: 300
+    workflowSpec:
+        entrypoint: main
+        podGC:
+            strategy: OnWorkflowSuccess
+        serviceAccountName: backup-restore-service-account
+        templates:
+            -   name: main
+                steps:
+                    -   -   name: release-retained-database-servers
+                            templateRef:
+                                clusterScope: true
+                                name: backup-restore-cluster-workflow-template
+                                template: release-retained-database-servers
+        ttlStrategy:
+            secondsAfterCompletion: 86400
+{{- end -}}
