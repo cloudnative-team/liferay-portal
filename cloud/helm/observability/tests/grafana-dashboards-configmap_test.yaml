@@ -62,3 +62,42 @@ tests:
         it: Renders the databases dashboard as a v2 resource carrying both the capacity and the utilization panels
         set:
             cloudProvider: gcp
+    -   asserts:
+            -   matchRegex:
+                    path: data["kubernetes-workloads.json"]
+                    pattern: 'container_memory_working_set_bytes\{namespace=~\\"\$environment\(-elasticsearch\)\?\\"'
+            -   matchRegex:
+                    path: data["kubernetes-workloads.json"]
+                    pattern: 'kube_pod_container_status_restarts_total\{namespace=~\\"\$environment\(-elasticsearch\)\?\\"'
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
+        it: Selects either Elasticsearch namespace layout when the cloud provider is AWS
+        set:
+            cloudProvider: aws
+    -   asserts:
+            -   matchRegex:
+                    path: data["kubernetes-workloads.json"]
+                    pattern: 'container_memory_working_set_bytes\{namespace=~\\"\$environment\(-elasticsearch\)\?\\"'
+            -   matchRegex:
+                    path: data["kubernetes-workloads.json"]
+                    pattern: 'kube_pod_container_status_restarts_total\{namespace=~\\"\$environment\(-elasticsearch\)\?\\"'
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
+        it: Selects either Elasticsearch namespace layout when the cloud provider is Azure
+        set:
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["kubernetes-workloads.json"]
+                    pattern: 'container_memory_working_set_bytes\{namespace=~\\"\$environment\(-elasticsearch\)\?\\"'
+            -   matchRegex:
+                    path: data["kubernetes-workloads.json"]
+                    pattern: 'kube_pod_container_status_restarts_total\{exported_namespace=~\\"\$environment\(-elasticsearch\)\?\\"'
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
+        it: Selects either Elasticsearch namespace layout when the cloud provider is GCP
+        set:
+            cloudProvider: gcp
