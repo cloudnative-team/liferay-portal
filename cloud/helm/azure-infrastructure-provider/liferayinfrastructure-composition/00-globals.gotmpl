@@ -12,6 +12,7 @@
 {{- $projectId := $xr.spec.projectId -}}
 {{- $region := $xr.spec.region -}}
 {{- $restorePhase := $xr.spec.restorePhase | default "none" -}}
+{{- $retainedDatabaseServers := $xr.spec.retainedDatabaseServers | default dict -}}
 {{- $targetActiveDataPlane := $xr.spec.targetActiveDataPlane | default "blue" -}}
 
 {{- $activeDataPlane := $targetActiveDataPlane -}}
@@ -35,6 +36,19 @@
 
 {{- $baseName := printf "%.18s-%s" $projectIdFull $uidHash -}}
 {{- $storageAccountBase := printf "%.15s%s" ($projectIdFull | replace "-" "" | lower) $uidHash -}}
+
+{{- $databaseServerNames := dict -}}
+
+{{- range $dataPlane := list "blue" "green" -}}
+    {{- $observedDatabaseServer := dig (printf "database-primary-%s" $dataPlane) "resource" dict $observedResources -}}
+    {{- if and $observedDatabaseServer (not (dig "metadata" "deletionTimestamp" "" $observedDatabaseServer)) -}}
+        {{- $_ := set $databaseServerNames $dataPlane (dig "metadata" "name" "" $observedDatabaseServer) -}}
+    {{- else if and (eq $restorePhase "provisioning") (eq $dataPlane $targetActiveDataPlane) -}}
+        {{- $_ := set $databaseServerNames $dataPlane (printf "%s-%s-%s" $baseName $dataPlane ($xr.spec.database.restorePointInTime | default "" | sha256sum | trunc 6)) -}}
+    {{- else -}}
+        {{- $_ := set $databaseServerNames $dataPlane (printf "%s-%s" $baseName $dataPlane) -}}
+    {{- end -}}
+{{- end }}
 
 {{- $cmkIdentityId := printf "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s-cmk" $env.subscriptionId $env.resourceGroupName $baseName -}}
 {{- $keyVaultName := printf "%s-kv" $storageAccountBase -}}

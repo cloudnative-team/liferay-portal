@@ -8,7 +8,7 @@
 {{- end }}
 
 {{- range $i, $dataPlane := $dataPlanes }}
-{{- $databaseServerName := printf "%s-%s" $baseName $dataPlane }}
+{{- $databaseServerName := index $databaseServerNames $dataPlane }}
 {{- $isDatabaseRestoreTarget := and (eq $restorePhase "provisioning") (eq $dataPlane $targetActiveDataPlane) }}
 {{- if $i }}
 ---
@@ -69,10 +69,7 @@ spec:
     initProvider:
         createMode: PointInTimeRestore
         pointInTimeRestoreTimeInUtc: {{ $databaseSpec.restorePointInTime }}
-        sourceServerIdSelector:
-            matchControllerRef: true
-            matchLabels:
-                dataPlane: {{ $activeDataPlane }}
+        sourceServerId: {{ $databaseSpec.restoreSourceServerId }}
     {{- end }}
     managementPolicies: {{ $managementPolicies }}
 ---
