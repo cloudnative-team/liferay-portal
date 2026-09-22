@@ -30,11 +30,22 @@ function main {
 
 	echo "${data_plane_active}" > /tmp/data-plane-active.txt
 
+	local data_plane_inactive
+
 	if [ "${data_plane_active}" == "blue" ]
 	then
-		echo "green" > /tmp/data-plane-inactive.txt
+		data_plane_inactive="green"
 	else
-		echo "blue" > /tmp/data-plane-inactive.txt
+		data_plane_inactive="blue"
+	fi
+
+	echo "${data_plane_inactive}" > /tmp/data-plane-inactive.txt
+
+	if [ -n "$(kubectl get flexibleservers.dbforpostgresql.azure.m.upbound.io --output jsonpath="{.items[*].metadata.name}" --selector "dataPlane=${data_plane_inactive}")" ]
+	then
+		echo "The ${data_plane_inactive} data plane still holds a database server that is being released. Retry the restore once it is gone." >&2
+
+		exit 1
 	fi
 
 	kubectl get backupvaults.dataprotection.azure.m.upbound.io \
@@ -56,6 +67,27 @@ function main {
 	echo "$(cat /tmp/database-server-name-active.txt) ${database_server_names_retained}" \
 		| jq --compact-output --raw-input 'split(" ") | map(select(. != ""))' \
 		> /tmp/database-server-names.txt
+
+	local retained_until
+
+	retained_until=$( \
+		echo "${liferay_infrastructure_json}" \
+			| jq --raw-output '([7, ([35, (.spec.backup.retentionDays // 30)] | min)] | max) as $retention_days | ([$retention_days, (.spec.backup.retainedDatabaseServerDays // 7)] | min) as $retained_days | (now + ($retained_days * 86400)) | floor | todate')
+
+	jq \
+		--arg name "$(cat /tmp/database-server-name-active.txt)" \
+		--arg retained_until "${retained_until}" \
+		--compact-output \
+		--null-input \
+		'{($name): $retained_until}' \
+		> /tmp/retained-database-server.txt
+
+	jq \
+		--arg name "$(cat /tmp/database-server-name-active.txt)" \
+		--compact-output \
+		--null-input \
+		'{($name): null}' \
+		> /tmp/retained-database-server-release.txt
 
 	kubectl get flexibleservers.dbforpostgresql.azure.m.upbound.io \
 		--output jsonpath="{.items[0].spec.forProvider.resourceGroupName}" \

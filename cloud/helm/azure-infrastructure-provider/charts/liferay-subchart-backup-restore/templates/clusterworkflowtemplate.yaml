@@ -29,6 +29,8 @@ spec:
                         name: restore-point-in-time
                     -   default: "null"
                         name: restore-source-server-id
+                    -   default: "{}"
+                        name: retained-database-servers
                     -   name: target-active-data-plane
             name: apply-infrastructure
             outputs:
@@ -51,6 +53,7 @@ spec:
                             restorePointInTime: {{ "{{" }}inputs.parameters.restore-point-in-time}}
                             restoreSourceServerId: {{ "{{" }}inputs.parameters.restore-source-server-id}}
                         restorePhase: {{ "{{" }}inputs.parameters.restore-phase}}
+                        retainedDatabaseServers: {{ "{{" }}inputs.parameters.retained-database-servers}}
                         targetActiveDataPlane: {{ "{{" }}inputs.parameters.target-active-data-plane}}
                 mergeStrategy: merge
         -   inputs:
@@ -61,6 +64,8 @@ spec:
                         name: restore-point-in-time
                     -   default: "null"
                         name: restore-source-server-id
+                    -   default: "{}"
+                        name: retained-database-servers
                     -   name: target-active-data-plane
             name: apply-wait-infrastructure
             steps:
@@ -74,6 +79,8 @@ spec:
                                     value: "{{ "{{" }}inputs.parameters.restore-point-in-time}}"
                                 -   name: restore-source-server-id
                                     value: "{{ "{{" }}inputs.parameters.restore-source-server-id}}"
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}inputs.parameters.retained-database-servers}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}inputs.parameters.target-active-data-plane}}"
                         name: apply-infrastructure
@@ -87,6 +94,8 @@ spec:
         -   inputs:
                 parameters:
                     -   name: liferay-infrastructure-name
+                    -   default: "{}"
+                        name: retained-database-servers
                     -   name: target-active-data-plane
             name: clean-up-infrastructure
             steps:
@@ -96,6 +105,8 @@ spec:
                                     value: "{{ "{{" }}inputs.parameters.liferay-infrastructure-name}}"
                                 -   name: restore-phase
                                     value: none
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}inputs.parameters.retained-database-servers}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}inputs.parameters.target-active-data-plane}}"
                         name: apply-wait-infrastructure
@@ -148,6 +159,12 @@ spec:
                     -   name: resource-group-name
                         valueFrom:
                             path: /tmp/resource-group-name.txt
+                    -   name: retained-database-server
+                        valueFrom:
+                            path: /tmp/retained-database-server.txt
+                    -   name: retained-database-server-release
+                        valueFrom:
+                            path: /tmp/retained-database-server-release.txt
                     -   name: storage-account-id-active
                         valueFrom:
                             path: /tmp/storage-account-id-active.txt
@@ -273,6 +290,8 @@ spec:
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.liferay-infrastructure-name}}"
                                 -   name: restore-phase
                                     value: promoting
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.retained-database-server}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
                         depends: restore-document-library && wait-for-database
@@ -317,6 +336,8 @@ spec:
                             parameters:
                                 -   name: liferay-infrastructure-name
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.liferay-infrastructure-name}}"
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.retained-database-server-release}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.data-active}}"
                         depends: "(!provision-inactive-data-plane.Omitted && !provision-inactive-data-plane.Skipped || !restore-document-library.Omitted && !restore-document-library.Skipped || !wait-for-database.Omitted && !wait-for-database.Skipped) && !promote-inactive-data-plane.Succeeded"
@@ -328,6 +349,8 @@ spec:
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.liferay-infrastructure-name}}"
                                 -   name: liferay-workload-name
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.liferay-workload-name}}"
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.retained-database-server-release}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.data-active}}"
                         depends: "promote-inactive-data-plane.Succeeded && !restart-liferay.Succeeded"
@@ -446,6 +469,8 @@ spec:
                 parameters:
                     -   name: liferay-infrastructure-name
                     -   name: liferay-workload-name
+                    -   default: "{}"
+                        name: retained-database-servers
                     -   name: target-active-data-plane
             name: roll-back-restart
             steps:
@@ -455,6 +480,8 @@ spec:
                                     value: "{{ "{{" }}inputs.parameters.liferay-infrastructure-name}}"
                                 -   name: restore-phase
                                     value: promoting
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}inputs.parameters.retained-database-servers}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}inputs.parameters.target-active-data-plane}}"
                         name: apply-wait-infrastructure
@@ -469,6 +496,8 @@ spec:
                             parameters:
                                 -   name: liferay-infrastructure-name
                                     value: "{{ "{{" }}inputs.parameters.liferay-infrastructure-name}}"
+                                -   name: retained-database-servers
+                                    value: "{{ "{{" }}inputs.parameters.retained-database-servers}}"
                                 -   name: target-active-data-plane
                                     value: "{{ "{{" }}inputs.parameters.target-active-data-plane}}"
                         name: clean-up-infrastructure
