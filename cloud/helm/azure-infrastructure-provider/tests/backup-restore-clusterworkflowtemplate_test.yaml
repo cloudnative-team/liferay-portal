@@ -30,6 +30,49 @@ tests:
                     value: "true"
         it: Labels every workflow pod so the workload identity webhook injects a token
     -   asserts:
+            -   contains:
+                    content:
+                        name: database-server-names
+                        valueFrom:
+                            path: /tmp/database-server-names.txt
+                    path: spec.templates[4].outputs.parameters
+            -   matchRegex:
+                    path: spec.templates[4].script.source
+                    pattern: --selector "retainedDatabaseServer=true"
+            -   contains:
+                    content:
+                        name: database-server-names
+                    path: spec.templates[6].inputs.parameters
+            -   contains:
+                    content:
+                        name: restore-source-server-id
+                        valueFrom:
+                            path: /tmp/restore-source-server-id.txt
+                    path: spec.templates[6].outputs.parameters
+            -   matchRegex:
+                    path: spec.templates[6].script.source
+                    pattern: for database_server_name in \$\(echo '\{\{inputs.parameters.database-server-names\}\}' \| jq --raw-output ".\[\]"\)
+            -   matchRegex:
+                    path: spec.templates[6].script.source
+                    pattern: (?s)sort \| tail --lines=1\)" == "\$\{earliest_restore_second\}".*?restore_source_server_id=
+            -   matchRegex:
+                    path: spec.templates[6].script.source
+                    pattern: No database server holds the recovery point time
+            -   contains:
+                    content:
+                        default: "null"
+                        name: restore-source-server-id
+                    path: spec.templates[0].inputs.parameters
+            -   matchRegex:
+                    path: spec.templates[0].resource.manifest
+                    pattern: "restoreSourceServerId: \\{\\{inputs.parameters.restore-source-server-id\\}\\}"
+            -   contains:
+                    content:
+                        name: restore-source-server-id
+                        value: "{{tasks.get-recovery-point-time.outputs.parameters.restore-source-server-id}}"
+                    path: spec.templates[9].dag.tasks[4].arguments.parameters
+        it: Picks the restore source as the latest lineage that can reach the recovery point
+    -   asserts:
             -   matchRegex:
                     path: spec.templates[3].script.source
                     pattern: az extension add \\\s+--name dataprotection \\\s+--version 1\.11\.3
@@ -76,7 +119,7 @@ tests:
                     pattern: --query properties.recoveryPointTime
             -   matchRegex:
                     path: spec.templates[6].script.source
-                    pattern: --query backup.earliestRestoreDate
+                    pattern: "--query \"{earliestRestoreDate: backup.earliestRestoreDate, id: id}\""
             -   matchRegex:
                     path: spec.templates[6].script.source
                     pattern: "\\[\\?properties.dataSourceInfo.resourceID=="
