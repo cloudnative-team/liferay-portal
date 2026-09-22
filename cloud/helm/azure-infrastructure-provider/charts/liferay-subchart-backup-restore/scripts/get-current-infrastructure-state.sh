@@ -50,7 +50,7 @@ function main {
 
 	database_server_names_retained=$( \
 		kubectl get flexibleservers.dbforpostgresql.azure.m.upbound.io \
-			--output jsonpath="{.items[*].metadata.name}" \
+			--output jsonpath="{.items[*].metadata.annotations.crossplane\.io/external-name}" \
 			--selector "retainedDatabaseServer=true")
 
 	echo "$(cat /tmp/database-server-name-active.txt) ${database_server_names_retained}" \

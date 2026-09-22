@@ -50,6 +50,19 @@
     {{- end -}}
 {{- end }}
 
+{{- $demotedDataPlane := "" -}}
+
+{{- if and (eq $restorePhase "promoting") (hasKey $retainedDatabaseServers (index $databaseServerNames $targetInactiveDataPlane)) -}}
+    {{- $demotedDataPlane = $targetInactiveDataPlane -}}
+{{- end }}
+
+{{- $demotedManagementPolicies := (eq $demotedDataPlane "") | ternary $managementPolicies (list "Create" "Observe" "Update" | toJson) -}}
+{{- $renderedDatabaseServerNames := list -}}
+
+{{- range $dataPlane := $dataPlanes -}}
+    {{- $renderedDatabaseServerNames = append $renderedDatabaseServerNames (index $databaseServerNames $dataPlane) -}}
+{{- end }}
+
 {{- $cmkIdentityId := printf "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s-cmk" $env.subscriptionId $env.resourceGroupName $baseName -}}
 {{- $keyVaultName := printf "%s-kv" $storageAccountBase -}}
 
