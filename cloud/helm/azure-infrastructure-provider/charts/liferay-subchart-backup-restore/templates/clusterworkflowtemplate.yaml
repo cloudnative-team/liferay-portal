@@ -211,6 +211,9 @@ spec:
                     -   name: backup-instance-name
                         valueFrom:
                             path: /tmp/backup-instance-name.txt
+                    -   name: document-library-restore-mode
+                        valueFrom:
+                            path: /tmp/document-library-restore-mode.txt
                     -   name: recovery-point-time
                         valueFrom:
                             path: /tmp/recovery-point-time.txt
@@ -327,6 +330,10 @@ spec:
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.backup-vault-name}}"
                                 -   name: data-inactive
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.data-inactive}}"
+                                -   name: document-library-restore-mode
+                                    value: "{{ "{{" }}tasks.get-recovery-point-time.outputs.parameters.document-library-restore-mode}}"
+                                -   name: recovery-point-time
+                                    value: "{{ "{{" }}tasks.get-recovery-point-time.outputs.parameters.recovery-point-time}}"
                                 -   name: resource-group-name
                                     value: "{{ "{{" }}tasks.get-current-infrastructure-state.outputs.parameters.resource-group-name}}"
                         depends: provision-inactive-data-plane
@@ -415,6 +422,8 @@ spec:
                     -   name: backup-instance-name
                     -   name: backup-vault-name
                     -   name: data-inactive
+                    -   name: document-library-restore-mode
+                    -   name: recovery-point-time
                     -   name: resource-group-name
             name: restore-document-library
             steps:
@@ -430,6 +439,18 @@ spec:
                                     value: "{{ "{{" }}steps.get-inactive-storage-account.outputs.parameters.storage-account-name}}"
                         name: delete-target-container
                         template: delete-target-container
+                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == vault"
+                    -   arguments:
+                            parameters:
+                                -   name: recovery-point-time
+                                    value: "{{ "{{" }}inputs.parameters.recovery-point-time}}"
+                                -   name: resource-group-name
+                                    value: "{{ "{{" }}inputs.parameters.resource-group-name}}"
+                                -   name: storage-account-name
+                                    value: "{{ "{{" }}steps.get-inactive-storage-account.outputs.parameters.storage-account-name}}"
+                        name: restore-document-library-in-place
+                        template: restore-document-library-in-place
+                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == in-place"
                 -   -   arguments:
                             parameters:
                                 -   name: backup-instance-name
@@ -444,6 +465,7 @@ spec:
                                     value: "{{ "{{" }}steps.get-inactive-storage-account.outputs.parameters.storage-account-location}}"
                         name: restore-document-library-blob
                         template: restore-document-library-blob
+                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == vault"
         -   activeDeadlineSeconds: {{ .Values.azureBackupService.restoreWaitTimeoutSeconds }}
             inputs:
                 parameters:
@@ -465,6 +487,25 @@ spec:
                     {{- .Values.resources.default | toYaml | nindent 20 }}
                 source: |-
                     {{- tpl (.Files.Get "scripts/restore-document-library-blob.sh") . | nindent 20 }}
+        -   activeDeadlineSeconds: {{ .Values.azureBackupService.restoreWaitTimeoutSeconds }}
+            inputs:
+                parameters:
+                    -   name: recovery-point-time
+                    -   name: resource-group-name
+                    -   name: storage-account-name
+            name: restore-document-library-in-place
+            script:
+                command: [sh]
+                env:
+                    -   name: AZURE_CONFIG_DIR
+                        value: /tmp/azure
+                    -   name: AZURE_EXTENSION_DIR
+                        value: /tmp/azure-extensions
+                image: "{{ $azureCli }}"
+                resources:
+                    {{- .Values.resources.default | toYaml | nindent 20 }}
+                source: |-
+                    {{- tpl (.Files.Get "scripts/restore-document-library-in-place.sh") . | nindent 20 }}
         -   inputs:
                 parameters:
                     -   name: liferay-infrastructure-name

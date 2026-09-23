@@ -76,18 +76,69 @@ function main {
 			--resource-group "${resource_group_name}" \
 			--vault-name "${backup_vault_name}")
 
-	if [ "${backup_instance_storage_account_id}" != "${storage_account_id}" ]
-	then
-		echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} was taken from the storage account ${backup_instance_storage_account_id}, which is the restore target. Azure cannot restore a vaulted blob recovery point into the storage account it was taken from, so the document library cannot follow this restore until the data planes swap again." >&2
-
-		exit 1
-	fi
-
-	echo "${backup_instance_name}" > /tmp/backup-instance-name.txt
-
 	local recovery_point_second
 
 	recovery_point_second=$(echo "${recovery_point_time}" | cut --characters=1-19)
+
+	local document_library_restore_mode
+
+	if [ "${backup_instance_storage_account_id}" == "${storage_account_id}" ]
+	then
+		document_library_restore_mode="vault"
+	else
+		document_library_restore_mode="in-place"
+
+		local restore_policy
+
+		restore_policy=$( \
+			az storage account blob-service-properties show \
+				--account-name "$(basename "${backup_instance_storage_account_id}")" \
+				--output tsv \
+				--query "{enabled: restorePolicy.enabled, minRestoreTime: restorePolicy.minRestoreTime}" \
+				--resource-group "${resource_group_name}")
+
+		local min_restore_second
+
+		min_restore_second=$( \
+			echo "${restore_policy}" \
+				| cut --fields=2 \
+				| cut --characters=1-19)
+
+		if [ "$(echo "${restore_policy}" | cut --fields=1 | tr "[:upper:]" "[:lower:]")" != "true" ] ||
+		   [ -z "${min_restore_second}" ] ||
+		   [ "$(printf "%s\n%s\n" "${min_restore_second}" "${recovery_point_second}" | sort | head --lines=1)" != "${min_restore_second}" ]
+		then
+			echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} was taken from the storage account ${backup_instance_storage_account_id}, which is the restore target, at ${recovery_point_time}, before its point in time restore window opened at ${min_restore_second}. Azure cannot restore a vaulted blob recovery point into the storage account it was taken from, so the document library cannot follow this restore." >&2
+
+			exit 1
+		fi
+
+		local container_modified_second
+
+		container_modified_second=$( \
+			az storage container-rm show \
+				--name document-library \
+				--output tsv \
+				--query lastModifiedTime \
+				--resource-group "${resource_group_name}" \
+				--storage-account "$(basename "${backup_instance_storage_account_id}")" 2> /dev/null \
+				| cut --characters=1-19 \
+				|| echo "")
+
+		if [ -z "${container_modified_second}" ] ||
+		   [ "$(printf "%s\n%s\n" "${container_modified_second}" "${recovery_point_second}" | sort | head --lines=1)" != "${container_modified_second}" ]
+		then
+			echo "The storage account ${backup_instance_storage_account_id} no longer holds the document-library container that was live at ${recovery_point_time}, so the document library cannot be restored in place." >&2
+
+			exit 1
+		fi
+	fi
+
+	echo "The document library is restored with the ${document_library_restore_mode} mode."
+
+	echo "${backup_instance_name}" > /tmp/backup-instance-name.txt
+
+	echo "${document_library_restore_mode}" > /tmp/document-library-restore-mode.txt
 
 	local restore_source_earliest_restore_second
 
