@@ -84,9 +84,9 @@ function main {
 
 	if [ "${backup_instance_storage_account_id}" == "${storage_account_id}" ]
 	then
-		document_library_restore_mode="vault"
+		document_library_restore_mode="alternate"
 	else
-		document_library_restore_mode="in-place"
+		document_library_restore_mode="original"
 
 		local restore_policy
 
@@ -134,7 +134,7 @@ function main {
 		fi
 	fi
 
-	echo "The document library is restored with the ${document_library_restore_mode} mode."
+	echo "The document library is restored to the ${document_library_restore_mode} location."
 
 	echo "${backup_instance_name}" > /tmp/backup-instance-name.txt
 

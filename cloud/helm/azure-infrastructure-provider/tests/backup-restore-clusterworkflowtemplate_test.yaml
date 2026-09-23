@@ -94,10 +94,10 @@ tests:
                     pattern: backup_instance_storage_account_id}" == ".{storage_account_id}"
             -   matchRegex:
                     path: spec.templates[6].script.source
-                    pattern: document_library_restore_mode="vault"
+                    pattern: document_library_restore_mode="alternate"
             -   matchRegex:
                     path: spec.templates[6].script.source
-                    pattern: document_library_restore_mode="in-place"
+                    pattern: document_library_restore_mode="original"
             -   matchRegex:
                     path: spec.templates[6].script.source
                     pattern: "--query \"{enabled: restorePolicy.enabled, minRestoreTime: restorePolicy.minRestoreTime}\""
@@ -294,19 +294,19 @@ tests:
                     value: delete-target-container
             -   equal:
                     path: spec.templates[13].steps[1][0].when
-                    value: "{{inputs.parameters.document-library-restore-mode}} == vault"
+                    value: "{{inputs.parameters.document-library-restore-mode}} == alternate"
             -   equal:
                     path: spec.templates[13].steps[1][1].name
                     value: restore-document-library-in-place
             -   equal:
                     path: spec.templates[13].steps[1][1].when
-                    value: "{{inputs.parameters.document-library-restore-mode}} == in-place"
+                    value: "{{inputs.parameters.document-library-restore-mode}} == original"
             -   equal:
                     path: spec.templates[13].steps[2][0].name
                     value: restore-document-library-blob
             -   equal:
                     path: spec.templates[13].steps[2][0].when
-                    value: "{{inputs.parameters.document-library-restore-mode}} == vault"
+                    value: "{{inputs.parameters.document-library-restore-mode}} == alternate"
             -   contains:
                     content:
                         name: document-library-restore-mode

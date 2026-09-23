@@ -439,7 +439,7 @@ spec:
                                     value: "{{ "{{" }}steps.get-inactive-storage-account.outputs.parameters.storage-account-name}}"
                         name: delete-target-container
                         template: delete-target-container
-                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == vault"
+                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == alternate"
                     -   arguments:
                             parameters:
                                 -   name: recovery-point-time
@@ -450,7 +450,7 @@ spec:
                                     value: "{{ "{{" }}steps.get-inactive-storage-account.outputs.parameters.storage-account-name}}"
                         name: restore-document-library-in-place
                         template: restore-document-library-in-place
-                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == in-place"
+                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == original"
                 -   -   arguments:
                             parameters:
                                 -   name: backup-instance-name
@@ -465,7 +465,7 @@ spec:
                                     value: "{{ "{{" }}steps.get-inactive-storage-account.outputs.parameters.storage-account-location}}"
                         name: restore-document-library-blob
                         template: restore-document-library-blob
-                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == vault"
+                        when: "{{ "{{" }}inputs.parameters.document-library-restore-mode}} == alternate"
         -   activeDeadlineSeconds: {{ .Values.azureBackupService.restoreWaitTimeoutSeconds }}
             inputs:
                 parameters:
