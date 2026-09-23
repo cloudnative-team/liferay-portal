@@ -1,5 +1,7 @@
 {{- $storage := $xr.spec.storage | default dict -}}
 
+{{- $blobDeleteRetentionDays := $backup.enabled | default false | ternary (add1 $backupRetentionDays) 7 -}}
+
 {{- range $i, $dataPlane := list "blue" "green" }}
 {{- $storageAccountName := printf "%s%s" $storageAccountBase (trunc 1 $dataPlane) }}
 {{- if $i }}
@@ -24,7 +26,11 @@ spec:
             containerDeleteRetentionPolicy:
                 days: 7
             deleteRetentionPolicy:
-                days: 7
+                days: {{ $blobDeleteRetentionDays }}
+            {{- if $backup.enabled }}
+            restorePolicy:
+                days: {{ $backupRetentionDays }}
+            {{- end }}
             versioningEnabled: {{ hasKey $storage "enableVersioning" | ternary $storage.enableVersioning true }}
         {{- if $cmkEnabled }}
         customerManagedKey:

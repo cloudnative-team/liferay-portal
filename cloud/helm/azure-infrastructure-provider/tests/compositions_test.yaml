@@ -313,6 +313,20 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
+                    pattern: "\\$blobDeleteRetentionDays := \\$backup.enabled \\| default false \\| ternary \\(add1 \\$backupRetentionDays\\) 7"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "deleteRetentionPolicy:\\s+days: \\{\\{ \\$blobDeleteRetentionDays \\}\\}"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "\\{\\{- if \\$backup.enabled \\}\\}\\s+restorePolicy:\\s+days: \\{\\{ \\$backupRetentionDays \\}\\}\\s+\\{\\{- end \\}\\}"
+        it: Keeps a point in time window on each plane storage account as long as the backups
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
                     pattern: "range \\$i, \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+\\{\\{- \\$storageAccountName"
             -   documentIndex: 0
                 matchRegex:
