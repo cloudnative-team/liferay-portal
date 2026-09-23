@@ -50,7 +50,7 @@ spec:
     managementPolicies: {{ $managementPolicies }}
     writeConnectionSecretToRef:
         name: liferay-storage-{{ $dataPlane }}-credentials
-{{- if eq $dataPlane $activeDataPlane }}
+{{- if or (eq $dataPlane $activeDataPlane) (eq $dataPlane $demotedDataPlane) }}
 ---
 apiVersion: storage.azure.m.upbound.io/v1beta1
 kind: Container
@@ -68,6 +68,6 @@ spec:
             matchControllerRef: true
             matchLabels:
                 dataPlane: {{ $dataPlane }}
-    managementPolicies: {{ $managementPolicies }}
+    managementPolicies: {{ (eq $dataPlane $demotedDataPlane) | ternary $demotedManagementPolicies $managementPolicies }}
 {{- end }}
 {{- end }}
