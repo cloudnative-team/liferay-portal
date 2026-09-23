@@ -29,39 +29,61 @@ function main {
 
 	local backup_instance_name
 
-	backup_instance_name=$( \
+	backup_instance_name=""
+
+	local recovery_point_time
+
+	recovery_point_time=""
+
+	for candidate_backup_instance_name in $( \
 		az dataprotection backup-instance list \
 			--output tsv \
-			--query "[?properties.dataSourceInfo.resourceID=='${storage_account_id}'].name | [0]" \
+			--query "[].name" \
 			--resource-group "${resource_group_name}" \
 			--vault-name "${backup_vault_name}")
+	do
+		recovery_point_time=$( \
+			az dataprotection recovery-point show \
+				--backup-instance-name "${candidate_backup_instance_name}" \
+				--output tsv \
+				--query properties.recoveryPointTime \
+				--recovery-point-id "{{ "{{" }}workflow.parameters.recovery-point-id}}" \
+				--resource-group "${resource_group_name}" \
+				--vault-name "${backup_vault_name}" 2> /dev/null || echo "")
+
+		if [ -n "${recovery_point_time}" ]
+		then
+			backup_instance_name="${candidate_backup_instance_name}"
+
+			break
+		fi
+	done
 
 	if [ -z "${backup_instance_name}" ]
 	then
-		echo "No backup instance protects the storage account ${storage_account_id}." >&2
+		echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} was not found in the backup vault ${backup_vault_name}." >&2
+
+		exit 1
+	fi
+
+	local backup_instance_storage_account_id
+
+	backup_instance_storage_account_id=$( \
+		az dataprotection backup-instance show \
+			--name "${backup_instance_name}" \
+			--output tsv \
+			--query properties.dataSourceInfo.resourceID \
+			--resource-group "${resource_group_name}" \
+			--vault-name "${backup_vault_name}")
+
+	if [ "${backup_instance_storage_account_id}" != "${storage_account_id}" ]
+	then
+		echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} was taken from the storage account ${backup_instance_storage_account_id}, which is the restore target. Azure cannot restore a vaulted blob recovery point into the storage account it was taken from, so the document library cannot follow this restore until the data planes swap again." >&2
 
 		exit 1
 	fi
 
 	echo "${backup_instance_name}" > /tmp/backup-instance-name.txt
-
-	local recovery_point_time
-
-	recovery_point_time=$( \
-		az dataprotection recovery-point show \
-			--backup-instance-name "${backup_instance_name}" \
-			--output tsv \
-			--query properties.recoveryPointTime \
-			--recovery-point-id "{{ "{{" }}workflow.parameters.recovery-point-id}}" \
-			--resource-group "${resource_group_name}" \
-			--vault-name "${backup_vault_name}")
-
-	if [ -z "${recovery_point_time}" ]
-	then
-		echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} has no recovery point time." >&2
-
-		exit 1
-	fi
 
 	local recovery_point_second
 
