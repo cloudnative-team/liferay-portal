@@ -23,10 +23,6 @@ function main {
 
 	resource_group_name="{{ "{{" }}inputs.parameters.resource-group-name}}"
 
-	local storage_account_id
-
-	storage_account_id="{{ "{{" }}inputs.parameters.storage-account-id}}"
-
 	local backup_instance_name
 
 	backup_instance_name=""
@@ -62,23 +58,6 @@ function main {
 	if [ -z "${backup_instance_name}" ]
 	then
 		echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} was not found in the backup vault ${backup_vault_name}." >&2
-
-		exit 1
-	fi
-
-	local backup_instance_storage_account_id
-
-	backup_instance_storage_account_id=$( \
-		az dataprotection backup-instance show \
-			--name "${backup_instance_name}" \
-			--output tsv \
-			--query properties.dataSourceInfo.resourceID \
-			--resource-group "${resource_group_name}" \
-			--vault-name "${backup_vault_name}")
-
-	if [ "${backup_instance_storage_account_id}" != "${storage_account_id}" ]
-	then
-		echo "The recovery point {{ "{{" }}workflow.parameters.recovery-point-id}} was taken from the storage account ${backup_instance_storage_account_id}, which is the restore target. Azure cannot restore a vaulted blob recovery point into the storage account it was taken from, so the document library cannot follow this restore until the data planes swap again." >&2
 
 		exit 1
 	fi
