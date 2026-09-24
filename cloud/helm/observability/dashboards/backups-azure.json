@@ -1,0 +1,284 @@
+{
+	"annotations": {
+		"list": [
+			{
+				"builtIn": 1,
+				"datasource": {
+					"type": "grafana",
+					"uid": "-- Grafana --"
+				},
+				"enable": true,
+				"hide": true,
+				"iconColor": "rgba(0, 211, 255, 1)",
+				"name": "Annotations & Alerts",
+				"type": "dashboard"
+			}
+		]
+	},
+	"editable": true,
+	"fiscalYearStartMonth": 0,
+	"graphTooltip": 0,
+	"links": [
+	],
+	"panels": [
+		{
+			"fieldConfig": {
+				"defaults": {
+				},
+				"overrides": [
+				]
+			},
+			"gridPos": {
+				"h": 5,
+				"w": 24,
+				"x": 0,
+				"y": 0
+			},
+			"id": 1,
+			"options": {
+				"code": {
+					"language": "plaintext",
+					"showLineNumbers": false,
+					"showMiniMap": false
+				},
+				"content": "${HEADER_HTML}",
+				"mode": "html"
+			},
+			"pluginVersion": "12.4.2",
+			"title": "",
+			"transparent": true,
+			"type": "text"
+		},
+		{
+			"datasource": {
+				"type": "grafana-azure-monitor-datasource",
+				"uid": "${DS_AZURE_MONITOR}"
+			},
+			"description": "Azure Resource Graph keeps backup jobs for 14 days, so unexpired recovery points older than that are not listed. Expiry is approximate: it is the backup job completion time plus the policy retention.",
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "thresholds"
+					},
+					"custom": {
+						"align": "auto",
+						"cellOptions": {
+							"type": "auto"
+						},
+						"filterable": true,
+						"footer": {
+							"reducers": [
+							]
+						},
+						"inspect": false
+					},
+					"mappings": [
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "red",
+								"value": 0
+							},
+							{
+								"color": "green",
+								"value": 1
+							}
+						]
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "Recovery Point ID"
+						},
+						"properties": [
+							{
+								"id": "custom.inspect",
+								"value": true
+							},
+							{
+								"id": "custom.minWidth",
+								"value": 280
+							}
+						]
+					},
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "Restorable"
+						},
+						"properties": [
+							{
+								"id": "mappings",
+								"value": [
+									{
+										"options": {
+											"Before database restore window": {
+												"index": 2,
+												"text": "🔴 Before database restore window"
+											},
+											"Inactive data plane": {
+												"index": 1,
+												"text": "🔴 Inactive data plane"
+											},
+											"Yes": {
+												"index": 0,
+												"text": "🟢 Yes"
+											}
+										},
+										"type": "value"
+									}
+								]
+							}
+						]
+					},
+					{
+						"matcher": {
+							"id": "byType",
+							"options": "time"
+						},
+						"properties": [
+							{
+								"id": "custom.filterable"
+							}
+						]
+					}
+				]
+			},
+			"gridPos": {
+				"h": 16,
+				"w": 24,
+				"x": 0,
+				"y": 5
+			},
+			"id": 2,
+			"options": {
+				"cellHeight": "sm",
+				"showHeader": true,
+				"sortBy": [
+					{
+						"desc": true,
+						"displayName": "Backup Completed"
+					}
+				]
+			},
+			"pluginVersion": "12.4.2",
+			"targets": [
+				{
+					"azureResourceGraph": {
+						"query": "recoveryservicesresources\n| where type == 'microsoft.dataprotection/backupvaults/backupjobs'\n| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n| where properties.operation == 'Backup' and properties.status == 'Completed'\n| extend policyId = tolower(tostring(properties.policyId))\n| join kind=inner (\n\trecoveryservicesresources\n\t| where type == 'microsoft.dataprotection/backupvaults/backuppolicies'\n\t| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n\t| mv-expand rule = properties.policyRules\n\t| where rule.name == 'Default'\n\t| project policyId = tolower(id), retentionDays = toint(extract(@'P(\\d+)D', 1, tostring(rule.lifecycles[0].deleteAfter.duration)))\n) on policyId\n| extend dataSourceId = tolower(tostring(properties.dataSourceId))\n| join kind=inner (\n\tresources\n\t| where type in ('microsoft.dbforpostgresql/flexibleservers', 'microsoft.storage/storageaccounts')\n\t| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n\t| extend active = tostring(tags['active']) == 'true', namespace = strcat('liferay-', tostring(tags['project-id']), '-', tostring(tags['environment-id']))\n\t| summarize activeStorageId = max(iff(type == 'microsoft.storage/storageaccounts' and active, tolower(id), '')), earliestRestore = min(iff(type == 'microsoft.dbforpostgresql/flexibleservers' and active, todatetime(properties.backup.earliestRestoreDate), datetime(null))), storageIds = make_set(iff(type == 'microsoft.storage/storageaccounts', tolower(id), '')) by namespace\n\t| mv-expand dataSourceId = storageIds to typeof(string)\n\t| where isnotempty(dataSourceId)\n\t| project dataSourceId, earliestRestore, isActivePlane = dataSourceId == activeStorageId, namespace\n) on dataSourceId\n| where namespace == '$environment'\n| extend completed = todatetime(properties.endTime), started = todatetime(properties.startTime)\n| extend expires = completed + retentionDays * 1d\n| where expires > now()\n| extend restorable = case(not(isActivePlane), 'Inactive data plane', isnull(earliestRestore) or started < earliestRestore, 'Before database restore window', 'Yes')\n| order by completed desc\n| project ['Recovery Point ID'] = tostring(properties.extendedInfo.targetRecoverPoint.recoveryPointID), ['Data Plane'] = extract(@'-(blue|green)$', 1, tostring(properties.backupInstanceFriendlyName)), ['Storage Account'] = tostring(properties.dataSourceName), ['Backup Completed'] = completed, ['Expires (approx.)'] = expires, Restorable = restorable",
+						"resultFormat": "table"
+					},
+					"datasource": {
+						"type": "grafana-azure-monitor-datasource",
+						"uid": "${DS_AZURE_MONITOR}"
+					},
+					"queryType": "Azure Resource Graph",
+					"refId": "A",
+					"subscriptions": [
+						"${AZURE_SUBSCRIPTION_ID}"
+					]
+				}
+			],
+			"title": "Recovery Points (Last 14 Days)",
+			"transformations": [
+				{
+					"id": "convertFieldType",
+					"options": {
+						"conversions": [
+							{
+								"destinationType": "time",
+								"targetField": "Backup Completed"
+							},
+							{
+								"destinationType": "time",
+								"targetField": "Expires (approx.)"
+							}
+						],
+						"fields": {
+						}
+					}
+				}
+			],
+			"type": "table"
+		},
+		{
+			"fieldConfig": {
+				"defaults": {
+				},
+				"overrides": [
+				]
+			},
+			"gridPos": {
+				"h": 14,
+				"w": 24,
+				"x": 0,
+				"y": 21
+			},
+			"id": 3,
+			"options": {
+				"code": {
+					"language": "plaintext",
+					"showLineNumbers": false,
+					"showMiniMap": false
+				},
+				"content": "${AZURE_BACKUP_HTML}",
+				"mode": "html"
+			},
+			"pluginVersion": "12.4.2",
+			"title": "",
+			"transparent": true,
+			"type": "text"
+		}
+	],
+	"preload": false,
+	"schemaVersion": 42,
+	"tags": [
+		"Backups",
+		"Liferay"
+	],
+	"templating": {
+		"list": [
+			{
+				"allowCustomValue": false,
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${DS_PROMETHEUS}"
+				},
+				"definition": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},${NS_LABEL})",
+				"label": "Environment",
+				"name": "environment",
+				"options": [
+				],
+				"query": {
+					"qryType": 1,
+					"query": "label_values(kube_namespace_labels{label_liferay_com_observable=\"true\"},${NS_LABEL})",
+					"refId": "PrometheusVariableQueryEditor-VariableQuery"
+				},
+				"refresh": 1,
+				"regex": "/(?<value>.*-(?<text>.*))/",
+				"regexApplyTo": "value",
+				"sort": 1,
+				"type": "query"
+			}
+		]
+	},
+	"time": {
+		"from": "now-7d",
+		"to": "now"
+	},
+	"timepicker": {
+	},
+	"timezone": "browser",
+	"title": "Backups",
+	"uid": "backups",
+	"version": 1,
+	"weekStart": ""
+}
