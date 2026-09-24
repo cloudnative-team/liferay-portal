@@ -5,10 +5,10 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "kube_pod_container_status_restarts_total\{[^}]*\}\\n  - kube_pod_container_status_restarts_total\{[^}]*\} offset \$__interval"
+                    pattern: 'kube_pod_container_status_restarts_total\{[^}]*\}\\n  - kube_pod_container_status_restarts_total\{[^}]*\} offset \$__interval'
             -   notMatchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "increase\(kube_pod_container_status_restarts_total"
+                    pattern: 'increase\(kube_pod_container_status_restarts_total'
         documentSelector:
             path: metadata.name
             value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
@@ -40,6 +40,69 @@ tests:
             value: RELEASE-NAME-observability-dashboard-databases
         it: Injects the cloud provider into the databases dashboard constant when the cloud provider is Azure
         set:
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: AWS Backup Dashboard
+            -   notMatchRegex:
+                    path: data["backups.json"]
+                    pattern: grafana-azure-monitor-datasource
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-backups
+        it: Keeps the AWS Backup console links when the cloud provider is AWS
+        set:
+            aws.region: us-east-1
+            cloudProvider: aws
+    -   asserts:
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: kube_customresource_liferay_backup_status_condition
+            -   notMatchRegex:
+                    path: data["backups.json"]
+                    pattern: grafana-azure-monitor-datasource
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-backups
+        it: Keeps the LiferayBackup metrics when the cloud provider is GCP
+        set:
+            cloudProvider: gcp
+    -   asserts:
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"type": "grafana-azure-monitor-datasource",\s+"uid": "azure-monitor"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"queryType": "Azure Resource Graph"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: resourceGroup =~ .liferay-test.
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"subscriptions": \[\s+"00000000-0000-0000-0000-000000000000"\s+\]'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"title": "Recovery Points \(Last 14 Days\)"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: 'where \$__timeFilter\(startTime\)[^"]*summarize \[.Failed Runs.\] = count\(\)'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/liferay-test/overview
+            -   notMatchRegex:
+                    path: data["backups.json"]
+                    pattern: \$\{AZURE_
+            -   notMatchRegex:
+                    path: data["backups.json"]
+                    pattern: kube_customresource_liferay_backup
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-backups
+        it: Lists the recovery points from Azure Resource Graph when the cloud provider is Azure
+        set:
+            azure.resourceGroupName: liferay-test
+            azure.subscriptionId: 00000000-0000-0000-0000-000000000000
             cloudProvider: azure
     -   asserts:
             -   matchRegex:
@@ -78,13 +141,13 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "container_memory_working_set_bytes\{namespace=\\\"\$environment-elasticsearch\\\""
+                    pattern: 'container_memory_working_set_bytes\{namespace=\\"\$environment-elasticsearch\\"'
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "kube_pod_container_status_restarts_total\{namespace=\\\"\$environment-elasticsearch\\\""
+                    pattern: 'kube_pod_container_status_restarts_total\{namespace=\\"\$environment-elasticsearch\\"'
             -   notMatchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "namespace=~\\\"\$environment"
+                    pattern: 'namespace=~\\"\$environment'
         documentSelector:
             path: metadata.name
             value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
@@ -94,13 +157,13 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "container_memory_working_set_bytes\{namespace=\\\"\$environment-elasticsearch\\\""
+                    pattern: 'container_memory_working_set_bytes\{namespace=\\"\$environment-elasticsearch\\"'
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "kube_pod_container_status_restarts_total\{namespace=\\\"\$environment-elasticsearch\\\""
+                    pattern: 'kube_pod_container_status_restarts_total\{namespace=\\"\$environment-elasticsearch\\"'
             -   notMatchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "namespace=~\\\"\$environment"
+                    pattern: 'namespace=~\\"\$environment'
         documentSelector:
             path: metadata.name
             value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
@@ -110,13 +173,13 @@ tests:
     -   asserts:
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "container_memory_working_set_bytes\{namespace=\\\"\$environment-elasticsearch\\\""
+                    pattern: 'container_memory_working_set_bytes\{namespace=\\"\$environment-elasticsearch\\"'
             -   matchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "kube_pod_container_status_restarts_total\{exported_namespace=\\\"\$environment-elasticsearch\\\""
+                    pattern: 'kube_pod_container_status_restarts_total\{exported_namespace=\\"\$environment-elasticsearch\\"'
             -   notMatchRegex:
                     path: data["kubernetes-workloads.json"]
-                    pattern: "namespace=~\\\"\$environment"
+                    pattern: 'namespace=~\\"\$environment'
         documentSelector:
             path: metadata.name
             value: RELEASE-NAME-observability-dashboard-kubernetes-workloads
