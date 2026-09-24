@@ -1,0 +1,83 @@
+<style>
+	.azb-code { display: block; margin-top: 8px; padding: 10px 12px; background-color: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; color: #111827; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+	.azb-emoji { font-size: 24px; }
+	.azb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; width: 100%; }
+	.azb-header { margin-bottom: 24px; border-left: 6px solid #0078d4; padding-left: 16px; }
+	.azb-icon { margin-bottom: 8px; height: 28px; display: flex; align-items: center; }
+	.azb-note { margin: 16px 0 24px 0; color: #4b5563; font-size: 13px; line-height: 1.5; }
+	.azb-panel { padding: 32px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); box-sizing: border-box; width: 100%; }
+	.azb-step { background-color: #ffffff; border: 2px solid #0078d4; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; box-sizing: border-box; }
+	.azb-sub { margin: 4px 0 0 0; color: #4b5563; font-size: 14px; line-height: 1.5; }
+	.azb-tile { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; text-decoration: none; display: flex; flex-direction: column; box-sizing: border-box; }
+	.azb-tile-sub { color: #6b7280; font-size: 12px; line-height: 1.3; }
+	.azb-tile-title { color: #111827; font-weight: 800; font-size: 16px; margin-bottom: 2px; }
+	.azb-title { margin: 0; color: #111827; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+</style>
+
+<div class="azb-panel">
+	<div class="azb-header">
+		<h1 class="azb-title">Restoring From a Recovery Point</h1>
+
+		<p class="azb-sub">On Azure, restores run through the backup-restore workflow template in the environment namespace. It takes the recovery point ID listed above as its only argument.</p>
+	</div>
+
+	<div class="azb-grid">
+		<div class="azb-step">
+			<div class="azb-icon">
+				<span class="azb-emoji">🟢</span>
+			</div>
+
+			<div class="azb-tile-title">1. Pick a Restorable Point</div>
+			<div class="azb-tile-sub">Only rows marked Yes can be restored. The workflow rejects points from the inactive data plane and points older than the active database's restore window.</div>
+		</div>
+
+		<div class="azb-step">
+			<div class="azb-icon">
+				<span class="azb-emoji">📋</span>
+			</div>
+
+			<div class="azb-tile-title">2. Copy the Recovery Point ID</div>
+			<div class="azb-tile-sub">Hover the ID cell, select the inspect icon, and select Copy to Clipboard.</div>
+		</div>
+
+		<div class="azb-step">
+			<div class="azb-icon">
+				<span class="azb-emoji">🚀</span>
+			</div>
+
+			<div class="azb-tile-title">3. Submit the Restore</div>
+			<code class="azb-code">argo submit --from workflowtemplate/backup-restore-workflow-template --namespace ${environment} --parameter recovery-point-id=&lt;ID&gt;</code>
+		</div>
+	</div>
+
+	<p class="azb-note">Azure Resource Graph only keeps the last 14 days of backup jobs, so recovery points older than that are not listed even if they have not expired. List them with <code>az dataprotection recovery-point list</code> against the backup instance of the active data plane.</p>
+
+	<div class="azb-grid">
+		<a class="azb-tile" href="https://portal.azure.com/#browse/Microsoft.DataProtection%2FBackupVaults" target="_blank">
+			<div class="azb-icon">
+				<span class="azb-emoji">🔒</span>
+			</div>
+
+			<div class="azb-tile-title">Backup Vaults</div>
+			<div class="azb-tile-sub">Backup Instances, Jobs and Policies</div>
+		</a>
+
+		<a class="azb-tile" href="https://portal.azure.com/#resource/subscriptions/{{ .subscriptionId }}/resourceGroups/{{ .resourceGroupName }}/overview" target="_blank">
+			<div class="azb-icon">
+				<span class="azb-emoji">🗂️</span>
+			</div>
+
+			<div class="azb-tile-title">Resource Group</div>
+			<div class="azb-tile-sub">Storage Accounts and Databases ({{ .resourceGroupName }})</div>
+		</a>
+
+		<a class="azb-tile" href="https://portal.azure.com/#view/HubsExtension/ArgQueryBlade" target="_blank">
+			<div class="azb-icon">
+				<span class="azb-emoji">🔎</span>
+			</div>
+
+			<div class="azb-tile-title">Resource Graph Explorer</div>
+			<div class="azb-tile-sub">Query Backup Jobs Directly</div>
+		</a>
+	</div>
+</div>
