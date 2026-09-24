@@ -56,6 +56,45 @@ tests:
             -   contains:
                     content:
                         default: "{}"
+                        name: retained-backup-instances
+                    path: spec.templates[0].inputs.parameters
+            -   matchRegex:
+                    path: spec.templates[0].resource.manifest
+                    pattern: "retainedBackupInstances: \\{\\{inputs.parameters.retained-backup-instances\\}\\}"
+            -   contains:
+                    content:
+                        name: retained-backup-instances
+                        value: "{{tasks.get-current-infrastructure-state.outputs.parameters.retained-backup-instance}}"
+                    path: spec.templates[9].dag.tasks[3].arguments.parameters
+            -   contains:
+                    content:
+                        name: retained-backup-instances
+                        value: "{{tasks.get-current-infrastructure-state.outputs.parameters.retained-backup-instance-release}}"
+                    path: spec.templates[9].dag.tasks[7].arguments.parameters
+            -   contains:
+                    content:
+                        name: retained-backup-instances
+                        value: "{{tasks.get-current-infrastructure-state.outputs.parameters.retained-backup-instance-release}}"
+                    path: spec.templates[9].dag.tasks[8].arguments.parameters
+            -   notContains:
+                    any: true
+                    content:
+                        name: retained-backup-instances
+                    path: spec.templates[9].dag.tasks[0].arguments.parameters
+            -   matchRegex:
+                    path: spec.templates[4].script.source
+                    pattern: --selector "dataPlane=[$]{data_plane_active}"[^|]*> /tmp/backup-instance-name-active.txt
+            -   matchRegex:
+                    path: spec.templates[4].script.source
+                    pattern: "if .name == .. then {} else {..name.: .retained_until} end"
+            -   matchRegex:
+                    path: spec.templates[10].script.source
+                    pattern: retainedBackupInstances.*expired_backup_instances
+        it: Marks the demoted backup instance retained in the promoting patch and releases it on every roll back
+    -   asserts:
+            -   contains:
+                    content:
+                        default: "{}"
                         name: retained-database-servers
                     path: spec.templates[0].inputs.parameters
             -   matchRegex:
@@ -264,10 +303,10 @@ tests:
                     path: spec.templates[9].dag.tasks[6].depends
                     value: provision-inactive-data-plane
             -   equal:
-                    path: spec.templates[9].dag.tasks[10].name
+                    path: spec.templates[9].dag.tasks[11].name
                     value: wait-for-database
             -   equal:
-                    path: spec.templates[9].dag.tasks[10].depends
+                    path: spec.templates[9].dag.tasks[11].depends
                     value: provision-inactive-data-plane
             -   equal:
                     path: spec.templates[9].dag.tasks[3].name
@@ -288,6 +327,9 @@ tests:
                     value: 7200
             -   equal:
                     path: spec.templates[18].activeDeadlineSeconds
+                    value: 600
+            -   equal:
+                    path: spec.templates[19].activeDeadlineSeconds
                     value: 3600
         it: Sets every step timeout well above the measured restore duration
     -   asserts:
@@ -298,39 +340,45 @@ tests:
                     path: spec.templates[9].dag.tasks[9].depends
                     value: promote-inactive-data-plane
             -   equal:
+                    path: spec.templates[9].dag.tasks[10].name
+                    value: suspend-demoted-backups
+            -   equal:
+                    path: spec.templates[9].dag.tasks[10].depends
+                    value: restart-liferay
+            -   equal:
+                    path: spec.templates[9].dag.tasks[0].depends
+                    value: suspend-demoted-backups
+            -   equal:
                     path: spec.templates[17].activeDeadlineSeconds
                     value: 600
             -   matchRegex:
                     path: spec.templates[17].script.source
-                    pattern: backup-instance resume-protection
-            -   matchRegex:
-                    path: spec.templates[17].script.source
-                    pattern: backup-instance suspend-backup
-            -   matchRegex:
-                    path: spec.templates[17].script.source
-                    pattern: promoted_state.. == .BackupsSuspended
-            -   matchRegex:
-                    path: spec.templates[17].script.source
-                    pattern: demoted_state.. == .ProtectionConfigured
+                    pattern: _wait_for_protection_state "[$]{promoted_instance_name}" ProtectionConfigured
             -   notMatchRegex:
                     path: spec.templates[17].script.source
-                    pattern: stop-protection
-            -   matchRegex:
+                    pattern: suspend-backup
+            -   notMatchRegex:
                     path: spec.templates[17].script.source
-                    pattern: _wait_for_protection_state
-            -   matchRegex:
-                    path: spec.templates[17].script.source
-                    pattern: (?s)resume-protection.*?--no-wait
-            -   matchRegex:
-                    path: spec.templates[17].script.source
-                    pattern: (?s)suspend-backup.*?--no-wait
+                    pattern: resume-protection
             -   matchRegex:
                     path: spec.templates[17].script.source
                     pattern: (?s)function main \{.*?function _wait_for_protection_state \{
+            -   equal:
+                    path: spec.templates[18].name
+                    value: suspend-demoted-backups
             -   matchRegex:
-                    path: spec.templates[17].script.source
-                    pattern: (?s)function main \{.*?\nmain
-        it: Suspends backups on the demoted plane and resumes them on the promoted one
+                    path: spec.templates[18].script.source
+                    pattern: (?s)backup-instance suspend-backup.*?--no-wait
+            -   matchRegex:
+                    path: spec.templates[18].script.source
+                    pattern: "state}\" == \"BackupsSuspended\""
+            -   matchRegex:
+                    path: spec.templates[18].script.source
+                    pattern: No backup instance protected the demoted data plane, so no backups were suspended
+            -   notMatchRegex:
+                    path: spec.templates[18].script.source
+                    pattern: backup-instance delete
+        it: Suspends backups on the demoted plane only once Liferay has restarted and waits for the promoted one
     -   asserts:
             -   equal:
                     path: spec.templates[5].name

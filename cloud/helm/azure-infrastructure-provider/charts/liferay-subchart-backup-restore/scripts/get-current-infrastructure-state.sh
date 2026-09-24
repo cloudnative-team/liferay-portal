@@ -48,6 +48,13 @@ function main {
 		exit 1
 	fi
 
+	if [ -n "$(kubectl get accounts.storage.azure.m.upbound.io --output jsonpath="{.items[*].metadata.name}" --selector "dataPlane=${data_plane_inactive}")" ]
+	then
+		echo "The ${data_plane_inactive} data plane still holds a storage account that is being released. Retry the restore once it is gone." >&2
+
+		exit 1
+	fi
+
 	kubectl get backupvaults.dataprotection.azure.m.upbound.io \
 		--output jsonpath="{.items[0].metadata.name}" \
 		> /tmp/backup-vault-name.txt
@@ -88,6 +95,26 @@ function main {
 		--null-input \
 		'{($name): null}' \
 		> /tmp/retained-database-server-release.txt
+
+	kubectl get backupinstanceblobstorages.dataprotection.azure.m.upbound.io \
+		--output jsonpath="{.items[0].metadata.name}" \
+		--selector "dataPlane=${data_plane_active}" \
+		> /tmp/backup-instance-name-active.txt 2> /dev/null || true
+
+	jq \
+		--arg name "$(cat /tmp/backup-instance-name-active.txt)" \
+		--arg retained_until "${retained_until}" \
+		--compact-output \
+		--null-input \
+		'if $name == "" then {} else {($name): $retained_until} end' \
+		> /tmp/retained-backup-instance.txt
+
+	jq \
+		--arg name "$(cat /tmp/backup-instance-name-active.txt)" \
+		--compact-output \
+		--null-input \
+		'if $name == "" then {} else {($name): null} end' \
+		> /tmp/retained-backup-instance-release.txt
 
 	kubectl get flexibleservers.dbforpostgresql.azure.m.upbound.io \
 		--output jsonpath="{.items[0].spec.forProvider.resourceGroupName}" \
