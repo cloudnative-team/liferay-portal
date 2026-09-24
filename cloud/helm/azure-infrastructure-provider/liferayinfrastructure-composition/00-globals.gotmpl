@@ -50,6 +50,19 @@
     {{- end -}}
 {{- end }}
 
+{{- $storageAccountNames := dict -}}
+
+{{- range $dataPlane := list "blue" "green" -}}
+    {{- $observedStorageAccount := dig (printf "liferay-storage-account-%s" $dataPlane) "resource" dict $observedResources -}}
+    {{- if and $observedStorageAccount (not (dig "metadata" "deletionTimestamp" "" $observedStorageAccount)) -}}
+        {{- $_ := set $storageAccountNames $dataPlane (dig "metadata" "name" "" $observedStorageAccount) -}}
+    {{- else if and (eq $restorePhase "provisioning") (eq $dataPlane $targetActiveDataPlane) -}}
+        {{- $_ := set $storageAccountNames $dataPlane (printf "%.11s%s%s%s" ($projectIdFull | replace "-" "" | lower) $uidHash (trunc 1 $dataPlane) ($xr.spec.database.restorePointInTime | default "" | sha256sum | trunc 6)) -}}
+    {{- else -}}
+        {{- $_ := set $storageAccountNames $dataPlane (printf "%s%s" $storageAccountBase (trunc 1 $dataPlane)) -}}
+    {{- end -}}
+{{- end }}
+
 {{- $demotedDataPlane := "" -}}
 
 {{- if and (eq $restorePhase "promoting") (hasKey $retainedDatabaseServers (index $databaseServerNames $targetInactiveDataPlane)) -}}

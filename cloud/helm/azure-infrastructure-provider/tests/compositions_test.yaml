@@ -125,7 +125,7 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "principalId: \\{\\{ \\$backupRestoreIdentityPrincipalId \\}\\}\\s+principalType: ServicePrincipal\\s+roleDefinitionName: Storage Blob Data Contributor\\s+scope: [^\\n]+Microsoft.Storage/storageAccounts/\\{\\{ \\$storageAccountBase \\}\\}\\{\\{ trunc 1 \\$dataPlane \\}\\}"
+                    pattern: "principalId: \\{\\{ \\$backupRestoreIdentityPrincipalId \\}\\}\\s+principalType: ServicePrincipal\\s+roleDefinitionName: Storage Blob Data Contributor\\s+scope: [^\\n]+Microsoft.Storage/storageAccounts/\\{\\{ index \\$storageAccountNames \\$dataPlane \\}\\}"
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
@@ -313,24 +313,6 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "range \\$i, \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+\\{\\{- \\$storageAccountName"
-            -   documentIndex: 0
-                matchRegex:
-                    path: spec.pipeline[1].input.inline.template
-                    pattern: "range \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+apiVersion: authorization[^\\v]*\\s+kind: RoleAssignment\\s+metadata:\\s+annotations:\\s+gotemplating[^:]*: liferay-storage-role-assignment-"
-            -   documentIndex: 0
-                matchRegex:
-                    path: spec.pipeline[1].input.inline.template
-                    pattern: "range \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+apiVersion: authorization[^\\v]*\\s+kind: RoleAssignment\\s+metadata:\\s+annotations:\\s+gotemplating[^:]*: liferay-backup-vault-storage-"
-            -   documentIndex: 0
-                matchRegex:
-                    path: spec.pipeline[1].input.inline.template
-                    pattern: "range \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+apiVersion: authorization[^\\v]*\\s+kind: RoleAssignment\\s+metadata:\\s+annotations:\\s+gotemplating[^:]*: liferay-backup-restore-storage-"
-        it: Keeps each plane storage account and its role assignments beyond a data plane swap
-    -   asserts:
-            -   documentIndex: 0
-                matchRegex:
-                    path: spec.pipeline[1].input.inline.template
                     pattern: "\\{\\{- if eq \\$dataPlane \\$activeDataPlane \\}\\}\\s+---\\s+apiVersion: storage.azure.m.upbound.io/v1beta1\\s+kind: Container"
             -   documentIndex: 0
                 matchRegex:
@@ -427,6 +409,24 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: "name: \\{\\{ \\$databaseServerName \\}\\}"
         it: Names each restored server after its restore point so the demoted server keeps its own
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "\\$observedStorageAccount := dig \\(printf \"liferay-storage-account-%s\" \\$dataPlane\\) \"resource\" dict \\$observedResources"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "if and \\$observedStorageAccount \\(not \\(dig \"metadata\" \"deletionTimestamp\" \"\" \\$observedStorageAccount\\)\\)"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "set \\$storageAccountNames \\$dataPlane \\(printf \"%.11s%s%s%s\" \\(\\$projectIdFull \\| replace \"-\" \"\" \\| lower\\) \\$uidHash \\(trunc 1 \\$dataPlane\\) \\(\\$xr.spec.database.restorePointInTime \\| default \"\" \\| sha256sum \\| trunc 6\\)\\)"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "LIFERAY_DOCLIB_STORAGE_ACCOUNT_NAME: \\{\\{ index \\$storageAccountNames \\$activeDataPlane \\| b64enc \\| quote \\}\\}"
+        it: Names each restored storage account after its restore point so the demoted account keeps its own
     -   asserts:
             -   documentIndex: 0
                 matchRegex:
@@ -589,6 +589,24 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: index \$backupVaultIdentity
         it: Reads the vault principal from the identity object rather than indexing it
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "range \\$i, \\$dataPlane := \\$dataPlanes \\}\\}\\s+\\{\\{- \\$storageAccountName := index \\$storageAccountNames \\$dataPlane \\}\\}"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "range \\$dataPlane := \\$dataPlanes \\}\\}\\s+apiVersion: authorization[^\\v]*\\s+kind: RoleAssignment\\s+metadata:\\s+annotations:\\s+gotemplating[^:]*: liferay-storage-role-assignment-"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "range \\$dataPlane := \\$dataPlanes \\}\\}\\s+apiVersion: authorization[^\\v]*\\s+kind: RoleAssignment\\s+metadata:\\s+annotations:\\s+gotemplating[^:]*: liferay-backup-vault-storage-"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "range \\$dataPlane := \\$dataPlanes \\}\\}\\s+apiVersion: authorization[^\\v]*\\s+kind: RoleAssignment\\s+metadata:\\s+annotations:\\s+gotemplating[^:]*: liferay-backup-restore-storage-"
+        it: Renders each storage account and its role assignments only while its plane is rendered
     -   asserts:
             -   documentIndex: 0
                 matchRegex:
