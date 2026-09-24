@@ -86,6 +86,9 @@ tests:
                     pattern: '"title": "Recovery Points \(Last 14 Days\)"'
             -   matchRegex:
                     path: data["backups.json"]
+                    pattern: 'where \$__timeFilter\(startTime\)[^"]*summarize \[.Failed Runs.\] = count\(\)'
+            -   matchRegex:
+                    path: data["backups.json"]
                     pattern: subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/liferay-test/overview
             -   notMatchRegex:
                     path: data["backups.json"]
