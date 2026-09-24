@@ -127,6 +127,8 @@ tests:
             -   notExists:
                     path: spec.restorePhase
             -   notExists:
+                    path: spec.retainedBackupInstances
+            -   notExists:
                     path: spec.retainedDatabaseServers
             -   notExists:
                     path: spec.targetActiveDataPlane
