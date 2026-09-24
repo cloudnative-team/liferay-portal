@@ -227,7 +227,7 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: \{\{- if and \$backupRoleId \(or \(eq \$dataPlane \$activeDataPlane\) \(has \$dataPlane \$observedBackupDataPlanes\)\) \}\}
+                    pattern: \{\{- if \$backupRoleId \}\}
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
@@ -253,11 +253,11 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "if and \\$backupRoleId \\(or \\(eq \\$dataPlane \\$activeDataPlane\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)\\)"
+                    pattern: "\\$backupInstanceDataPlanes := list \\$activeDataPlane"
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "if or \\(eq \\$dataPlane \\$activeDataPlane\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)"
+                    pattern: "range \\$dataPlane := \\$backupInstanceDataPlanes \\}\\}\\s+\\{\\{- \\$backupRoleId := dig"
         it: Holds protection off the restore target until it is promoted
     -   asserts:
             -   equal:
@@ -381,6 +381,24 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
+                    pattern: "set \\$backupInstanceNames \\$dataPlane \\(printf \"%s-%s\" \\$backupVaultName \\(index \\$storageAccountNames \\$dataPlane\\)\\)"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "kind: BackupInstanceBlobStorage\\s+metadata:[\\s\\S]{0,300}?name: \\{\\{ index \\$backupInstanceNames \\$dataPlane \\}\\}"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "if and \\$observedBackupInstance \\(not \\(dig \"metadata\" \"deletionTimestamp\" \"\" \\$observedBackupInstance\\)\\)"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "set \\$backupInstanceNames \\$dataPlane \\(dig \"metadata\" \"name\" \"\" \\$observedBackupInstance\\)"
+        it: Names each backup instance after its storage account so a retained instance never collides with the next one
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
                     pattern: \$backupScheduleHash := printf "%s\|%s\|%s" \$backupRepeatingTimeInterval
             -   documentIndex: 0
                 matchRegex:
@@ -457,12 +475,18 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: \$observedBackupDataPlanes = append \$observedBackupDataPlanes \$dataPlane
+                    pattern: "range \\$dataPlane := \\$backupInstanceDataPlanes \\}\\}\\s+\\{\\{- if dig \\(printf \"liferay-backup-vault-storage-%s\" \\$dataPlane\\)"
+        it: Orders the storage account deletion behind its backup instance
+    -   asserts:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: "or \\(eq \\$dataPlane \\$activeDataPlane\\) \\(has \\$dataPlane \\$observedBackupDataPlanes\\)"
-        it: Orders the storage account deletion behind its backup instance
+                    pattern: "if and \\(eq \\$restorePhase \"promoting\"\\) \\(hasKey \\$retainedBackupInstances \\(index \\$backupInstanceNames \\$targetInactiveDataPlane\\)\\)"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "managementPolicies: \\{\\{ \\(eq \\$dataPlane \\$demotedBackupInstanceDataPlane\\) \\| ternary \\(list \"Create\" \"Observe\" \"Update\" \\| toJson\\) \\$managementPolicies \\}\\}"
+        it: Orphans the demoted backup instance only when the workflow has marked it retained
     -   asserts:
             -   documentIndex: 0
                 matchRegex:
@@ -653,12 +677,6 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: sourceServerIdSelector
         it: Restores the inactive plane to a point in time through initProvider
-    -   asserts:
-            -   documentIndex: 0
-                matchRegex:
-                    path: spec.pipeline[1].input.inline.template
-                    pattern: "range \\$dataPlane := list \"blue\" \"green\" \\}\\}\\s+\\{\\{- \\$backupRoleId := dig"
-        it: Retains each backup instance once created so a promotion never soft deletes one
     -   asserts:
             -   documentIndex: 0
                 matchRegex:

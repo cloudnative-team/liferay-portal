@@ -12,6 +12,7 @@
 {{- $projectId := $xr.spec.projectId -}}
 {{- $region := $xr.spec.region -}}
 {{- $restorePhase := $xr.spec.restorePhase | default "none" -}}
+{{- $retainedBackupInstances := $xr.spec.retainedBackupInstances | default dict -}}
 {{- $retainedDatabaseServers := $xr.spec.retainedDatabaseServers | default dict -}}
 {{- $targetActiveDataPlane := $xr.spec.targetActiveDataPlane | default "blue" -}}
 
