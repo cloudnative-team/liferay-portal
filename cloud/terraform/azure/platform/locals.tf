@@ -54,6 +54,22 @@ locals {
 		namespace="external-secrets-system"
 	}
 	keda_enabled=var.keda_config.enabled && var.observability_config.enabled
+	prometheus_recording_rules=[
+		{
+			expression=trimspace(<<-EOT
+				sum by (container, namespace, pod) (rate(container_cpu_usage_seconds_total{container!="", container!="POD"}[5m])) / sum by (container, namespace, pod) (kube_pod_container_resource_limits{resource="cpu"})
+			EOT
+			)
+			record="liferay:container_cpu_limit_utilization:ratio"
+		},
+		{
+			expression=trimspace(<<-EOT
+				sum by (container, namespace, pod) (container_memory_working_set_bytes{container!="", container!="POD"}) / sum by (container, namespace, pod) (kube_pod_container_resource_limits{resource="memory"})
+			EOT
+			)
+			record="liferay:container_memory_limit_utilization:ratio"
+		},
+	]
 	resource_group_name=var.deployment_name
 	system_node_pool_vm_size=one([
 		for agent_pool_profile in data.azurerm_kubernetes_cluster.aks.agent_pool_profile :
