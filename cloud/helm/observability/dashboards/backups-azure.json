@@ -54,7 +54,7 @@
 				"type": "grafana-azure-monitor-datasource",
 				"uid": "${DS_AZURE_MONITOR}"
 			},
-			"description": "Azure Resource Graph keeps backup jobs for 14 days, so unexpired recovery points older than that are not listed. Expiry is approximate: it is the backup job completion time plus the policy retention.",
+			"description": "Azure Resource Graph only keeps the last 14 days of backup jobs, so older backups are not listed even if their recovery points have not expired.",
 			"fieldConfig": {
 				"defaults": {
 					"color": {
@@ -91,6 +91,19 @@
 				"overrides": [
 					{
 						"matcher": {
+							"id": "byRegexp",
+							"options": ".*"
+						},
+						"properties": [
+							{
+								"id": "links",
+								"value": [
+								]
+							}
+						]
+					},
+					{
+						"matcher": {
 							"id": "byName",
 							"options": "Recovery Point ID"
 						},
@@ -108,7 +121,7 @@
 					{
 						"matcher": {
 							"id": "byName",
-							"options": "Restorable"
+							"options": "Status"
 						},
 						"properties": [
 							{
@@ -116,20 +129,38 @@
 								"value": [
 									{
 										"options": {
-											"Before database restore window": {
+											"FAILED": {
 												"index": 2,
-												"text": "🔴 Before database restore window"
+												"text": "🔴 FAILED"
 											},
-											"Inactive data plane": {
+											"IN PROGRESS": {
 												"index": 1,
-												"text": "🔴 Inactive data plane"
+												"text": "🟡 IN PROGRESS"
 											},
-											"Yes": {
+											"SUCCEEDED": {
 												"index": 0,
-												"text": "🟢 Yes"
+												"text": "🟢 SUCCEEDED"
 											}
 										},
 										"type": "value"
+									}
+								]
+							}
+						]
+					},
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "Storage Account"
+						},
+						"properties": [
+							{
+								"id": "links",
+								"value": [
+									{
+										"targetBlank": true,
+										"title": "Open the storage account in the Azure Portal",
+										"url": "https://portal.azure.com/#resource/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.Storage/storageAccounts/${__value.raw}/overview"
 									}
 								]
 							}
@@ -161,7 +192,7 @@
 				"sortBy": [
 					{
 						"desc": true,
-						"displayName": "Backup Completed"
+						"displayName": "Backup Triggered"
 					}
 				]
 			},
@@ -169,7 +200,7 @@
 			"targets": [
 				{
 					"azureResourceGraph": {
-						"query": "recoveryservicesresources\n| where type == 'microsoft.dataprotection/backupvaults/backupjobs'\n| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n| where properties.operation == 'Backup' and properties.status == 'Completed'\n| extend policyId = tolower(tostring(properties.policyId))\n| join kind=inner (\n\trecoveryservicesresources\n\t| where type == 'microsoft.dataprotection/backupvaults/backuppolicies'\n\t| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n\t| mv-expand rule = properties.policyRules\n\t| where rule.name == 'Default'\n\t| project policyId = tolower(id), retentionDays = toint(extract(@'P(\\d+)D', 1, tostring(rule.lifecycles[0].deleteAfter.duration)))\n) on policyId\n| extend dataSourceId = tolower(tostring(properties.dataSourceId))\n| join kind=inner (\n\tresources\n\t| where type in ('microsoft.dbforpostgresql/flexibleservers', 'microsoft.storage/storageaccounts')\n\t| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n\t| extend active = tostring(tags['active']) == 'true', namespace = strcat('liferay-', tostring(tags['project-id']), '-', tostring(tags['environment-id']))\n\t| summarize activeStorageId = max(iff(type == 'microsoft.storage/storageaccounts' and active, tolower(id), '')), earliestRestore = min(iff(type == 'microsoft.dbforpostgresql/flexibleservers' and active, todatetime(properties.backup.earliestRestoreDate), datetime(null))), storageIds = make_set(iff(type == 'microsoft.storage/storageaccounts', tolower(id), '')) by namespace\n\t| mv-expand dataSourceId = storageIds to typeof(string)\n\t| where isnotempty(dataSourceId)\n\t| project dataSourceId, earliestRestore, isActivePlane = dataSourceId == activeStorageId, namespace\n) on dataSourceId\n| where namespace == '$environment'\n| extend completed = todatetime(properties.endTime), started = todatetime(properties.startTime)\n| extend expires = completed + retentionDays * 1d\n| where expires > now()\n| extend restorable = case(not(isActivePlane), 'Inactive data plane', isnull(earliestRestore) or started < earliestRestore, 'Before database restore window', 'Yes')\n| order by completed desc\n| project ['Recovery Point ID'] = tostring(properties.extendedInfo.targetRecoverPoint.recoveryPointID), ['Data Plane'] = extract(@'-(blue|green)$', 1, tostring(properties.backupInstanceFriendlyName)), ['Storage Account'] = tostring(properties.dataSourceName), ['Backup Completed'] = completed, ['Expires (approx.)'] = expires, Restorable = restorable",
+						"query": "recoveryservicesresources\n| where type == 'microsoft.dataprotection/backupvaults/backupjobs'\n| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n| where properties.operation == 'Backup'\n| extend dataSourceId = tolower(tostring(properties.dataSourceId))\n| join kind=inner (\n\tresources\n\t| where type == 'microsoft.storage/storageaccounts'\n\t| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n\t| project dataSourceId = tolower(id), namespace = strcat('liferay-', tostring(tags['project-id']), '-', tostring(tags['environment-id']))\n) on dataSourceId\n| where namespace == '$environment'\n| extend completed = todatetime(properties.endTime), status = tostring(properties.status), triggered = todatetime(properties.startTime)\n| extend finished = status != 'InProgress' and isnotnull(completed)\n| extend minutes = iff(finished, max_of(toint(round((completed - triggered) / 1m)), 1), int(null))\n| order by triggered desc\n| project ['Recovery Point ID'] = iff(status in ('Completed', 'CompletedWithWarnings'), tostring(properties.extendedInfo.targetRecoverPoint.recoveryPointID), ''), ['Data Plane'] = extract(@'-(blue|green)$', 1, tostring(properties.backupInstanceFriendlyName)), ['Storage Account'] = tostring(properties.dataSourceName), ['Backup Triggered'] = triggered, ['Backup Completed'] = iff(finished, completed, datetime(null)), Duration = case(not(finished), '', minutes >= 60, strcat(minutes / 60, 'h', iff(minutes % 60 < 10, '0', ''), minutes % 60, 'm'), strcat(minutes, 'm')), Status = case(status in ('Completed', 'CompletedWithWarnings'), 'SUCCEEDED', status == 'InProgress', 'IN PROGRESS', status == 'Failed', 'FAILED', toupper(status))",
 						"resultFormat": "table"
 					},
 					"datasource": {
@@ -183,7 +214,7 @@
 					]
 				}
 			],
-			"title": "Recovery Points (Last 14 Days)",
+			"title": "Backups (Last 14 Days)",
 			"transformations": [
 				{
 					"id": "convertFieldType",
@@ -195,7 +226,7 @@
 							},
 							{
 								"destinationType": "time",
-								"targetField": "Expires (approx.)"
+								"targetField": "Backup Triggered"
 							}
 						],
 						"fields": {
@@ -239,6 +270,19 @@
 					"unit": "none"
 				},
 				"overrides": [
+					{
+						"matcher": {
+							"id": "byRegexp",
+							"options": ".*"
+						},
+						"properties": [
+							{
+								"id": "links",
+								"value": [
+								]
+							}
+						]
+					}
 				]
 			},
 			"gridPos": {
@@ -320,6 +364,19 @@
 					"unit": "none"
 				},
 				"overrides": [
+					{
+						"matcher": {
+							"id": "byRegexp",
+							"options": ".*"
+						},
+						"properties": [
+							{
+								"id": "links",
+								"value": [
+								]
+							}
+						]
+					}
 				]
 			},
 			"gridPos": {
@@ -401,6 +458,19 @@
 					"unit": "none"
 				},
 				"overrides": [
+					{
+						"matcher": {
+							"id": "byRegexp",
+							"options": ".*"
+						},
+						"properties": [
+							{
+								"id": "links",
+								"value": [
+								]
+							}
+						]
+					}
 				]
 			},
 			"gridPos": {
@@ -490,6 +560,19 @@
 					"unit": "percent"
 				},
 				"overrides": [
+					{
+						"matcher": {
+							"id": "byRegexp",
+							"options": ".*"
+						},
+						"properties": [
+							{
+								"id": "links",
+								"value": [
+								]
+							}
+						]
+					}
 				]
 			},
 			"gridPos": {
@@ -543,7 +626,7 @@
 				]
 			},
 			"gridPos": {
-				"h": 14,
+				"h": 19,
 				"w": 24,
 				"x": 0,
 				"y": 21
@@ -596,6 +679,96 @@
 				"regex": "/(?<value>.*-(?<text>.*))/",
 				"regexApplyTo": "value",
 				"sort": 1,
+				"type": "query"
+			},
+			{
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "grafana-azure-monitor-datasource",
+					"uid": "${DS_AZURE_MONITOR}"
+				},
+				"definition": "",
+				"hide": 2,
+				"name": "backupInstance",
+				"options": [
+				],
+				"query": {
+					"azureResourceGraph": {
+						"query": "recoveryservicesresources\n| where type == 'microsoft.dataprotection/backupvaults/backupinstances'\n| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n| extend dataSourceId = tolower(tostring(properties.dataSourceInfo.resourceID))\n| join kind=inner (\n\tresources\n\t| where type == 'microsoft.storage/storageaccounts'\n\t| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n\t| where tostring(tags['active']) == 'true'\n\t| project dataSourceId = tolower(id), namespace = strcat('liferay-', tostring(tags['project-id']), '-', tostring(tags['environment-id']))\n) on dataSourceId\n| where namespace == '$environment'\n| project name",
+						"resultFormat": "table"
+					},
+					"queryType": "Azure Resource Graph",
+					"refId": "A",
+					"subscriptions": [
+						"${AZURE_SUBSCRIPTION_ID}"
+					]
+				},
+				"refresh": 1,
+				"regex": "",
+				"sort": 0,
+				"type": "query"
+			},
+			{
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "grafana-azure-monitor-datasource",
+					"uid": "${DS_AZURE_MONITOR}"
+				},
+				"definition": "",
+				"hide": 2,
+				"name": "backupListEndTime",
+				"options": [
+				],
+				"query": {
+					"azureResourceGraph": {
+						"query": "resources\n| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n| take 1\n| extend cutoff = now() - 14d\n| project endTime = strcat(format_datetime(cutoff, 'yyyy-MM-dd'), 'T', format_datetime(cutoff, 'HH:mm:ss'))",
+						"resultFormat": "table"
+					},
+					"queryType": "Azure Resource Graph",
+					"refId": "A",
+					"subscriptions": [
+						"${AZURE_SUBSCRIPTION_ID}"
+					]
+				},
+				"refresh": 1,
+				"regex": "",
+				"sort": 0,
+				"type": "query"
+			},
+			{
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "grafana-azure-monitor-datasource",
+					"uid": "${DS_AZURE_MONITOR}"
+				},
+				"definition": "",
+				"hide": 2,
+				"name": "backupVault",
+				"options": [
+				],
+				"query": {
+					"azureResourceGraph": {
+						"query": "resources\n| where type == 'microsoft.dataprotection/backupvaults'\n| where resourceGroup =~ '${AZURE_RESOURCE_GROUP}'\n| where strcat('liferay-', tostring(tags['project-id']), '-', tostring(tags['environment-id'])) == '$environment'\n| project name",
+						"resultFormat": "table"
+					},
+					"queryType": "Azure Resource Graph",
+					"refId": "A",
+					"subscriptions": [
+						"${AZURE_SUBSCRIPTION_ID}"
+					]
+				},
+				"refresh": 1,
+				"regex": "",
+				"sort": 0,
 				"type": "query"
 			}
 		]
