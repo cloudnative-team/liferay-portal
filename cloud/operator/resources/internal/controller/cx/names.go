@@ -1,11 +1,35 @@
 package cx
 
 import (
+	"fmt"
 	"strings"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 )
+
+const (
+	AnnotationDomains    = "ext.lxc.liferay.com/domains"
+	AnnotationMainDomain = "ext.lxc.liferay.com/mainDomain"
+)
+
+const (
+	LabelMetadataType    = "lxc.liferay.com/metadataType"
+	LabelOwnerName       = "cx.liferay.com/owner-name"
+	LabelOwnerNamespace  = "cx.liferay.com/owner-namespace"
+	LabelProjectName     = "ext.lxc.liferay.com/projectName"
+	LabelServiceID       = "ext.lxc.liferay.com/serviceId"
+	LabelVirtualInstance = "dxp.lxc.liferay.com/virtualInstanceId"
+)
+
+const (
+	MetadataTypeDxp          = "dxp"
+	MetadataTypeExtProvision = "ext-provision"
+)
+
+func DxpMetadataName(virtualInstanceID string) string {
+	return virtualInstanceID + "-lxc-dxp-metadata"
+}
 
 func DxpNamespace(clientExtension *cxv1alpha1.ClientExtension) string {
 	if clientExtension.Spec.DxpNamespace != "" {
@@ -13,6 +37,16 @@ func DxpNamespace(clientExtension *cxv1alpha1.ClientExtension) string {
 	}
 
 	return clientExtension.Namespace
+}
+
+func ExtProvisionName(clientExtension *cxv1alpha1.ClientExtension) string {
+	return truncate(
+		253,
+		fmt.Sprintf(
+			"%s-%s-lxc-ext-provision-metadata",
+			clientExtension.Spec.ServiceID, clientExtension.Spec.VirtualInstanceID,
+		),
+	)
 }
 
 func PermittedNamespaces(namespace *corev1.Namespace) []string {
@@ -27,4 +61,25 @@ func PermittedNamespaces(namespace *corev1.Namespace) []string {
 	}
 
 	return permittedNamespaces
+}
+
+func ProjectName(clientExtension *cxv1alpha1.ClientExtension) string {
+	if clientExtension.Spec.ProjectName != "" {
+		return clientExtension.Spec.ProjectName
+	}
+
+	return clientExtension.Spec.ServiceID
+}
+
+func ownsExtProvision(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
+	return (configMap.Labels[LabelOwnerName] == clientExtension.Name) &&
+		(configMap.Labels[LabelOwnerNamespace] == clientExtension.Namespace)
+}
+
+func truncate(limit int, value string) string {
+	if len(value) <= limit {
+		return value
+	}
+
+	return strings.TrimRight(value[:limit], "-.")
 }

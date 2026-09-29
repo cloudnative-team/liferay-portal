@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
+	"time"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -16,19 +18,26 @@ import (
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	builder "sigs.k8s.io/controller-runtime/pkg/builder"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
+	controllerutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	predicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 	reconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
-	ReasonDxpNamespaceNotFound  = "DxpNamespaceNotFound"
-	ReasonNamespaceNotPermitted = "NamespaceNotPermitted"
-	ReasonNamespacePermitted    = "NamespacePermitted"
-	ReasonStepNotEvaluated      = "StepNotEvaluated"
-	ReasonStepsComplete         = "StepsComplete"
+	ReasonDelivered              = "Delivered"
+	ReasonDxpNamespaceNotFound   = "DxpNamespaceNotFound"
+	ReasonInvalidConfigs         = "InvalidConfigs"
+	ReasonNamespaceNotPermitted  = "NamespaceNotPermitted"
+	ReasonServiceIDConflict      = "ServiceIDConflict"
+	ReasonStepNotEvaluated       = "StepNotEvaluated"
+	ReasonStepsComplete          = "StepsComplete"
+	ReasonUnknownVirtualInstance = "UnknownVirtualInstance"
 )
 
+const unknownVirtualInstanceRequeueInterval = time.Minute
+
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;patch;update;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=cx.liferay.com,resources=clientextensions,verbs=get;list;watch
@@ -53,20 +62,79 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
+	extProvisionConfigMapNames := clientExtension.Status.ExtProvisionConfigMapNames
+
 	if reason != "" {
 		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-			&clientExtension, metav1.ConditionFalse, context,
+			&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
 			refusalMessage(&clientExtension, dxpNamespace, reason), reason,
 		)
 	}
 
+	var dxpMetadata corev1.ConfigMap
+
+	error = clientExtensionReconciler.Get(
+		context,
+		types.NamespacedName{
+			Name:      DxpMetadataName(clientExtension.Spec.VirtualInstanceID),
+			Namespace: dxpNamespace,
+		},
+		&dxpMetadata,
+	)
+
+	if apierrors.IsNotFound(error) {
+		message, error := clientExtensionReconciler.unknownVirtualInstanceMessage(
+			&clientExtension, context, dxpNamespace,
+		)
+
+		if error != nil {
+			return controllerruntime.Result{}, error
+		}
+
+		return controllerruntime.Result{RequeueAfter: unknownVirtualInstanceRequeueInterval},
+			clientExtensionReconciler.updateStatus(
+				&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
+				message, ReasonUnknownVirtualInstance,
+			)
+	}
+
+	if error != nil {
+		return controllerruntime.Result{}, error
+	}
+
+	payload, error := BuildPayload(clientExtension.Spec.Configs)
+
+	if error != nil {
+		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
+			&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
+			fmt.Sprintf("Unable to build the configuration payload: %s.", error), ReasonInvalidConfigs,
+		)
+	}
+
+	conflictingConfigMap, error := clientExtensionReconciler.applyExtProvision(
+		&clientExtension, context, dxpNamespace, payload,
+	)
+
+	if error != nil {
+		return controllerruntime.Result{}, error
+	}
+
+	if conflictingConfigMap != nil {
+		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
+			&clientExtension, metav1.ConditionFalse, context, nil,
+			serviceIDConflictMessage(&clientExtension, conflictingConfigMap),
+			ReasonServiceIDConflict,
+		)
+	}
+
+	extProvisionName := ExtProvisionName(&clientExtension)
+
 	return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-		&clientExtension, metav1.ConditionUnknown, context,
+		&clientExtension, metav1.ConditionTrue, context, []string{extProvisionName},
 		fmt.Sprintf(
-			"Namespace %q accepts client extensions from namespace %q.",
-			dxpNamespace, clientExtension.Namespace,
+			"Delivered to ConfigMap %q in namespace %q.", extProvisionName, dxpNamespace,
 		),
-		ReasonNamespacePermitted,
+		ReasonDelivered,
 	)
 }
 
@@ -81,11 +149,76 @@ func (clientExtensionReconciler *ClientExtensionReconciler) SetupWithManager(
 	).Named(
 		"clientextension",
 	).Watches(
+		&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(clientExtensionReconciler.requestsForConfigMap),
+	).Watches(
 		&corev1.Namespace{},
 		handler.EnqueueRequestsFromMapFunc(clientExtensionReconciler.requestsForNamespace),
 	).Complete(
 		clientExtensionReconciler,
 	)
+}
+
+func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
+	clientExtension *cxv1alpha1.ClientExtension,
+	context context.Context,
+	dxpNamespace string,
+	payload string,
+) (*corev1.ConfigMap, error) {
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ExtProvisionName(clientExtension),
+			Namespace: dxpNamespace,
+		},
+	}
+
+	getError := clientExtensionReconciler.Get(
+		context, client.ObjectKeyFromObject(configMap), configMap,
+	)
+
+	if (getError == nil) && !ownsExtProvision(clientExtension, configMap) {
+		return configMap, nil
+	}
+
+	if (getError != nil) && !apierrors.IsNotFound(getError) {
+		return nil, getError
+	}
+
+	_, error := controllerutil.CreateOrUpdate(
+		context, clientExtensionReconciler.Client, configMap,
+		func() error {
+			if configMap.Annotations == nil {
+				configMap.Annotations = map[string]string{}
+			}
+
+			if clientExtension.Spec.Domain == "" {
+				delete(configMap.Annotations, AnnotationDomains)
+				delete(configMap.Annotations, AnnotationMainDomain)
+			} else {
+				configMap.Annotations[AnnotationDomains] = clientExtension.Spec.Domain
+				configMap.Annotations[AnnotationMainDomain] = clientExtension.Spec.Domain
+			}
+
+			configMap.Data = map[string]string{
+				clientExtension.Spec.ServiceID + ".client-extension-config.json": payload,
+			}
+
+			if configMap.Labels == nil {
+				configMap.Labels = map[string]string{}
+			}
+
+			configMap.Labels[LabelMetadataType] = MetadataTypeExtProvision
+			configMap.Labels[LabelOwnerName] = clientExtension.Name
+			configMap.Labels[LabelOwnerNamespace] = clientExtension.Namespace
+			configMap.Labels[LabelProjectName] = ProjectName(clientExtension)
+			configMap.Labels[LabelServiceID] = clientExtension.Spec.ServiceID
+			configMap.Labels[LabelVirtualInstance] = clientExtension.Spec.VirtualInstanceID
+
+			return nil
+		},
+	)
+
+	return nil, error
 }
 
 func notReadyCondition(
@@ -132,6 +265,55 @@ func refusalMessage(
 		dxpNamespace, clientExtension.Namespace,
 		cxv1alpha1.AnnotationAllowedClientExtensionNamespaces, clientExtension.Namespace,
 	)
+}
+
+func (clientExtensionReconciler *ClientExtensionReconciler) requestsForConfigMap(
+	context context.Context,
+	object client.Object,
+) []reconcile.Request {
+	labels := object.GetLabels()
+
+	metadataType := labels[LabelMetadataType]
+
+	if (metadataType != MetadataTypeDxp) && (metadataType != MetadataTypeExtProvision) {
+		return nil
+	}
+
+	var clientExtensionList cxv1alpha1.ClientExtensionList
+
+	if error := clientExtensionReconciler.List(context, &clientExtensionList); error != nil {
+		controllerruntime.LoggerFrom(context).Error(
+			error, "Unable to list client extensions", "configMap", client.ObjectKeyFromObject(object),
+		)
+
+		return nil
+	}
+
+	var requests []reconcile.Request
+
+	for index := range clientExtensionList.Items {
+		clientExtension := &clientExtensionList.Items[index]
+
+		if DxpNamespace(clientExtension) != object.GetNamespace() {
+			continue
+		}
+
+		if clientExtension.Spec.VirtualInstanceID != labels[LabelVirtualInstance] {
+			continue
+		}
+
+		if (metadataType == MetadataTypeExtProvision) &&
+			(clientExtension.Spec.ServiceID != labels[LabelServiceID]) {
+
+			continue
+		}
+
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(clientExtension),
+		})
+	}
+
+	return requests
 }
 
 func (clientExtensionReconciler *ClientExtensionReconciler) requestsForNamespace(
@@ -200,6 +382,22 @@ func (clientExtensionReconciler *ClientExtensionReconciler) resolveDxpNamespace(
 	return dxpNamespace, "", nil
 }
 
+func serviceIDConflictMessage(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) string {
+	owner := "is not managed by any ClientExtension"
+
+	if ownerName := configMap.Labels[LabelOwnerName]; ownerName != "" {
+		owner = fmt.Sprintf(
+			"already belongs to ClientExtension %q in namespace %q",
+			ownerName, configMap.Labels[LabelOwnerNamespace],
+		)
+	}
+
+	return fmt.Sprintf(
+		"Unable to deliver to ConfigMap %q in namespace %q: it %s. DXP identifies a client extension by its serviceId %q for a virtual instance, so it can be deployed only once.",
+		configMap.Name, configMap.Namespace, owner, clientExtension.Spec.ServiceID,
+	)
+}
+
 func summarize(
 	conditionTypes []string,
 	generation int64,
@@ -230,14 +428,60 @@ func summarize(
 	meta.SetStatusCondition(&status.Conditions, ready)
 }
 
+func (clientExtensionReconciler *ClientExtensionReconciler) unknownVirtualInstanceMessage(
+	clientExtension *cxv1alpha1.ClientExtension,
+	context context.Context,
+	dxpNamespace string,
+) (string, error) {
+	var configMapList corev1.ConfigMapList
+
+	if error := clientExtensionReconciler.List(
+		context, &configMapList,
+		client.InNamespace(dxpNamespace),
+		client.MatchingLabels{LabelMetadataType: MetadataTypeDxp},
+	); error != nil {
+		return "", error
+	}
+
+	var virtualInstanceIDs []string
+
+	for _, configMap := range configMapList.Items {
+		if virtualInstanceID := configMap.Labels[LabelVirtualInstance]; virtualInstanceID != "" {
+			virtualInstanceIDs = append(virtualInstanceIDs, fmt.Sprintf("%q", virtualInstanceID))
+		}
+	}
+
+	slices.Sort(virtualInstanceIDs)
+
+	published := fmt.Sprintf("There are currently no available DXP virtual instances in namespace %q.", dxpNamespace)
+
+	if len(virtualInstanceIDs) > 0 {
+		published = fmt.Sprintf(
+			"The available DXP virtual instances are %s; check spec.virtualInstanceId.",
+			strings.Join(virtualInstanceIDs, ", "),
+		)
+	}
+
+	message := fmt.Sprintf(
+		"Virtual instance %q is unknown to DXP: ConfigMap %q does not exist in namespace %q. %s The client extension is delivered as soon as the virtual instance appears.",
+		clientExtension.Spec.VirtualInstanceID,
+		DxpMetadataName(clientExtension.Spec.VirtualInstanceID), dxpNamespace, published,
+	)
+
+	return message, nil
+}
+
 func (clientExtensionReconciler *ClientExtensionReconciler) updateStatus(
 	clientExtension *cxv1alpha1.ClientExtension,
 	conditionStatus metav1.ConditionStatus,
 	context context.Context,
+	extProvisionConfigMapNames []string,
 	message string,
 	reason string,
 ) error {
 	status := clientExtension.Status.DeepCopy()
+
+	status.ExtProvisionConfigMapNames = extProvisionConfigMapNames
 
 	meta.SetStatusCondition(&status.Conditions, metav1.Condition{
 		Message:            message,

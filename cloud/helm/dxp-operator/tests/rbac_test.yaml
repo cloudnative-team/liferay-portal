@@ -43,6 +43,20 @@ tests:
             serviceAccount.name: operator-sa
     -   asserts:
             -   equal:
+                    path: rules[?(@.resources[0]=="configmaps")].verbs
+                    value:
+                        -   create
+                        -   get
+                        -   list
+                        -   patch
+                        -   update
+                        -   watch
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Grants the ConfigMap verbs delivering a client extension needs
+    -   asserts:
+            -   equal:
                     path: rules[?(@.resources[0]=="clientextensions")].verbs
                     value:
                         -   get
@@ -125,7 +139,7 @@ tests:
         it: Omits the service account annotations by default
     -   asserts:
             -   lengthEqual:
-                    count: 10
+                    count: 11
                     path: rules
             -   contains:
                     content:
