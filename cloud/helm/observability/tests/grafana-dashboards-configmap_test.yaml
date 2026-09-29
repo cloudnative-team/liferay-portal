@@ -83,26 +83,77 @@ tests:
                     pattern: '"subscriptions": \[\s+"00000000-0000-0000-0000-000000000000"\s+\]'
             -   matchRegex:
                     path: data["backups.json"]
-                    pattern: '"title": "Recovery Points \(Last 14 Days\)"'
+                    pattern: '"title": "Backups \(Last 14 Days\)"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '\[.Backup Triggered.\] = triggered'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"IN PROGRESS": \{\s+"index": 1,\s+"text": "🟡 IN PROGRESS"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: resourceGroups/liferay-test/providers/Microsoft.Storage/storageAccounts/\$\{__value.raw\}/overview
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"name": "backupInstance"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"name": "backupListEndTime"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"name": "backupVault"'
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: resourceGroups/liferay-test/providers/Microsoft.DataProtection/backupVaults/\$\{backupVault\}/overview
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: '"id": "links",\s+"value": \[\s+\]'
             -   matchRegex:
                     path: data["backups.json"]
                     pattern: 'where \$__timeFilter\(startTime\)[^"]*summarize \[.Failed Runs.\] = count\(\)'
-            -   matchRegex:
-                    path: data["backups.json"]
-                    pattern: subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/liferay-test/overview
             -   notMatchRegex:
                     path: data["backups.json"]
                     pattern: \$\{AZURE_
             -   notMatchRegex:
                     path: data["backups.json"]
                     pattern: kube_customresource_liferay_backup
+            -   notMatchRegex:
+                    path: data["backups.json"]
+                    pattern: resourceGroups/liferay-test/overview
         documentSelector:
             path: metadata.name
             value: RELEASE-NAME-observability-dashboard-backups
-        it: Lists the recovery points from Azure Resource Graph when the cloud provider is Azure
+        it: Lists the backups from Azure Resource Graph when the cloud provider is Azure
         set:
             azure.resourceGroupName: liferay-test
             azure.subscriptionId: 00000000-0000-0000-0000-000000000000
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: azb-tile-muted azb-tile-row\\" href=\\"#\\"
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: Set centralHub.argoWorkflowsURL in your values.yaml to enable this link.
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-backups
+        it: Mutes the Argo Workflows link in the Azure restore guide when centralHub.argoWorkflowsURL is not set
+        set:
+            cloudProvider: azure
+    -   asserts:
+            -   matchRegex:
+                    path: data["backups.json"]
+                    pattern: azb-tile azb-tile-row\\" href=\\"https://argo.example.com/workflow-templates/\$\{environment\}/backup-restore-workflow-template\\"
+            -   notMatchRegex:
+                    path: data["backups.json"]
+                    pattern: azb-tile-muted azb-tile-row
+        documentSelector:
+            path: metadata.name
+            value: RELEASE-NAME-observability-dashboard-backups
+        it: Opens the backup-restore workflow template from the Azure restore guide when centralHub.argoWorkflowsURL is set
+        set:
+            centralHub.argoWorkflowsURL: https://argo.example.com/
             cloudProvider: azure
     -   asserts:
             -   matchRegex:
