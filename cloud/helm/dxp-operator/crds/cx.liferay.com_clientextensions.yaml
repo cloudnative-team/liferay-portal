@@ -68,9 +68,11 @@ spec:
                     spec:
                         properties:
                             configs:
-                                items:
-                                    type: string
-                                type: array
+                                additionalProperties:
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+                                minProperties: 1
+                                type: object
                             domain:
                                 type: string
                             dxpNamespace:
@@ -101,6 +103,7 @@ spec:
                                 -   name
                                 type: object
                         required:
+                        -   configs
                         -   serviceId
                         -   virtualInstanceId
                         type: object
