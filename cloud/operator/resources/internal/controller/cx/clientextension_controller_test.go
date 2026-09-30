@@ -401,8 +401,8 @@ func TestReconcileRefusesUnknownVirtualInstance(t *testing.T) {
 		t.Fatalf("Reconcile() error = %v, want nil", error)
 	}
 
-	if result.RequeueAfter <= 0 {
-		t.Errorf("Reconcile() RequeueAfter = %v, want a retry", result.RequeueAfter)
+	if result != (controllerruntime.Result{}) {
+		t.Errorf("Reconcile() = %+v, want no requeue: the dxp metadata watch delivers once the virtual instance appears", result)
 	}
 
 	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
@@ -914,7 +914,7 @@ func getConfigMap(
 
 	var configMap corev1.ConfigMap
 
-	error := clientExtensionReconciler.Get(
+	error := clientExtensionReconciler.APIReader.Get(
 		context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &configMap,
 	)
 
@@ -1035,11 +1035,18 @@ func newReconciler(
 		&cxv1alpha1.ClientExtension{},
 	)
 
+	// The interceptor stands in for the cache, so the API reader sees the store
+	// without it.
+
+	apiReader := clientBuilder.Build()
+
+	var cachedClient client.Client = apiReader
+
 	if funcs != nil {
-		clientBuilder.WithInterceptorFuncs(*funcs)
+		cachedClient = interceptor.NewClient(apiReader, *funcs)
 	}
 
-	return &ClientExtensionReconciler{Client: clientBuilder.Build()}
+	return &ClientExtensionReconciler{APIReader: apiReader, Client: cachedClient}
 }
 
 func reconcileClientExtension(
@@ -1071,4 +1078,145 @@ func reconcileClientExtension(
 	}
 
 	return updatedClientExtension.Status.Phase, delivered.Reason
+}
+
+func TestReconcileDoesNotOverwriteExtProvisionConfigMapTakenOverSinceItWasRead(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	other := newExtProvision(
+		map[string]string{AnnotationOwnerName: "baker", AnnotationOwnerNamespace: "baker"},
+		map[string]string{LabelMetadataType: MetadataTypeExtProvision},
+	)
+
+	clientExtensionReconciler := newReconciler(
+		&interceptor.Funcs{
+			Get: func(
+				context context.Context, client client.WithWatch, key client.ObjectKey,
+				object client.Object, options ...client.GetOption,
+			) error {
+				if error := client.Get(context, key, object, options...); error != nil {
+					return error
+				}
+
+				// A stale read: the ConfigMap as it was before baker took it over.
+
+				if configMap, ok := object.(*corev1.ConfigMap); ok && (configMap.Name == other.Name) {
+					configMap.Annotations = map[string]string{
+						AnnotationOwnerName:      "able",
+						AnnotationOwnerNamespace: "able",
+					}
+					configMap.ResourceVersion = "1"
+				}
+
+				return nil
+			},
+		},
+		t, clientExtension, other,
+		newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	if _, error := clientExtensionReconciler.Reconcile(
+		context.Background(),
+		controllerruntime.Request{NamespacedName: client.ObjectKeyFromObject(clientExtension)},
+	); !apierrors.IsConflict(error) {
+		t.Fatalf("Reconcile() error = %v, want a conflict", error)
+	}
+
+	configMap := getConfigMap(clientExtensionReconciler, other.Name, "liferay-dev", t)
+
+	if (configMap.Annotations[AnnotationOwnerName] != "baker") || (configMap.Data["owner"] != "untouched") {
+		t.Errorf("Expected baker's ConfigMap to be untouched, got %v / %v", configMap.Annotations, configMap.Data)
+	}
+}
+
+func TestReconcileRefusesExtProvisionConfigMapTheCacheCannotSee(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	unlabelled := newExtProvision(nil, nil)
+
+	clientExtensionReconciler := newReconciler(
+		&interceptor.Funcs{
+			Get: func(
+				context context.Context, client client.WithWatch, key client.ObjectKey,
+				object client.Object, options ...client.GetOption,
+			) error {
+
+				// The cache holds only labelled ConfigMaps.
+
+				if _, ok := object.(*corev1.ConfigMap); ok && (key.Name == unlabelled.Name) {
+					return apierrors.NewNotFound(corev1.Resource("configmaps"), key.Name)
+				}
+
+				return client.Get(context, key, object, options...)
+			},
+		},
+		t, clientExtension, unlabelled,
+		newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonServiceIDConflict {
+		t.Fatalf("Delivered reason = %q, want %q", reason, ReasonServiceIDConflict)
+	}
+
+	delivered := getDelivered(clientExtension, clientExtensionReconciler, t)
+
+	if !strings.Contains(delivered.Message, "is not managed by any ClientExtension") {
+		t.Errorf("Expected the message to say no ClientExtension manages it, got %q", delivered.Message)
+	}
+
+	if configMap := getConfigMap(clientExtensionReconciler, unlabelled.Name, "liferay-dev", t); configMap.Data["owner"] != "untouched" {
+		t.Errorf("Expected the unlabelled ConfigMap to be untouched, got %v", configMap.Data)
+	}
+}
+
+func TestReconcileKeepsSupersededExtProvisionConfigMapChangedSinceItWasListed(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	clientExtension.Spec.ServiceID = "baker"
+
+	superseded := newExtProvision(
+		map[string]string{AnnotationOwnerName: "able", AnnotationOwnerNamespace: "able"},
+		map[string]string{
+			LabelMetadataType: MetadataTypeExtProvision,
+			LabelOwner:        ownerLabelValue(clientExtension),
+		},
+	)
+
+	clientExtensionReconciler := newReconciler(
+		&interceptor.Funcs{
+			List: func(
+				context context.Context, client client.WithWatch, list client.ObjectList,
+				options ...client.ListOption,
+			) error {
+				if error := client.List(context, list, options...); error != nil {
+					return error
+				}
+
+				// A stale list: the ConfigMap as it was before it last changed.
+
+				if configMapList, ok := list.(*corev1.ConfigMapList); ok {
+					for index := range configMapList.Items {
+						if configMapList.Items[index].Name == superseded.Name {
+							configMapList.Items[index].ResourceVersion = "1"
+						}
+					}
+				}
+
+				return nil
+			},
+		},
+		t, clientExtension, superseded,
+		newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	if _, error := clientExtensionReconciler.Reconcile(
+		context.Background(),
+		controllerruntime.Request{NamespacedName: client.ObjectKeyFromObject(clientExtension)},
+	); !apierrors.IsConflict(error) {
+		t.Fatalf("Reconcile() error = %v, want a conflict", error)
+	}
+
+	if getExtProvision(clientExtensionReconciler, "liferay-dev", t) == nil {
+		t.Error("Expected a ConfigMap that changed since it was listed not to be withdrawn")
+	}
 }

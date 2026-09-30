@@ -3,10 +3,10 @@ package cx
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,8 +34,6 @@ const (
 	ReasonStepsComplete          = "StepsComplete"
 	ReasonUnknownVirtualInstance = "UnknownVirtualInstance"
 )
-
-const unknownVirtualInstanceRequeueInterval = time.Minute
 
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;patch;update;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -99,11 +97,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 			return controllerruntime.Result{}, error
 		}
 
-		return controllerruntime.Result{RequeueAfter: unknownVirtualInstanceRequeueInterval},
-			clientExtensionReconciler.updateStatus(
-				&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
-				message, ReasonUnknownVirtualInstance,
-			)
+		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
+			&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
+			message, ReasonUnknownVirtualInstance,
+		)
 	}
 
 	if error != nil {
@@ -183,21 +180,17 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 		},
 	}
 
-	getError := clientExtensionReconciler.Get(
-		context, client.ObjectKeyFromObject(configMap), configMap,
-	)
-
-	if (getError == nil) && !ownsExtProvision(clientExtension, configMap) {
-		return configMap, nil
-	}
-
-	if (getError != nil) && !apierrors.IsNotFound(getError) {
-		return nil, getError
-	}
+	// Ownership is checked against the object CreateOrUpdate is about to write,
+	// and the update carries that object's resourceVersion, so a ConfigMap
+	// another ClientExtension took over since it was read is never overwritten.
 
 	_, error := controllerutil.CreateOrUpdate(
 		context, clientExtensionReconciler.Client, configMap,
 		func() error {
+			if (configMap.ResourceVersion != "") && !ownsExtProvision(clientExtension, configMap) {
+				return errExtProvisionOwnedElsewhere
+			}
+
 			if configMap.Annotations == nil {
 				configMap.Annotations = map[string]string{}
 			}
@@ -231,6 +224,28 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 			return nil
 		},
 	)
+
+	if errors.Is(error, errExtProvisionOwnedElsewhere) {
+		return configMap, nil
+	}
+
+	// The cache only holds ConfigMaps DXP or the operator labelled, so one it
+	// cannot see can still exist under this name. Read it directly to report
+	// whose it is rather than retrying the create forever.
+
+	if apierrors.IsAlreadyExists(error) {
+		var existing corev1.ConfigMap
+
+		if getError := clientExtensionReconciler.APIReader.Get(
+			context, client.ObjectKeyFromObject(configMap), &existing,
+		); getError != nil {
+			return nil, getError
+		}
+
+		if !ownsExtProvision(clientExtension, &existing) {
+			return &existing, nil
+		}
+	}
 
 	return nil, error
 }
@@ -585,7 +600,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededEx
 			continue
 		}
 
-		if error := clientExtensionReconciler.Delete(context, configMap); client.IgnoreNotFound(error) != nil {
+		if error := clientExtensionReconciler.Delete(
+			context, configMap,
+			client.Preconditions{ResourceVersion: &configMap.ResourceVersion, UID: &configMap.UID},
+		); client.IgnoreNotFound(error) != nil {
 			return error
 		}
 
@@ -604,7 +622,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededEx
 type ClientExtensionReconciler struct {
 	client.Client
 
-	Recorder record.EventRecorder
+	APIReader client.Reader
+	Recorder  record.EventRecorder
 }
+
+var errExtProvisionOwnedElsewhere = errors.New("ext-provision: owned by another client extension")
 
 var stepConditionTypes = []string{cxv1alpha1.ConditionDelivered}
