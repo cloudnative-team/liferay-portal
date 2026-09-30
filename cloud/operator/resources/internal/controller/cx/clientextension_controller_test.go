@@ -118,8 +118,6 @@ func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 
 	wantLabels := map[string]string{
 		LabelMetadataType:    MetadataTypeExtProvision,
-		LabelOwnerName:       "able",
-		LabelOwnerNamespace:  "able",
 		LabelProjectName:     "able-project",
 		LabelServiceID:       "able",
 		LabelVirtualInstance: "liferay.com",
@@ -130,8 +128,10 @@ func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 	}
 
 	wantAnnotations := map[string]string{
-		AnnotationDomains:    "able.example.com",
-		AnnotationMainDomain: "able.example.com",
+		AnnotationDomains:        "able.example.com",
+		AnnotationMainDomain:     "able.example.com",
+		AnnotationOwnerName:      "able",
+		AnnotationOwnerNamespace: "able",
 	}
 
 	if !maps.Equal(configMap.Annotations, wantAnnotations) {
@@ -243,14 +243,13 @@ func TestReconcileRecordsRefusalOnce(t *testing.T) {
 
 func TestReconcileRefusesExtProvisionConfigMapItDoesNotOwn(t *testing.T) {
 	testCases := map[string]struct {
-		labels      map[string]string
+		annotations map[string]string
 		wantMessage string
 	}{
 		"a ConfigMap another ClientExtension owns": {
-			labels: map[string]string{
-				LabelMetadataType:   MetadataTypeExtProvision,
-				LabelOwnerName:      "able",
-				LabelOwnerNamespace: "baker",
+			annotations: map[string]string{
+				AnnotationOwnerName:      "able",
+				AnnotationOwnerNamespace: "baker",
 			},
 			wantMessage: `already belongs to ClientExtension "able" in namespace "baker"`,
 		},
@@ -265,7 +264,9 @@ func TestReconcileRefusesExtProvisionConfigMapItDoesNotOwn(t *testing.T) {
 
 			clientExtension.Status.ExtProvisionConfigMapNames = []string{"able-liferay.com-lxc-ext-provision-metadata"}
 
-			owned := newExtProvision(testCase.labels)
+			owned := newExtProvision(
+				testCase.annotations, map[string]string{LabelMetadataType: MetadataTypeExtProvision},
+			)
 
 			clientExtensionReconciler := newReconciler(
 				nil, t, clientExtension, owned,
@@ -290,8 +291,14 @@ func TestReconcileRefusesExtProvisionConfigMapItDoesNotOwn(t *testing.T) {
 
 			configMap := getExtProvision(clientExtensionReconciler, "liferay-dev", t)
 
-			if (configMap.Data["owner"] != "untouched") || !maps.Equal(configMap.Labels, owned.Labels) {
-				t.Errorf("Expected the other owner's ConfigMap to be untouched, got %v / %v", configMap.Labels, configMap.Data)
+			if (configMap.Data["owner"] != "untouched") ||
+				!maps.Equal(configMap.Annotations, owned.Annotations) ||
+				!maps.Equal(configMap.Labels, owned.Labels) {
+
+				t.Errorf(
+					"Expected the other owner's ConfigMap to be untouched, got %v / %v / %v",
+					configMap.Annotations, configMap.Labels, configMap.Data,
+				)
 			}
 
 			if names := updatedClientExtension.Status.ExtProvisionConfigMapNames; len(names) != 0 {
@@ -495,16 +502,16 @@ func TestReconcileRetriesWhenTheDxpNamespaceIsUnreadable(t *testing.T) {
 func TestReconcileUpdatesItsOwnExtProvisionConfigMapInPlace(t *testing.T) {
 	clientExtension := newClientExtension("liferay-dev", "able", "able")
 
-	owned := newExtProvision(map[string]string{
-		LabelMetadataType:   MetadataTypeExtProvision,
-		LabelOwnerName:      "able",
-		LabelOwnerNamespace: "able",
-	})
+	owned := newExtProvision(
+		map[string]string{
+			AnnotationDomains:        "old.example.com",
+			AnnotationMainDomain:     "old.example.com",
+			AnnotationOwnerName:      "able",
+			AnnotationOwnerNamespace: "able",
+		},
+		map[string]string{LabelMetadataType: MetadataTypeExtProvision},
+	)
 
-	owned.Annotations = map[string]string{
-		AnnotationDomains:    "old.example.com",
-		AnnotationMainDomain: "old.example.com",
-	}
 	owned.UID = "able-uid"
 
 	clientExtensionReconciler := newReconciler(
@@ -546,7 +553,7 @@ func TestRequestsForConfigMapRequeuesClientExtensionsThatDependOnIt(t *testing.T
 		otherInstance,
 	)
 
-	extProvision := newExtProvision(map[string]string{
+	extProvision := newExtProvision(nil, map[string]string{
 		LabelMetadataType:    MetadataTypeExtProvision,
 		LabelServiceID:       "elsewhere",
 		LabelVirtualInstance: "liferay.com",
@@ -798,13 +805,14 @@ func newDxpNamespace(permittedNamespaces string) *corev1.Namespace {
 	}
 }
 
-func newExtProvision(labels map[string]string) *corev1.ConfigMap {
+func newExtProvision(annotations map[string]string, labels map[string]string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		Data: map[string]string{"owner": "untouched"},
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Name:      "able-liferay.com-lxc-ext-provision-metadata",
-			Namespace: "liferay-dev",
+			Annotations: annotations,
+			Labels:      labels,
+			Name:        "able-liferay.com-lxc-ext-provision-metadata",
+			Namespace:   "liferay-dev",
 		},
 	}
 }

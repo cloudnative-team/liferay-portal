@@ -2,7 +2,6 @@ package cx
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
@@ -35,29 +34,11 @@ func TestDxpNamespaceDefaultsToClientExtensionNamespace(t *testing.T) {
 	}
 }
 
-func TestExtProvisionNameIsAValidConfigMapName(t *testing.T) {
-	testCases := map[string]struct {
-		serviceID string
-		want      string
-	}{
-		"a long serviceId is cut without a trailing dash or dot": {
-			serviceID: strings.Repeat("a", 251) + ".",
-			want:      strings.Repeat("a", 251),
-		},
-		"a short serviceId is kept whole": {
-			serviceID: "able",
-			want:      "able-liferay.com-lxc-ext-provision-metadata",
-		},
-	}
+func TestExtProvisionNameJoinsServiceIDAndVirtualInstance(t *testing.T) {
+	clientExtension := newClientExtension("", "able", "able")
 
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			clientExtension := newClientExtension("", testCase.serviceID, "able")
-
-			if got := ExtProvisionName(clientExtension); got != testCase.want {
-				t.Errorf("ExtProvisionName() = %q, want %q", got, testCase.want)
-			}
-		})
+	if got, want := ExtProvisionName(clientExtension), "able-liferay.com-lxc-ext-provision-metadata"; got != want {
+		t.Errorf("ExtProvisionName() = %q, want %q", got, want)
 	}
 }
 

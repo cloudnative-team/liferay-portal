@@ -196,6 +196,12 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 				configMap.Annotations[AnnotationMainDomain] = clientExtension.Spec.Domain
 			}
 
+			// The owner is an annotation, not a label, because a ClientExtension
+			// name can be longer than a label value allows.
+
+			configMap.Annotations[AnnotationOwnerName] = clientExtension.Name
+			configMap.Annotations[AnnotationOwnerNamespace] = clientExtension.Namespace
+
 			configMap.Data = map[string]string{
 				clientExtension.Spec.ServiceID + ".client-extension-config.json": payload,
 			}
@@ -205,8 +211,6 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 			}
 
 			configMap.Labels[LabelMetadataType] = MetadataTypeExtProvision
-			configMap.Labels[LabelOwnerName] = clientExtension.Name
-			configMap.Labels[LabelOwnerNamespace] = clientExtension.Namespace
 			configMap.Labels[LabelProjectName] = ProjectName(clientExtension)
 			configMap.Labels[LabelServiceID] = clientExtension.Spec.ServiceID
 			configMap.Labels[LabelVirtualInstance] = clientExtension.Spec.VirtualInstanceID
@@ -382,10 +386,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) resolveDxpNamespace(
 func serviceIDConflictMessage(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) string {
 	owner := "is not managed by any ClientExtension"
 
-	if ownerName := configMap.Labels[LabelOwnerName]; ownerName != "" {
+	if ownerName := configMap.Annotations[AnnotationOwnerName]; ownerName != "" {
 		owner = fmt.Sprintf(
 			"already belongs to ClientExtension %q in namespace %q",
-			ownerName, configMap.Labels[LabelOwnerNamespace],
+			ownerName, configMap.Annotations[AnnotationOwnerNamespace],
 		)
 	}
 

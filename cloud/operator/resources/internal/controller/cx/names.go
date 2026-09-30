@@ -9,14 +9,14 @@ import (
 )
 
 const (
-	AnnotationDomains    = "ext.lxc.liferay.com/domains"
-	AnnotationMainDomain = "ext.lxc.liferay.com/mainDomain"
+	AnnotationDomains        = "ext.lxc.liferay.com/domains"
+	AnnotationMainDomain     = "ext.lxc.liferay.com/mainDomain"
+	AnnotationOwnerName      = "cx.liferay.com/owner-name"
+	AnnotationOwnerNamespace = "cx.liferay.com/owner-namespace"
 )
 
 const (
 	LabelMetadataType    = "lxc.liferay.com/metadataType"
-	LabelOwnerName       = "cx.liferay.com/owner-name"
-	LabelOwnerNamespace  = "cx.liferay.com/owner-namespace"
 	LabelProjectName     = "ext.lxc.liferay.com/projectName"
 	LabelServiceID       = "ext.lxc.liferay.com/serviceId"
 	LabelVirtualInstance = "dxp.lxc.liferay.com/virtualInstanceId"
@@ -40,12 +40,9 @@ func DxpNamespace(clientExtension *cxv1alpha1.ClientExtension) string {
 }
 
 func ExtProvisionName(clientExtension *cxv1alpha1.ClientExtension) string {
-	return truncate(
-		253,
-		fmt.Sprintf(
-			"%s-%s-lxc-ext-provision-metadata",
-			clientExtension.Spec.ServiceID, clientExtension.Spec.VirtualInstanceID,
-		),
+	return fmt.Sprintf(
+		"%s-%s-lxc-ext-provision-metadata",
+		clientExtension.Spec.ServiceID, clientExtension.Spec.VirtualInstanceID,
 	)
 }
 
@@ -72,14 +69,6 @@ func ProjectName(clientExtension *cxv1alpha1.ClientExtension) string {
 }
 
 func ownsExtProvision(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
-	return (configMap.Labels[LabelOwnerName] == clientExtension.Name) &&
-		(configMap.Labels[LabelOwnerNamespace] == clientExtension.Namespace)
-}
-
-func truncate(limit int, value string) string {
-	if len(value) <= limit {
-		return value
-	}
-
-	return strings.TrimRight(value[:limit], "-.")
+	return (configMap.Annotations[AnnotationOwnerName] == clientExtension.Name) &&
+		(configMap.Annotations[AnnotationOwnerNamespace] == clientExtension.Namespace)
 }
