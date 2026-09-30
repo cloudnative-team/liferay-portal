@@ -1,0 +1,22 @@
+{{- if .Values.rbac.create -}}
+# Writing a client extension's configuration into DXP's namespace is granted by
+# DXP, not by the operator: nothing binds this role cluster wide, and the chart
+# that installs DXP binds it in DXP's namespace when it accepts client
+# extensions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+    labels:
+        {{- include "dxp-operator.labels" . | nindent 8 }}
+    name: client-extension-delivery-cluster-role
+rules:
+    -   apiGroups:
+            -   ""
+        resources:
+            -   configmaps
+        verbs:
+            -   create
+            -   delete
+            -   patch
+            -   update
+{{- end -}}

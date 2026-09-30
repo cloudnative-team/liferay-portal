@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +28,7 @@ import (
 
 const (
 	ReasonDelivered              = "Delivered"
+	ReasonDeliveryNotPermitted   = "DeliveryNotPermitted"
 	ReasonDxpNamespaceNotFound   = "DxpNamespaceNotFound"
 	ReasonNamespaceNotPermitted  = "NamespaceNotPermitted"
 	ReasonServiceIDConflict      = "ServiceIDConflict"
@@ -34,6 +36,12 @@ const (
 	ReasonStepsComplete          = "StepsComplete"
 	ReasonUnknownVirtualInstance = "UnknownVirtualInstance"
 )
+
+const deliveryClusterRoleName = "client-extension-delivery-cluster-role"
+
+// Permission to write into DXP's namespace is a RoleBinding there, which the
+// operator does not watch, so a refused delivery is retried on a timer.
+const deliveryNotPermittedRequeueInterval = time.Minute
 
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;patch;update;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -117,6 +125,18 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		&clientExtension, context, dxpNamespace, string(payload),
 	)
 
+	if apierrors.IsForbidden(error) {
+		return controllerruntime.Result{RequeueAfter: deliveryNotPermittedRequeueInterval},
+			clientExtensionReconciler.updateStatus(
+				&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
+				fmt.Sprintf(
+					"The DXP operator is not permitted to write ConfigMaps in namespace %q. DXP grants that by binding ClusterRole %q to the operator in its own namespace, which the liferay-default chart does when clientExtensions.delivery.enabled is true.",
+					dxpNamespace, deliveryClusterRoleName,
+				),
+				ReasonDeliveryNotPermitted,
+			)
+	}
+
 	if error != nil {
 		return controllerruntime.Result{}, error
 	}
@@ -131,14 +151,22 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	extProvisionName := ExtProvisionName(&clientExtension)
 
-	if error := clientExtensionReconciler.withdrawSupersededExtProvisions(
+	unwithdrawnExtProvisions, error := clientExtensionReconciler.withdrawSupersededExtProvisions(
 		&clientExtension, context, dxpNamespace, extProvisionName, ownedExtProvisions,
-	); error != nil {
+	)
+
+	if error != nil {
 		return controllerruntime.Result{}, error
 	}
 
 	return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-		&clientExtension, metav1.ConditionTrue, context, []string{dxpNamespace + "/" + extProvisionName},
+		&clientExtension, metav1.ConditionTrue, context,
+		configMapReferences(
+			append(
+				unwithdrawnExtProvisions,
+				corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: extProvisionName, Namespace: dxpNamespace}},
+			),
+		),
 		fmt.Sprintf(
 			"Delivered to ConfigMap %q in namespace %q.", extProvisionName, dxpNamespace,
 		),
@@ -592,7 +620,9 @@ func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededEx
 	dxpNamespace string,
 	extProvisionName string,
 	ownedExtProvisions []corev1.ConfigMap,
-) error {
+) ([]corev1.ConfigMap, error) {
+	var unwithdrawnExtProvisions []corev1.ConfigMap
+
 	for index := range ownedExtProvisions {
 		configMap := &ownedExtProvisions[index]
 
@@ -600,11 +630,31 @@ func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededEx
 			continue
 		}
 
-		if error := clientExtensionReconciler.Delete(
+		error := clientExtensionReconciler.Delete(
 			context, configMap,
 			client.Preconditions{ResourceVersion: &configMap.ResourceVersion, UID: &configMap.UID},
-		); client.IgnoreNotFound(error) != nil {
-			return error
+		)
+
+		// A DXP namespace that no longer grants delivery keeps what was
+		// delivered there. It stays in status, so the deletion work still
+		// finds it, rather than blocking the delivery that replaced it.
+
+		if apierrors.IsForbidden(error) {
+			unwithdrawnExtProvisions = append(unwithdrawnExtProvisions, *configMap)
+
+			if clientExtensionReconciler.Recorder != nil {
+				clientExtensionReconciler.Recorder.Eventf(
+					clientExtension, corev1.EventTypeWarning, "WithdrawalNotPermitted",
+					"Unable to withdraw ConfigMap %q from namespace %q, which this client extension delivered before its serviceId, virtual instance or DXP namespace changed, because the DXP operator is no longer permitted to write there.",
+					configMap.Name, configMap.Namespace,
+				)
+			}
+
+			continue
+		}
+
+		if client.IgnoreNotFound(error) != nil {
+			return nil, error
 		}
 
 		if clientExtensionReconciler.Recorder != nil {
@@ -616,7 +666,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededEx
 		}
 	}
 
-	return nil
+	return unwithdrawnExtProvisions, nil
 }
 
 type ClientExtensionReconciler struct {

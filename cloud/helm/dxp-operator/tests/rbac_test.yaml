@@ -45,17 +45,13 @@ tests:
             -   equal:
                     path: rules[?(@.resources[0]=="configmaps")].verbs
                     value:
-                        -   create
-                        -   delete
                         -   get
                         -   list
-                        -   patch
-                        -   update
                         -   watch
         documentSelector:
             path: kind
             value: ClusterRole
-        it: Grants the ConfigMap verbs delivering a client extension needs
+        it: Grants only reading ConfigMaps cluster wide
     -   asserts:
             -   equal:
                     path: rules[?(@.resources[0]=="clientextensions")].verbs
