@@ -82,6 +82,8 @@ type ClientExtensionSpec struct {
 	// +kubebuilder:validation:Required
 	Configs map[string]Configuration `json:"configs"`
 
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*(:[0-9]{1,5})?$`
 	// +optional
 	Domain string `json:"domain,omitempty"`
 

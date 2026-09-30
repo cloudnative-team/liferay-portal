@@ -40,6 +40,40 @@ func TestCRDAcceptsConfigurationOnlyClientExtension(t *testing.T) {
 	}
 }
 
+func TestCRDAcceptsDomainsThatAreAHostAndPort(t *testing.T) {
+	testClient := startEnvironment(t)
+
+	testCases := map[string]struct {
+		domain       string
+		resourceName string
+	}{
+		"a host": {
+			domain:       "liferay-sample-etc-spring-boot.example.com",
+			resourceName: "host",
+		},
+		"a host and port": {
+			domain:       "localhost:8080",
+			resourceName: "host-and-port",
+		},
+		"an address and port": {
+			domain:       "10.0.0.1:8443",
+			resourceName: "address-and-port",
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientExtension := validClientExtension(testCase.resourceName)
+
+			clientExtension.Spec.Domain = testCase.domain
+
+			if error := testClient.Create(context.Background(), clientExtension); error != nil {
+				t.Errorf("Expected domain %q to be accepted, got %v", testCase.domain, error)
+			}
+		})
+	}
+}
+
 func TestCRDAcceptsDxpNamespace(t *testing.T) {
 	testClient := startEnvironment(t)
 
@@ -125,6 +159,21 @@ func TestCRDRejectsInvalidClientExtensions(t *testing.T) {
 		"a configuration that is not an object": {
 			mutate: func(object map[string]any) {
 				spec(object)["configs"] = map[string]any{"CETConfiguration~sample": 5}
+			},
+		},
+		"a domain that is a URL": {
+			mutate: func(object map[string]any) {
+				spec(object)["domain"] = "https://liferay-sample.example.com"
+			},
+		},
+		"a domain with a path": {
+			mutate: func(object map[string]any) {
+				spec(object)["domain"] = "liferay-sample.example.com/o/sample"
+			},
+		},
+		"a domain with uppercase letters": {
+			mutate: func(object map[string]any) {
+				spec(object)["domain"] = "Liferay-Sample.example.com"
 			},
 		},
 		"a dxpNamespace longer than a namespace name": {
