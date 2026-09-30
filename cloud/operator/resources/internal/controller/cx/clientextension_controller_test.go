@@ -2,14 +2,17 @@ package cx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,10 +138,18 @@ func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 		t.Errorf("annotations = %v, want %v", configMap.Annotations, wantAnnotations)
 	}
 
-	payload, ok := configMap.Data["able.client-extension-config.json"]
+	var payload map[string]map[string]any
 
-	if !ok || !strings.Contains(payload, `CETConfiguration~able"`) {
-		t.Errorf("Expected the payload under able.client-extension-config.json, got %v", configMap.Data)
+	if error := json.Unmarshal([]byte(configMap.Data["able.client-extension-config.json"]), &payload); error != nil {
+		t.Fatalf("Expected a JSON payload under able.client-extension-config.json, got %v: %v", configMap.Data, error)
+	}
+
+	wantPayload := map[string]map[string]any{
+		"com.liferay.client.extension.type.configuration.CETConfiguration~able": {"name": "Sample"},
+	}
+
+	if !reflect.DeepEqual(payload, wantPayload) {
+		t.Errorf("payload = %v, want %v", payload, wantPayload)
 	}
 
 	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
@@ -339,24 +350,6 @@ func TestReconcileRefusesUnknownVirtualInstance(t *testing.T) {
 
 	if getExtProvision(clientExtensionReconciler, "able", t) != nil {
 		t.Error("Expected nothing to be written for an unknown virtual instance")
-	}
-}
-
-func TestReconcileRefusesInvalidConfigs(t *testing.T) {
-	clientExtension := newClientExtension("", "able", "able")
-
-	clientExtension.Spec.Configs = []string{"not json"}
-
-	clientExtensionReconciler := newReconciler(nil, t, clientExtension, newDxpMetadata("able", "liferay.com"))
-
-	phase, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
-
-	if (phase != cxv1alpha1.PhaseDegraded) || (reason != ReasonInvalidConfigs) {
-		t.Errorf("Reconcile() = %s / %s, want %s / %s", phase, reason, cxv1alpha1.PhaseDegraded, ReasonInvalidConfigs)
-	}
-
-	if getExtProvision(clientExtensionReconciler, "able", t) != nil {
-		t.Error("Expected nothing to be written for configs that cannot be delivered")
 	}
 }
 
@@ -769,7 +762,11 @@ func newClientExtension(dxpNamespace string, name string, namespace string) *cxv
 	return &cxv1alpha1.ClientExtension{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: cxv1alpha1.ClientExtensionSpec{
-			Configs:           []string{`{"com.liferay.client.extension.type.configuration.CETConfiguration~` + name + `": {"name": "Sample"}}`},
+			Configs: map[string]cxv1alpha1.Configuration{
+				"com.liferay.client.extension.type.configuration.CETConfiguration~" + name: {
+					JSON: apiextensionsv1.JSON{Raw: []byte(`{"name": "Sample"}`)},
+				},
+			},
 			DxpNamespace:      dxpNamespace,
 			ServiceID:         name,
 			VirtualInstanceID: "liferay.com",

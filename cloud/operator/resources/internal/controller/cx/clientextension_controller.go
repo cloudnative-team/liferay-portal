@@ -2,6 +2,7 @@ package cx
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -27,7 +28,6 @@ import (
 const (
 	ReasonDelivered              = "Delivered"
 	ReasonDxpNamespaceNotFound   = "DxpNamespaceNotFound"
-	ReasonInvalidConfigs         = "InvalidConfigs"
 	ReasonNamespaceNotPermitted  = "NamespaceNotPermitted"
 	ReasonServiceIDConflict      = "ServiceIDConflict"
 	ReasonStepNotEvaluated       = "StepNotEvaluated"
@@ -102,17 +102,14 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
-	payload, error := BuildPayload(clientExtension.Spec.Configs)
+	payload, error := json.MarshalIndent(clientExtension.Spec.Configs, "", "\t")
 
 	if error != nil {
-		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-			&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
-			fmt.Sprintf("Unable to build the configuration payload: %s.", error), ReasonInvalidConfigs,
-		)
+		return controllerruntime.Result{}, error
 	}
 
 	conflictingConfigMap, error := clientExtensionReconciler.applyExtProvision(
-		&clientExtension, context, dxpNamespace, payload,
+		&clientExtension, context, dxpNamespace, string(payload),
 	)
 
 	if error != nil {

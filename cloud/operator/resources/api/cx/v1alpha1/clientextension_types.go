@@ -5,6 +5,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -77,8 +78,9 @@ type ClientExtensionList struct {
 }
 
 type ClientExtensionSpec struct {
-	// +optional
-	Configs []string `json:"configs,omitempty"`
+	// +kubebuilder:validation:MinProperties=1
+	// +kubebuilder:validation:Required
+	Configs map[string]Configuration `json:"configs"`
 
 	// +optional
 	Domain string `json:"domain,omitempty"`
@@ -133,6 +135,12 @@ type ClientExtensionStatus struct {
 
 	// +optional
 	WorkloadName string `json:"workloadName,omitempty"`
+}
+
+// +kubebuilder:pruning:PreserveUnknownFields
+// +kubebuilder:validation:Type=object
+type Configuration struct {
+	apiextensionsv1.JSON `json:",inline"`
 }
 
 type ConfigurationError struct {

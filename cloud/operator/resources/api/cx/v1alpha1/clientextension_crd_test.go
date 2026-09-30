@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -121,6 +122,11 @@ func TestCRDRejectsInvalidClientExtensions(t *testing.T) {
 	testCases := map[string]struct {
 		mutate func(object map[string]any)
 	}{
+		"a configuration that is not an object": {
+			mutate: func(object map[string]any) {
+				spec(object)["configs"] = map[string]any{"CETConfiguration~sample": 5}
+			},
+		},
 		"a dxpNamespace longer than a namespace name": {
 			mutate: func(object map[string]any) {
 				spec(object)["dxpNamespace"] = strings.Repeat("a", 64)
@@ -136,6 +142,11 @@ func TestCRDRejectsInvalidClientExtensions(t *testing.T) {
 				delete(spec(object)["workloadRef"].(map[string]any), "name")
 			},
 		},
+		"an empty configs": {
+			mutate: func(object map[string]any) {
+				spec(object)["configs"] = map[string]any{}
+			},
+		},
 		"an empty serviceId": {
 			mutate: func(object map[string]any) {
 				spec(object)["serviceId"] = ""
@@ -149,6 +160,11 @@ func TestCRDRejectsInvalidClientExtensions(t *testing.T) {
 		"an unsupported workload kind": {
 			mutate: func(object map[string]any) {
 				spec(object)["workloadRef"].(map[string]any)["kind"] = "StatefulSet"
+			},
+		},
+		"no configs": {
+			mutate: func(object map[string]any) {
+				delete(spec(object), "configs")
 			},
 		},
 		"no serviceId": {
@@ -175,6 +191,52 @@ func TestCRDRejectsInvalidClientExtensions(t *testing.T) {
 				t.Errorf("Expected the API server to reject %s, got %v", name, error)
 			}
 		})
+	}
+}
+
+func TestCRDStoresConfigurationsAsWritten(t *testing.T) {
+	testClient := startEnvironment(t)
+
+	clientExtension := validClientExtension("configurations")
+
+	configuration := `{"buildTimestamp": 1790196579355, "name": "Sample \u00e9", "scopes": ["a", "b"], "typeSettings": {"nested": true}}`
+
+	clientExtension.Spec.Configs = map[string]Configuration{
+		"com.liferay.client.extension.type.configuration.CETConfiguration~sample": {
+			JSON: apiextensionsv1.JSON{Raw: []byte(configuration)},
+		},
+	}
+
+	if error := testClient.Create(context.Background(), clientExtension); error != nil {
+		t.Fatalf("Unable to create the ClientExtension: %v", error)
+	}
+
+	var storedClientExtension ClientExtension
+
+	if error := testClient.Get(
+		context.Background(), client.ObjectKeyFromObject(clientExtension), &storedClientExtension,
+	); error != nil {
+		t.Fatalf("Unable to get the ClientExtension: %v", error)
+	}
+
+	stored := storedClientExtension.Spec.Configs["com.liferay.client.extension.type.configuration.CETConfiguration~sample"]
+
+	var got, want any
+
+	if error := json.Unmarshal(stored.Raw, &got); error != nil {
+		t.Fatalf("Unable to decode the stored configuration %s: %v", stored.Raw, error)
+	}
+
+	if error := json.Unmarshal([]byte(configuration), &want); error != nil {
+		t.Fatal(error)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("stored configuration = %s, want %s", stored.Raw, configuration)
+	}
+
+	if !strings.Contains(string(stored.Raw), "1790196579355") {
+		t.Errorf("Expected buildTimestamp to be stored exactly, got %s", stored.Raw)
 	}
 }
 
@@ -287,7 +349,11 @@ func validClientExtension(name string) *ClientExtension {
 			Namespace: namespace,
 		},
 		Spec: ClientExtensionSpec{
-			Configs:           []string{`{"com.liferay.client.extension.type.configuration.CETConfiguration~sample": {}}`},
+			Configs: map[string]Configuration{
+				"com.liferay.client.extension.type.configuration.CETConfiguration~sample": {
+					JSON: apiextensionsv1.JSON{Raw: []byte(`{}`)},
+				},
+			},
 			ServiceID:         "liferay-sample-cx",
 			VirtualInstanceID: "liferay.com",
 			WorkloadRef: &WorkloadRef{
