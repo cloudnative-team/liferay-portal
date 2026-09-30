@@ -1,6 +1,8 @@
 package cx
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -16,6 +18,7 @@ const (
 
 const (
 	LabelMetadataType    = "lxc.liferay.com/metadataType"
+	LabelOwner           = "cx.liferay.com/owner"
 	LabelProjectName     = "ext.lxc.liferay.com/projectName"
 	LabelServiceID       = "ext.lxc.liferay.com/serviceId"
 	LabelVirtualInstance = "dxp.lxc.liferay.com/virtualInstanceId"
@@ -65,6 +68,15 @@ func ProjectName(clientExtension *cxv1alpha1.ClientExtension) string {
 	}
 
 	return clientExtension.Spec.ServiceID
+}
+
+// The owner's namespace and name can be longer than a label value allows, so
+// the label carries a hash of them, which lets the operator select every
+// ConfigMap a ClientExtension owns. The annotations still decide ownership.
+func ownerLabelValue(clientExtension *cxv1alpha1.ClientExtension) string {
+	sum := sha256.Sum256([]byte(clientExtension.Namespace + "/" + clientExtension.Name))
+
+	return hex.EncodeToString(sum[:16])
 }
 
 func ownsExtProvision(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {

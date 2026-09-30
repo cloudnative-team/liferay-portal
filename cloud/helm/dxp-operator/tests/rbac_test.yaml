@@ -46,6 +46,7 @@ tests:
                     path: rules[?(@.resources[0]=="configmaps")].verbs
                     value:
                         -   create
+                        -   delete
                         -   get
                         -   list
                         -   patch

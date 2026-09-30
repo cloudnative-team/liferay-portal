@@ -72,30 +72,6 @@ func TestReconcileChecksConsentBeforeVirtualInstance(t *testing.T) {
 	}
 }
 
-func TestReconcileDeliversOnceVirtualInstanceAppears(t *testing.T) {
-	clientExtension := newClientExtension("", "able", "able")
-
-	clientExtensionReconciler := newReconciler(nil, t, clientExtension)
-
-	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonUnknownVirtualInstance {
-		t.Fatalf("Delivered reason = %q, want %q", reason, ReasonUnknownVirtualInstance)
-	}
-
-	if error := clientExtensionReconciler.Create(
-		context.Background(), newDxpMetadata("able", "liferay.com"),
-	); error != nil {
-		t.Fatal(error)
-	}
-
-	if phase, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonDelivered {
-		t.Errorf("Reconcile() = %s / %s, want %s / %s", phase, reason, cxv1alpha1.PhaseReady, ReasonDelivered)
-	}
-
-	if getExtProvision(clientExtensionReconciler, "able", t) == nil {
-		t.Error("Expected the ext-provision ConfigMap once the virtual instance appears")
-	}
-}
-
 func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 	clientExtension := newClientExtension("liferay-dev", "able", "able")
 
@@ -118,6 +94,7 @@ func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 
 	wantLabels := map[string]string{
 		LabelMetadataType:    MetadataTypeExtProvision,
+		LabelOwner:           ownerLabelValue(clientExtension),
 		LabelProjectName:     "able-project",
 		LabelServiceID:       "able",
 		LabelVirtualInstance: "liferay.com",
@@ -153,8 +130,32 @@ func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 
 	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
 
-	if names := updatedClientExtension.Status.ExtProvisionConfigMapNames; (len(names) != 1) || (names[0] != configMap.Name) {
-		t.Errorf("extProvisionConfigMapNames = %v, want [%s]", names, configMap.Name)
+	if want := []string{"liferay-dev/" + configMap.Name}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+		t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
+	}
+}
+
+func TestReconcileDeliversOnceVirtualInstanceAppears(t *testing.T) {
+	clientExtension := newClientExtension("", "able", "able")
+
+	clientExtensionReconciler := newReconciler(nil, t, clientExtension)
+
+	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonUnknownVirtualInstance {
+		t.Fatalf("Delivered reason = %q, want %q", reason, ReasonUnknownVirtualInstance)
+	}
+
+	if error := clientExtensionReconciler.Create(
+		context.Background(), newDxpMetadata("able", "liferay.com"),
+	); error != nil {
+		t.Fatal(error)
+	}
+
+	if phase, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonDelivered {
+		t.Errorf("Reconcile() = %s / %s, want %s / %s", phase, reason, cxv1alpha1.PhaseReady, ReasonDelivered)
+	}
+
+	if getExtProvision(clientExtensionReconciler, "able", t) == nil {
+		t.Error("Expected the ext-provision ConfigMap once the virtual instance appears")
 	}
 }
 
@@ -199,8 +200,81 @@ func TestReconcileKeepsDeliveredConfigMapWhenTheVirtualInstanceDisappears(t *tes
 
 	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
 
-	if !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, []string{before.Name}) {
-		t.Errorf("extProvisionConfigMapNames = %v, want [%s]", updatedClientExtension.Status.ExtProvisionConfigMapNames, before.Name)
+	if want := []string{"able/" + before.Name}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+		t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
+	}
+}
+
+func TestReconcileKeepsTheOldExtProvisionConfigMapWhenTheNewOneConflicts(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	other := newExtProvision(
+		map[string]string{AnnotationOwnerName: "baker", AnnotationOwnerNamespace: "baker"},
+		map[string]string{LabelMetadataType: MetadataTypeExtProvision},
+	)
+
+	other.Name = "baker-liferay.com-lxc-ext-provision-metadata"
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, clientExtension, other,
+		newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	updatedClientExtension.Spec.ServiceID = "baker"
+
+	if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
+		t.Fatal(error)
+	}
+
+	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonServiceIDConflict {
+		t.Fatalf("Delivered reason = %q, want %q", reason, ReasonServiceIDConflict)
+	}
+
+	if getExtProvision(clientExtensionReconciler, "liferay-dev", t) == nil {
+		t.Error("Expected the ConfigMap already delivered to stay while the new one is refused")
+	}
+
+	updatedClientExtension = getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	if want := []string{"liferay-dev/able-liferay.com-lxc-ext-provision-metadata"}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+		t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
+	}
+}
+
+func TestReconcileLeavesConfigMapsCarryingItsOwnerHashButNotItsOwnerAlone(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	collision := newExtProvision(
+		map[string]string{AnnotationOwnerName: "baker", AnnotationOwnerNamespace: "baker"},
+		map[string]string{
+			LabelMetadataType: MetadataTypeExtProvision,
+			LabelOwner:        ownerLabelValue(clientExtension),
+		},
+	)
+
+	collision.Name = "baker-liferay.com-lxc-ext-provision-metadata"
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, clientExtension, collision,
+		newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonDelivered {
+		t.Fatalf("Delivered reason = %q, want %q", reason, ReasonDelivered)
+	}
+
+	if getConfigMap(clientExtensionReconciler, collision.Name, "liferay-dev", t) == nil {
+		t.Error("Expected a ConfigMap owned by another ClientExtension to survive")
+	}
+
+	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	if want := []string{"liferay-dev/able-liferay.com-lxc-ext-provision-metadata"}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+		t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
 	}
 }
 
@@ -356,6 +430,32 @@ func TestReconcileRefusesUnknownVirtualInstance(t *testing.T) {
 
 	if getExtProvision(clientExtensionReconciler, "able", t) != nil {
 		t.Error("Expected nothing to be written for an unknown virtual instance")
+	}
+}
+
+// Status is empty again after a restore or a recreate, while the ConfigMaps it
+// delivered are still live, so it is rebuilt from them.
+func TestReconcileReportsOwnedExtProvisionConfigMapsWhenStatusIsLost(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	owned := newExtProvision(
+		map[string]string{AnnotationOwnerName: "able", AnnotationOwnerNamespace: "able"},
+		map[string]string{
+			LabelMetadataType: MetadataTypeExtProvision,
+			LabelOwner:        ownerLabelValue(clientExtension),
+		},
+	)
+
+	clientExtensionReconciler := newReconciler(nil, t, clientExtension, newDxpNamespace("able"), owned)
+
+	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonUnknownVirtualInstance {
+		t.Fatalf("Delivered reason = %q, want %q", reason, ReasonUnknownVirtualInstance)
+	}
+
+	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	if want := []string{"liferay-dev/able-liferay.com-lxc-ext-provision-metadata"}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+		t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
 	}
 }
 
@@ -535,6 +635,92 @@ func TestReconcileUpdatesItsOwnExtProvisionConfigMapInPlace(t *testing.T) {
 
 	if _, ok := configMap.Annotations[AnnotationMainDomain]; ok {
 		t.Errorf("Expected the domain annotations to be removed with the domain, got %v", configMap.Annotations)
+	}
+}
+
+func TestReconcileWithdrawsTheExtProvisionConfigMapItSupersedes(t *testing.T) {
+	testCases := map[string]struct {
+		change        func(clientExtension *cxv1alpha1.ClientExtension)
+		wantName      string
+		wantNamespace string
+	}{
+		"a changed dxpNamespace": {
+			change: func(clientExtension *cxv1alpha1.ClientExtension) {
+				clientExtension.Spec.DxpNamespace = "liferay-uat"
+			},
+			wantName:      "able-liferay.com-lxc-ext-provision-metadata",
+			wantNamespace: "liferay-uat",
+		},
+		"a changed serviceId": {
+			change: func(clientExtension *cxv1alpha1.ClientExtension) {
+				clientExtension.Spec.ServiceID = "baker"
+			},
+			wantName:      "baker-liferay.com-lxc-ext-provision-metadata",
+			wantNamespace: "liferay-dev",
+		},
+		"a changed virtualInstanceId": {
+			change: func(clientExtension *cxv1alpha1.ClientExtension) {
+				clientExtension.Spec.VirtualInstanceID = "other.test"
+			},
+			wantName:      "able-other.test-lxc-ext-provision-metadata",
+			wantNamespace: "liferay-dev",
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientExtension := newClientExtension("liferay-dev", "able", "able")
+			recorder := record.NewFakeRecorder(10)
+
+			uatNamespace := newDxpNamespace("able")
+
+			uatNamespace.Name = "liferay-uat"
+
+			clientExtensionReconciler := newReconciler(
+				nil, t, clientExtension,
+				newDxpMetadata("liferay-dev", "liferay.com"), newDxpMetadata("liferay-dev", "other.test"),
+				newDxpMetadata("liferay-uat", "liferay.com"), newDxpNamespace("able"), uatNamespace,
+			)
+
+			clientExtensionReconciler.Recorder = recorder
+
+			reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			testCase.change(updatedClientExtension)
+
+			if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
+				t.Fatal(error)
+			}
+
+			if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonDelivered {
+				t.Fatalf("Delivered reason = %q, want %q", reason, ReasonDelivered)
+			}
+
+			if getExtProvision(clientExtensionReconciler, "liferay-dev", t) != nil {
+				t.Error("Expected the superseded ConfigMap to be withdrawn")
+			}
+
+			if getConfigMap(clientExtensionReconciler, testCase.wantName, testCase.wantNamespace, t) == nil {
+				t.Errorf("Expected ConfigMap %s/%s to be delivered", testCase.wantNamespace, testCase.wantName)
+			}
+
+			updatedClientExtension = getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			if want := []string{testCase.wantNamespace + "/" + testCase.wantName}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+				t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
+			}
+
+			select {
+			case event := <-recorder.Events:
+				if !strings.HasPrefix(event, "Normal Withdrawn") {
+					t.Errorf("Expected a Withdrawn event, got %q", event)
+				}
+			default:
+				t.Error("Expected a Withdrawn event")
+			}
+		})
 	}
 }
 
@@ -718,6 +904,31 @@ func getClientExtension(
 	return &updatedClientExtension
 }
 
+func getConfigMap(
+	clientExtensionReconciler *ClientExtensionReconciler,
+	name string,
+	namespace string,
+	t *testing.T,
+) *corev1.ConfigMap {
+	t.Helper()
+
+	var configMap corev1.ConfigMap
+
+	error := clientExtensionReconciler.Get(
+		context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &configMap,
+	)
+
+	if apierrors.IsNotFound(error) {
+		return nil
+	}
+
+	if error != nil {
+		t.Fatal(error)
+	}
+
+	return &configMap
+}
+
 func getDelivered(
 	clientExtension *cxv1alpha1.ClientExtension,
 	clientExtensionReconciler *ClientExtensionReconciler,
@@ -744,23 +955,7 @@ func getExtProvision(
 ) *corev1.ConfigMap {
 	t.Helper()
 
-	var configMap corev1.ConfigMap
-
-	error := clientExtensionReconciler.Get(
-		context.Background(),
-		types.NamespacedName{Name: "able-liferay.com-lxc-ext-provision-metadata", Namespace: namespace},
-		&configMap,
-	)
-
-	if apierrors.IsNotFound(error) {
-		return nil
-	}
-
-	if error != nil {
-		t.Fatal(error)
-	}
-
-	return &configMap
+	return getConfigMap(clientExtensionReconciler, "able-liferay.com-lxc-ext-provision-metadata", namespace, t)
 }
 
 func newClientExtension(dxpNamespace string, name string, namespace string) *cxv1alpha1.ClientExtension {

@@ -37,7 +37,7 @@ const (
 
 const unknownVirtualInstanceRequeueInterval = time.Minute
 
-// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;patch;update;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=cx.liferay.com,resources=clientextensions,verbs=get;list;watch
@@ -62,7 +62,15 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
-	extProvisionConfigMapNames := clientExtension.Status.ExtProvisionConfigMapNames
+	ownedExtProvisions, error := clientExtensionReconciler.listOwnedExtProvisions(
+		&clientExtension, context,
+	)
+
+	if error != nil {
+		return controllerruntime.Result{}, error
+	}
+
+	extProvisionConfigMapNames := configMapReferences(ownedExtProvisions)
 
 	if reason != "" {
 		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
@@ -118,7 +126,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	if conflictingConfigMap != nil {
 		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-			&clientExtension, metav1.ConditionFalse, context, nil,
+			&clientExtension, metav1.ConditionFalse, context, extProvisionConfigMapNames,
 			serviceIDConflictMessage(&clientExtension, conflictingConfigMap),
 			ReasonServiceIDConflict,
 		)
@@ -126,8 +134,14 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	extProvisionName := ExtProvisionName(&clientExtension)
 
+	if error := clientExtensionReconciler.withdrawSupersededExtProvisions(
+		&clientExtension, context, dxpNamespace, extProvisionName, ownedExtProvisions,
+	); error != nil {
+		return controllerruntime.Result{}, error
+	}
+
 	return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-		&clientExtension, metav1.ConditionTrue, context, []string{extProvisionName},
+		&clientExtension, metav1.ConditionTrue, context, []string{dxpNamespace + "/" + extProvisionName},
 		fmt.Sprintf(
 			"Delivered to ConfigMap %q in namespace %q.", extProvisionName, dxpNamespace,
 		),
@@ -209,6 +223,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 			}
 
 			configMap.Labels[LabelMetadataType] = MetadataTypeExtProvision
+			configMap.Labels[LabelOwner] = ownerLabelValue(clientExtension)
 			configMap.Labels[LabelProjectName] = ProjectName(clientExtension)
 			configMap.Labels[LabelServiceID] = clientExtension.Spec.ServiceID
 			configMap.Labels[LabelVirtualInstance] = clientExtension.Spec.VirtualInstanceID
@@ -218,6 +233,47 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 	)
 
 	return nil, error
+}
+
+func configMapReferences(configMaps []corev1.ConfigMap) []string {
+	var references []string
+
+	for _, configMap := range configMaps {
+		references = append(references, configMap.Namespace+"/"+configMap.Name)
+	}
+
+	slices.Sort(references)
+
+	return references
+}
+
+// The ConfigMaps record what a ClientExtension delivered, not its status,
+// which is empty again after a restore or a recreate.
+func (clientExtensionReconciler *ClientExtensionReconciler) listOwnedExtProvisions(
+	clientExtension *cxv1alpha1.ClientExtension,
+	context context.Context,
+) ([]corev1.ConfigMap, error) {
+	var configMapList corev1.ConfigMapList
+
+	if error := clientExtensionReconciler.List(
+		context, &configMapList,
+		client.MatchingLabels{
+			LabelMetadataType: MetadataTypeExtProvision,
+			LabelOwner:        ownerLabelValue(clientExtension),
+		},
+	); error != nil {
+		return nil, error
+	}
+
+	var configMaps []corev1.ConfigMap
+
+	for _, configMap := range configMapList.Items {
+		if ownsExtProvision(clientExtension, &configMap) {
+			configMaps = append(configMaps, configMap)
+		}
+	}
+
+	return configMaps, nil
 }
 
 func notReadyCondition(
@@ -506,6 +562,40 @@ func (clientExtensionReconciler *ClientExtensionReconciler) updateStatus(
 
 	if (status.Phase == cxv1alpha1.PhaseDegraded) && (clientExtensionReconciler.Recorder != nil) {
 		clientExtensionReconciler.Recorder.Event(clientExtension, corev1.EventTypeWarning, reason, message)
+	}
+
+	return nil
+}
+
+// A ClientExtension whose serviceId, virtual instance or DXP namespace changed
+// delivers to a ConfigMap with a new name. The old one would otherwise stay
+// live in DXP as a second client extension, so it is withdrawn once the new
+// one is delivered.
+func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededExtProvisions(
+	clientExtension *cxv1alpha1.ClientExtension,
+	context context.Context,
+	dxpNamespace string,
+	extProvisionName string,
+	ownedExtProvisions []corev1.ConfigMap,
+) error {
+	for index := range ownedExtProvisions {
+		configMap := &ownedExtProvisions[index]
+
+		if (configMap.Name == extProvisionName) && (configMap.Namespace == dxpNamespace) {
+			continue
+		}
+
+		if error := clientExtensionReconciler.Delete(context, configMap); client.IgnoreNotFound(error) != nil {
+			return error
+		}
+
+		if clientExtensionReconciler.Recorder != nil {
+			clientExtensionReconciler.Recorder.Eventf(
+				clientExtension, corev1.EventTypeNormal, "Withdrawn",
+				"Withdrew ConfigMap %q from namespace %q, which this client extension delivered before its serviceId, virtual instance or DXP namespace changed.",
+				configMap.Name, configMap.Namespace,
+			)
+		}
 	}
 
 	return nil
