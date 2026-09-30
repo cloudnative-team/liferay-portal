@@ -128,7 +128,6 @@ func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 	}
 
 	wantAnnotations := map[string]string{
-		AnnotationDomains:        "able.example.com",
 		AnnotationMainDomain:     "able.example.com",
 		AnnotationOwnerName:      "able",
 		AnnotationOwnerNamespace: "able",
@@ -504,7 +503,6 @@ func TestReconcileUpdatesItsOwnExtProvisionConfigMapInPlace(t *testing.T) {
 
 	owned := newExtProvision(
 		map[string]string{
-			AnnotationDomains:        "old.example.com",
 			AnnotationMainDomain:     "old.example.com",
 			AnnotationOwnerName:      "able",
 			AnnotationOwnerNamespace: "able",
@@ -535,7 +533,7 @@ func TestReconcileUpdatesItsOwnExtProvisionConfigMapInPlace(t *testing.T) {
 		t.Errorf("Expected the old payload to be replaced, got %v", configMap.Data)
 	}
 
-	if _, ok := configMap.Annotations[AnnotationDomains]; ok {
+	if _, ok := configMap.Annotations[AnnotationMainDomain]; ok {
 		t.Errorf("Expected the domain annotations to be removed with the domain, got %v", configMap.Annotations)
 	}
 }

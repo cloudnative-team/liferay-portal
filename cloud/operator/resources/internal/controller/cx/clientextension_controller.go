@@ -189,10 +189,8 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 			}
 
 			if clientExtension.Spec.Domain == "" {
-				delete(configMap.Annotations, AnnotationDomains)
 				delete(configMap.Annotations, AnnotationMainDomain)
 			} else {
-				configMap.Annotations[AnnotationDomains] = clientExtension.Spec.Domain
 				configMap.Annotations[AnnotationMainDomain] = clientExtension.Spec.Domain
 			}
 

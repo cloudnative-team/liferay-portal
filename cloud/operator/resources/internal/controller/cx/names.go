@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	AnnotationDomains        = "ext.lxc.liferay.com/domains"
 	AnnotationMainDomain     = "ext.lxc.liferay.com/mainDomain"
 	AnnotationOwnerName      = "cx.liferay.com/owner-name"
 	AnnotationOwnerNamespace = "cx.liferay.com/owner-namespace"
