@@ -90,14 +90,20 @@ type ClientExtensionSpec struct {
 	// +optional
 	DxpNamespace string `json:"dxpNamespace,omitempty"`
 
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern=`^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$`
 	// +optional
 	ProjectName string `json:"projectName,omitempty"`
 
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	// +kubebuilder:validation:Required
 	ServiceID string `json:"serviceId"`
 
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$`
 	// +kubebuilder:validation:Required
 	VirtualInstanceID string `json:"virtualInstanceId"`
 

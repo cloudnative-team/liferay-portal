@@ -137,6 +137,36 @@ func TestCRDRejectsInvalidClientExtensions(t *testing.T) {
 				spec(object)["dxpNamespace"] = "Liferay_Prod"
 			},
 		},
+		"a projectName longer than a label value": {
+			mutate: func(object map[string]any) {
+				spec(object)["projectName"] = strings.Repeat("a", 64)
+			},
+		},
+		"a projectName that is not a label value": {
+			mutate: func(object map[string]any) {
+				spec(object)["projectName"] = "sample project"
+			},
+		},
+		"a serviceId longer than a label value": {
+			mutate: func(object map[string]any) {
+				spec(object)["serviceId"] = strings.Repeat("a", 64)
+			},
+		},
+		"a serviceId that is not a DNS label": {
+			mutate: func(object map[string]any) {
+				spec(object)["serviceId"] = "Sample_Service"
+			},
+		},
+		"a virtualInstanceId longer than a label value": {
+			mutate: func(object map[string]any) {
+				spec(object)["virtualInstanceId"] = strings.Repeat("a", 64)
+			},
+		},
+		"a virtualInstanceId that is not a DNS name": {
+			mutate: func(object map[string]any) {
+				spec(object)["virtualInstanceId"] = "Liferay.com"
+			},
+		},
 		"a workloadRef with no name": {
 			mutate: func(object map[string]any) {
 				delete(spec(object)["workloadRef"].(map[string]any), "name")
