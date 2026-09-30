@@ -72,6 +72,92 @@ func TestReconcileChecksConsentBeforeVirtualInstance(t *testing.T) {
 	}
 }
 
+func TestReconcileDeletesStaleExtProvisionConfigMaps(t *testing.T) {
+	testCases := map[string]struct {
+		change        func(clientExtension *cxv1alpha1.ClientExtension)
+		wantName      string
+		wantNamespace string
+	}{
+		"a changed dxpNamespace": {
+			change: func(clientExtension *cxv1alpha1.ClientExtension) {
+				clientExtension.Spec.DxpNamespace = "liferay-uat"
+			},
+			wantName:      "able-liferay.com-lxc-ext-provision-metadata",
+			wantNamespace: "liferay-uat",
+		},
+		"a changed serviceId": {
+			change: func(clientExtension *cxv1alpha1.ClientExtension) {
+				clientExtension.Spec.ServiceID = "baker"
+			},
+			wantName:      "baker-liferay.com-lxc-ext-provision-metadata",
+			wantNamespace: "liferay-dev",
+		},
+		"a changed virtualInstanceId": {
+			change: func(clientExtension *cxv1alpha1.ClientExtension) {
+				clientExtension.Spec.VirtualInstanceID = "other.test"
+			},
+			wantName:      "able-other.test-lxc-ext-provision-metadata",
+			wantNamespace: "liferay-dev",
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientExtension := newClientExtension("liferay-dev", "able", "able")
+			recorder := record.NewFakeRecorder(10)
+
+			uatNamespace := newDxpNamespace("able")
+
+			uatNamespace.Name = "liferay-uat"
+
+			clientExtensionReconciler := newReconciler(
+				nil, t, clientExtension,
+				newDxpMetadata("liferay-dev", "liferay.com"), newDxpMetadata("liferay-dev", "other.test"),
+				newDxpMetadata("liferay-uat", "liferay.com"), newDxpNamespace("able"), uatNamespace,
+			)
+
+			clientExtensionReconciler.Recorder = recorder
+
+			reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			testCase.change(updatedClientExtension)
+
+			if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
+				t.Fatal(error)
+			}
+
+			if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonDelivered {
+				t.Fatalf("Delivered reason = %q, want %q", reason, ReasonDelivered)
+			}
+
+			if getExtProvision(clientExtensionReconciler, "liferay-dev", t) != nil {
+				t.Error("Expected the stale ConfigMap to be deleted")
+			}
+
+			if getConfigMap(clientExtensionReconciler, testCase.wantName, testCase.wantNamespace, t) == nil {
+				t.Errorf("Expected ConfigMap %s/%s to be delivered", testCase.wantNamespace, testCase.wantName)
+			}
+
+			updatedClientExtension = getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			if want := []string{testCase.wantNamespace + "/" + testCase.wantName}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
+				t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
+			}
+
+			select {
+			case event := <-recorder.Events:
+				if !strings.HasPrefix(event, "Normal StaleConfigMapDeleted") {
+					t.Errorf("Expected a StaleConfigMapDeleted event, got %q", event)
+				}
+			default:
+				t.Error("Expected a StaleConfigMapDeleted event")
+			}
+		})
+	}
+}
+
 func TestReconcileDeliversExtProvisionConfigMap(t *testing.T) {
 	clientExtension := newClientExtension("liferay-dev", "able", "able")
 
@@ -254,12 +340,12 @@ func TestReconcileKeepsDeliveredConfigMapWhenTheVirtualInstanceDisappears(t *tes
 	}
 }
 
-func TestReconcileKeepsSupersededExtProvisionConfigMapChangedSinceItWasListed(t *testing.T) {
+func TestReconcileKeepsStaleExtProvisionConfigMapChangedSinceItWasListed(t *testing.T) {
 	clientExtension := newClientExtension("liferay-dev", "able", "able")
 
 	clientExtension.Spec.ServiceID = "baker"
 
-	superseded := newExtProvision(
+	stale := newExtProvision(
 		map[string]string{AnnotationOwnerName: "able", AnnotationOwnerNamespace: "able"},
 		map[string]string{
 			LabelMetadataType: MetadataTypeExtProvision,
@@ -281,7 +367,7 @@ func TestReconcileKeepsSupersededExtProvisionConfigMapChangedSinceItWasListed(t 
 
 				if configMapList, ok := list.(*corev1.ConfigMapList); ok {
 					for index := range configMapList.Items {
-						if configMapList.Items[index].Name == superseded.Name {
+						if configMapList.Items[index].Name == stale.Name {
 							configMapList.Items[index].ResourceVersion = "1"
 						}
 					}
@@ -290,7 +376,7 @@ func TestReconcileKeepsSupersededExtProvisionConfigMapChangedSinceItWasListed(t 
 				return nil
 			},
 		},
-		t, clientExtension, superseded,
+		t, clientExtension, stale,
 		newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
 	)
 
@@ -302,11 +388,11 @@ func TestReconcileKeepsSupersededExtProvisionConfigMapChangedSinceItWasListed(t 
 	}
 
 	if getExtProvision(clientExtensionReconciler, "liferay-dev", t) == nil {
-		t.Error("Expected a ConfigMap that changed since it was listed not to be withdrawn")
+		t.Error("Expected a ConfigMap that changed since it was listed not to be deleted")
 	}
 }
 
-func TestReconcileKeepsSupersededExtProvisionConfigMapItMayNoLongerWithdraw(t *testing.T) {
+func TestReconcileKeepsStaleExtProvisionConfigMapItMayNotDelete(t *testing.T) {
 	clientExtension := newClientExtension("liferay-dev", "able", "able")
 	recorder := record.NewFakeRecorder(10)
 
@@ -349,7 +435,7 @@ func TestReconcileKeepsSupersededExtProvisionConfigMapItMayNoLongerWithdraw(t *t
 	}
 
 	if getExtProvision(clientExtensionReconciler, "liferay-dev", t) == nil {
-		t.Error("Expected the ConfigMap that could not be withdrawn to remain")
+		t.Error("Expected the ConfigMap that could not be deleted to remain")
 	}
 
 	updatedClientExtension = getClientExtension(clientExtension, clientExtensionReconciler, t)
@@ -365,11 +451,11 @@ func TestReconcileKeepsSupersededExtProvisionConfigMapItMayNoLongerWithdraw(t *t
 
 	select {
 	case event := <-recorder.Events:
-		if !strings.HasPrefix(event, "Warning WithdrawalNotPermitted") {
-			t.Errorf("Expected a WithdrawalNotPermitted event, got %q", event)
+		if !strings.HasPrefix(event, "Warning StaleConfigMapNotDeleted") {
+			t.Errorf("Expected a StaleConfigMapNotDeleted event, got %q", event)
 		}
 	default:
-		t.Error("Expected a WithdrawalNotPermitted event")
+		t.Error("Expected a StaleConfigMapNotDeleted event")
 	}
 }
 
@@ -895,92 +981,6 @@ func TestReconcileUpdatesItsOwnExtProvisionConfigMapInPlace(t *testing.T) {
 	}
 }
 
-func TestReconcileWithdrawsTheExtProvisionConfigMapItSupersedes(t *testing.T) {
-	testCases := map[string]struct {
-		change        func(clientExtension *cxv1alpha1.ClientExtension)
-		wantName      string
-		wantNamespace string
-	}{
-		"a changed dxpNamespace": {
-			change: func(clientExtension *cxv1alpha1.ClientExtension) {
-				clientExtension.Spec.DxpNamespace = "liferay-uat"
-			},
-			wantName:      "able-liferay.com-lxc-ext-provision-metadata",
-			wantNamespace: "liferay-uat",
-		},
-		"a changed serviceId": {
-			change: func(clientExtension *cxv1alpha1.ClientExtension) {
-				clientExtension.Spec.ServiceID = "baker"
-			},
-			wantName:      "baker-liferay.com-lxc-ext-provision-metadata",
-			wantNamespace: "liferay-dev",
-		},
-		"a changed virtualInstanceId": {
-			change: func(clientExtension *cxv1alpha1.ClientExtension) {
-				clientExtension.Spec.VirtualInstanceID = "other.test"
-			},
-			wantName:      "able-other.test-lxc-ext-provision-metadata",
-			wantNamespace: "liferay-dev",
-		},
-	}
-
-	for name, testCase := range testCases {
-		t.Run(name, func(t *testing.T) {
-			clientExtension := newClientExtension("liferay-dev", "able", "able")
-			recorder := record.NewFakeRecorder(10)
-
-			uatNamespace := newDxpNamespace("able")
-
-			uatNamespace.Name = "liferay-uat"
-
-			clientExtensionReconciler := newReconciler(
-				nil, t, clientExtension,
-				newDxpMetadata("liferay-dev", "liferay.com"), newDxpMetadata("liferay-dev", "other.test"),
-				newDxpMetadata("liferay-uat", "liferay.com"), newDxpNamespace("able"), uatNamespace,
-			)
-
-			clientExtensionReconciler.Recorder = recorder
-
-			reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
-
-			updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
-
-			testCase.change(updatedClientExtension)
-
-			if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
-				t.Fatal(error)
-			}
-
-			if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonDelivered {
-				t.Fatalf("Delivered reason = %q, want %q", reason, ReasonDelivered)
-			}
-
-			if getExtProvision(clientExtensionReconciler, "liferay-dev", t) != nil {
-				t.Error("Expected the superseded ConfigMap to be withdrawn")
-			}
-
-			if getConfigMap(clientExtensionReconciler, testCase.wantName, testCase.wantNamespace, t) == nil {
-				t.Errorf("Expected ConfigMap %s/%s to be delivered", testCase.wantNamespace, testCase.wantName)
-			}
-
-			updatedClientExtension = getClientExtension(clientExtension, clientExtensionReconciler, t)
-
-			if want := []string{testCase.wantNamespace + "/" + testCase.wantName}; !slices.Equal(updatedClientExtension.Status.ExtProvisionConfigMapNames, want) {
-				t.Errorf("extProvisionConfigMapNames = %v, want %v", updatedClientExtension.Status.ExtProvisionConfigMapNames, want)
-			}
-
-			select {
-			case event := <-recorder.Events:
-				if !strings.HasPrefix(event, "Normal Withdrawn") {
-					t.Errorf("Expected a Withdrawn event, got %q", event)
-				}
-			default:
-				t.Error("Expected a Withdrawn event")
-			}
-		})
-	}
-}
-
 func TestRequestsForConfigMapRequeuesClientExtensionsThatDependOnIt(t *testing.T) {
 	otherInstance := newClientExtension("liferay-dev", "other-instance", "baker")
 
@@ -1303,7 +1303,13 @@ func newReconciler(
 		cachedClient = interceptor.NewClient(apiReader, *funcs)
 	}
 
-	return &ClientExtensionReconciler{APIReader: apiReader, Client: cachedClient}
+	// A recorder with no channel discards its events.
+
+	return &ClientExtensionReconciler{
+		APIReader: apiReader,
+		Client:    cachedClient,
+		Recorder:  &record.FakeRecorder{},
+	}
 }
 
 func reconcileClientExtension(

@@ -149,10 +149,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		)
 	}
 
-	extProvisionName := ExtProvisionName(&clientExtension)
+	current := types.NamespacedName{Name: ExtProvisionName(&clientExtension), Namespace: dxpNamespace}
 
-	unwithdrawnExtProvisions, error := clientExtensionReconciler.withdrawSupersededExtProvisions(
-		&clientExtension, context, dxpNamespace, extProvisionName, ownedExtProvisions,
+	extProvisionConfigMapNames, error = clientExtensionReconciler.deleteStaleExtProvisions(
+		&clientExtension, context, current, ownedExtProvisions,
 	)
 
 	if error != nil {
@@ -160,16 +160,8 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 	}
 
 	return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
-		&clientExtension, metav1.ConditionTrue, context,
-		configMapReferences(
-			append(
-				unwithdrawnExtProvisions,
-				corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: extProvisionName, Namespace: dxpNamespace}},
-			),
-		),
-		fmt.Sprintf(
-			"Delivered to ConfigMap %q in namespace %q.", extProvisionName, dxpNamespace,
-		),
+		&clientExtension, metav1.ConditionTrue, context, extProvisionConfigMapNames,
+		fmt.Sprintf("Delivered to ConfigMap %q in namespace %q.", current.Name, current.Namespace),
 		ReasonDelivered,
 	)
 }
@@ -229,9 +221,6 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 				configMap.Annotations[AnnotationMainDomain] = clientExtension.Spec.Domain
 			}
 
-			// The owner is an annotation, not a label, because a ClientExtension
-			// name can be longer than a label value allows.
-
 			configMap.Annotations[AnnotationOwnerName] = clientExtension.Name
 			configMap.Annotations[AnnotationOwnerNamespace] = clientExtension.Namespace
 
@@ -288,6 +277,58 @@ func configMapReferences(configMaps []corev1.ConfigMap) []string {
 	slices.Sort(references)
 
 	return references
+}
+
+// Changing serviceId, virtualInstanceId or dxpNamespace delivers to a new
+// ConfigMap, and DXP would keep loading the old one as a second client
+// extension.
+func (clientExtensionReconciler *ClientExtensionReconciler) deleteStaleExtProvisions(
+	clientExtension *cxv1alpha1.ClientExtension,
+	context context.Context,
+	current types.NamespacedName,
+	ownedExtProvisions []corev1.ConfigMap,
+) ([]string, error) {
+	extProvisionConfigMapNames := []string{current.String()}
+
+	for index := range ownedExtProvisions {
+		configMap := &ownedExtProvisions[index]
+
+		if client.ObjectKeyFromObject(configMap) == current {
+			continue
+		}
+
+		error := clientExtensionReconciler.Delete(
+			context, configMap,
+			client.Preconditions{ResourceVersion: &configMap.ResourceVersion, UID: &configMap.UID},
+		)
+
+		if apierrors.IsForbidden(error) {
+			extProvisionConfigMapNames = append(
+				extProvisionConfigMapNames, client.ObjectKeyFromObject(configMap).String(),
+			)
+
+			clientExtensionReconciler.Recorder.Eventf(
+				clientExtension, corev1.EventTypeWarning, "StaleConfigMapNotDeleted",
+				"Unable to delete stale ConfigMap %q: the DXP operator is not permitted to write in namespace %q.",
+				configMap.Name, configMap.Namespace,
+			)
+
+			continue
+		}
+
+		if client.IgnoreNotFound(error) != nil {
+			return nil, error
+		}
+
+		clientExtensionReconciler.Recorder.Eventf(
+			clientExtension, corev1.EventTypeNormal, "StaleConfigMapDeleted",
+			"Deleted stale ConfigMap %q from namespace %q.", configMap.Name, configMap.Namespace,
+		)
+	}
+
+	slices.Sort(extProvisionConfigMapNames)
+
+	return extProvisionConfigMapNames, nil
 }
 
 // The ConfigMaps record what a ClientExtension delivered, not its status,
@@ -603,70 +644,11 @@ func (clientExtensionReconciler *ClientExtensionReconciler) updateStatus(
 		return client.IgnoreNotFound(error)
 	}
 
-	if (status.Phase == cxv1alpha1.PhaseDegraded) && (clientExtensionReconciler.Recorder != nil) {
+	if status.Phase == cxv1alpha1.PhaseDegraded {
 		clientExtensionReconciler.Recorder.Event(clientExtension, corev1.EventTypeWarning, reason, message)
 	}
 
 	return nil
-}
-
-// A ClientExtension whose serviceId, virtual instance or DXP namespace changed
-// delivers to a ConfigMap with a new name. The old one would otherwise stay
-// live in DXP as a second client extension, so it is withdrawn once the new
-// one is delivered.
-func (clientExtensionReconciler *ClientExtensionReconciler) withdrawSupersededExtProvisions(
-	clientExtension *cxv1alpha1.ClientExtension,
-	context context.Context,
-	dxpNamespace string,
-	extProvisionName string,
-	ownedExtProvisions []corev1.ConfigMap,
-) ([]corev1.ConfigMap, error) {
-	var unwithdrawnExtProvisions []corev1.ConfigMap
-
-	for index := range ownedExtProvisions {
-		configMap := &ownedExtProvisions[index]
-
-		if (configMap.Name == extProvisionName) && (configMap.Namespace == dxpNamespace) {
-			continue
-		}
-
-		error := clientExtensionReconciler.Delete(
-			context, configMap,
-			client.Preconditions{ResourceVersion: &configMap.ResourceVersion, UID: &configMap.UID},
-		)
-
-		// A DXP namespace that no longer grants delivery keeps what was
-		// delivered there. It stays in status, so the deletion work still
-		// finds it, rather than blocking the delivery that replaced it.
-
-		if apierrors.IsForbidden(error) {
-			unwithdrawnExtProvisions = append(unwithdrawnExtProvisions, *configMap)
-
-			if clientExtensionReconciler.Recorder != nil {
-				clientExtensionReconciler.Recorder.Eventf(
-					clientExtension, corev1.EventTypeWarning, "WithdrawalNotPermitted",
-					"Unable to withdraw ConfigMap %q from namespace %q, which this client extension delivered before its serviceId, virtual instance or DXP namespace changed, because the DXP operator is no longer permitted to write there.",
-					configMap.Name, configMap.Namespace,
-				)
-			}
-
-			continue
-		}
-
-		if client.IgnoreNotFound(error) != nil {
-			return nil, error
-		}
-
-		if clientExtensionReconciler.Recorder != nil {
-			clientExtensionReconciler.Recorder.Eventf(
-				clientExtension, corev1.EventTypeNormal, "Withdrawn",
-				"Withdrew ConfigMap %q from namespace %q, which this client extension delivered before its serviceId, virtual instance or DXP namespace changed.",
-				configMap.Name, configMap.Namespace,
-			)
-		}
-	}
-
-	return unwithdrawnExtProvisions, nil
 }
 
 type ClientExtensionReconciler struct {
