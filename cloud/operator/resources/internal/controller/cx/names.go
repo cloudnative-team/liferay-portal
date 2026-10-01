@@ -9,16 +9,19 @@ import (
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	AnnotationMainDomain     = "ext.lxc.liferay.com/mainDomain"
 	AnnotationOwnerName      = "cx.liferay.com/owner-name"
 	AnnotationOwnerNamespace = "cx.liferay.com/owner-namespace"
+	AnnotationSource         = "cx.liferay.com/source"
 )
 
 const (
 	LabelMetadataType    = "lxc.liferay.com/metadataType"
+	LabelMirror          = "cx.liferay.com/mirror"
 	LabelOwner           = "cx.liferay.com/owner"
 	LabelServiceID       = "ext.lxc.liferay.com/serviceId"
 	LabelVirtualInstance = "dxp.lxc.liferay.com/virtualInstanceId"
@@ -109,6 +112,15 @@ func ownerLabelValue(clientExtension *cxv1alpha1.ClientExtension) string {
 func ownsExtProvision(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
 	return (configMap.Annotations[AnnotationOwnerName] == clientExtension.Name) &&
 		(configMap.Annotations[AnnotationOwnerNamespace] == clientExtension.Namespace)
+}
+
+func ownsMirror(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
+	return slices.ContainsFunc(
+		configMap.OwnerReferences,
+		func(ownerReference metav1.OwnerReference) bool {
+			return ownerReference.UID == clientExtension.UID
+		},
+	)
 }
 
 var extInitFactoryPIDs = []string{
