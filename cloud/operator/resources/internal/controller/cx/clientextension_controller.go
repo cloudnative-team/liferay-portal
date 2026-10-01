@@ -572,7 +572,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) resolveDxpNamespace(
 ) (string, string, error) {
 	dxpNamespace := effectiveDxpNamespace(clientExtension)
 
-	if dxpNamespace == clientExtension.Namespace {
+	if clientExtension.Namespace == dxpNamespace {
 		return dxpNamespace, "", nil
 	}
 
@@ -611,8 +611,8 @@ func serviceIDConflictMessage(clientExtension *cxv1alpha1.ClientExtension, confi
 	virtualInstanceID := configMap.Labels[LabelVirtualInstance]
 
 	if (serviceID != "") &&
-		((serviceID != clientExtension.Spec.ServiceID) ||
-			(virtualInstanceID != clientExtension.Spec.VirtualInstanceID)) {
+		((clientExtension.Spec.ServiceID != serviceID) ||
+			(clientExtension.Spec.VirtualInstanceID != virtualInstanceID)) {
 
 		return fmt.Sprintf(
 			"Unable to deliver to ConfigMap %q in namespace %q: it %s and holds serviceId %q on virtual instance %q, whose ConfigMap names collide with serviceId %q on virtual instance %q. Give one of them a different serviceId.",

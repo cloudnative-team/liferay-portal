@@ -112,7 +112,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) deleteStaleMirrors(
 		configMap.OwnerReferences = slices.DeleteFunc(
 			configMap.OwnerReferences,
 			func(ownerReference metav1.OwnerReference) bool {
-				return ownerReference.UID == clientExtension.UID
+				return clientExtension.UID == ownerReference.UID
 			},
 		)
 
@@ -146,7 +146,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) mirrorMetadata(
 	dxpMetadata *corev1.ConfigMap,
 	extInit *corev1.ConfigMap,
 ) error {
-	if dxpMetadata.Namespace == clientExtension.Namespace {
+	if clientExtension.Namespace == dxpMetadata.Namespace {
 		return clientExtensionReconciler.deleteStaleMirrors(clientExtension, context, nil)
 	}
 
@@ -171,7 +171,7 @@ func requestsForMirror(object client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 
 	for _, ownerReference := range object.GetOwnerReferences() {
-		if (ownerReference.APIVersion != cxv1alpha1.SchemeBuilder.GroupVersion.String()) ||
+		if (cxv1alpha1.SchemeBuilder.GroupVersion.String() != ownerReference.APIVersion) ||
 			(ownerReference.Kind != "ClientExtension") {
 
 			continue

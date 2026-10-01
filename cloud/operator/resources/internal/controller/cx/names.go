@@ -110,15 +110,15 @@ func ownerLabelValue(clientExtension *cxv1alpha1.ClientExtension) string {
 }
 
 func ownsExtProvision(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
-	return (configMap.Annotations[AnnotationOwnerName] == clientExtension.Name) &&
-		(configMap.Annotations[AnnotationOwnerNamespace] == clientExtension.Namespace)
+	return (clientExtension.Name == configMap.Annotations[AnnotationOwnerName]) &&
+		(clientExtension.Namespace == configMap.Annotations[AnnotationOwnerNamespace])
 }
 
 func ownsMirror(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
 	return slices.ContainsFunc(
 		configMap.OwnerReferences,
 		func(ownerReference metav1.OwnerReference) bool {
-			return ownerReference.UID == clientExtension.UID
+			return clientExtension.UID == ownerReference.UID
 		},
 	)
 }

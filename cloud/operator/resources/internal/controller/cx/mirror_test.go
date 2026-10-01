@@ -92,7 +92,7 @@ func TestReconcileMirrorsDxpMetadataIntoClientExtensionNamespace(t *testing.T) {
 		t.Errorf("source = %q, want %q", source, "liferay-dev/liferay.com-lxc-dxp-metadata")
 	}
 
-	if (len(configMap.OwnerReferences) != 1) || (configMap.OwnerReferences[0].UID != clientExtension.UID) ||
+	if (len(configMap.OwnerReferences) != 1) || (clientExtension.UID != configMap.OwnerReferences[0].UID) ||
 		((configMap.OwnerReferences[0].Controller != nil) && *configMap.OwnerReferences[0].Controller) {
 
 		t.Errorf("owner references = %v, want one non-controller reference to the client extension", configMap.OwnerReferences)
@@ -141,7 +141,7 @@ func TestReconcileMirrorsExtInitIntoClientExtensionNamespace(t *testing.T) {
 		t.Errorf("source = %q, want %q", source, "liferay-dev/able-liferay.com-lxc-ext-init-metadata")
 	}
 
-	if controllerReference := metav1.GetControllerOf(configMap); (controllerReference == nil) || (controllerReference.UID != clientExtension.UID) {
+	if controllerReference := metav1.GetControllerOf(configMap); (controllerReference == nil) || (clientExtension.UID != controllerReference.UID) {
 		t.Errorf("controller = %v, want the client extension", controllerReference)
 	}
 }
@@ -210,7 +210,7 @@ func TestReconcileReleasesStaleDxpMetadataMirror(t *testing.T) {
 
 	configMap := getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t)
 
-	if (configMap == nil) || (len(configMap.OwnerReferences) != 1) || (configMap.OwnerReferences[0].UID != baker.UID) {
+	if (configMap == nil) || (len(configMap.OwnerReferences) != 1) || (baker.UID != configMap.OwnerReferences[0].UID) {
 		t.Fatalf("Expected the old mirror to remain, owned by baker alone, got %v", configMap)
 	}
 
