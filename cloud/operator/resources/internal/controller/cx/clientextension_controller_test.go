@@ -123,7 +123,7 @@ func TestReconcileAllowedNamespaces(t *testing.T) {
 				t.Fatal(error)
 			}
 
-			if updatedClientExtension.Status.Phase != testCase.wantPhase {
+			if testCase.wantPhase != updatedClientExtension.Status.Phase {
 				t.Errorf("phase = %q, want %q", updatedClientExtension.Status.Phase, testCase.wantPhase)
 			}
 
