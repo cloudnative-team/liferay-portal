@@ -31,6 +31,7 @@ const (
 	ReasonDeliveryNotPermitted   = "DeliveryNotPermitted"
 	ReasonDxpNamespaceNotFound   = "DxpNamespaceNotFound"
 	ReasonExtInitMissing         = "ExtInitMissing"
+	ReasonMirrorFailed           = "MirrorFailed"
 	ReasonNamespaceNotPermitted  = "NamespaceNotPermitted"
 	ReasonNoExtInitRequired      = "NoExtInitRequired"
 	ReasonProvisioned            = "Provisioned"
@@ -176,12 +177,29 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		)
 	}
 
-	provisionedCondition, error := clientExtensionReconciler.provisionedCondition(
+	provisionedCondition, extInitConfigMap, error := clientExtensionReconciler.provisionedCondition(
 		&clientExtension, context, dxpNamespace,
 	)
 
 	if error != nil {
 		return controllerruntime.Result{}, error
+	}
+
+	var result controllerruntime.Result
+
+	mirrorError := clientExtensionReconciler.mirrorMetadata(&clientExtension, context, &dxpMetadata, extInitConfigMap)
+
+	if apierrors.IsAlreadyExists(mirrorError) || apierrors.IsConflict(mirrorError) {
+		return controllerruntime.Result{}, mirrorError
+	}
+
+	if mirrorError != nil {
+		provisionedCondition = newCondition(
+			metav1.ConditionFalse, clientExtensionReconciler.mirrorFailedMessage(&clientExtension, mirrorError),
+			ReasonMirrorFailed,
+		)
+
+		result.RequeueAfter = refusalRequeueInterval
 	}
 
 	if error := clientExtensionReconciler.updateStatus(
@@ -192,9 +210,11 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
-	return controllerruntime.Result{
-		RequeueAfter: extInitGraceRemaining(clientExtension.Status.Conditions),
-	}, nil
+	if result.RequeueAfter == 0 {
+		result.RequeueAfter = extInitGraceRemaining(clientExtension.Status.Conditions)
+	}
+
+	return result, nil
 }
 
 func (clientExtensionReconciler *ClientExtensionReconciler) SetupWithManager(
@@ -352,6 +372,20 @@ func (clientExtensionReconciler *ClientExtensionReconciler) listOwnedExtProvisio
 	return configMapList.Items, nil
 }
 
+func (clientExtensionReconciler *ClientExtensionReconciler) mirrorFailedMessage(
+	clientExtension *cxv1alpha1.ClientExtension,
+	mirrorError error,
+) string {
+	if apierrors.IsForbidden(mirrorError) {
+		return fmt.Sprintf(
+			"The DXP operator is not permitted to write ConfigMaps in namespace %q, so it cannot mirror DXP's metadata there. Bind ClusterRole %q to ServiceAccount %q in that namespace.",
+			clientExtension.Namespace, deliveryClusterRoleName, clientExtensionReconciler.ServiceAccount,
+		)
+	}
+
+	return fmt.Sprintf("Unable to mirror DXP's metadata into namespace %q: %s.", clientExtension.Namespace, mirrorError)
+}
+
 func newCondition(conditionStatus metav1.ConditionStatus, message string, reason string) metav1.Condition {
 	return metav1.Condition{Message: message, Reason: reason, Status: conditionStatus}
 }
@@ -360,13 +394,13 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 	clientExtension *cxv1alpha1.ClientExtension,
 	context context.Context,
 	dxpNamespace string,
-) (metav1.Condition, error) {
+) (metav1.Condition, *corev1.ConfigMap, error) {
 	if !requiresExtInit(clientExtension) {
 		return newCondition(
 			metav1.ConditionTrue,
 			"The configs declare no OAuth2 application, so they require no ext-init ConfigMap from DXP.",
 			ReasonNoExtInitRequired,
-		), nil
+		), nil, nil
 	}
 
 	var extInitConfigMap corev1.ConfigMap
@@ -383,18 +417,18 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 				extInitConfigMapName.Name, extInitConfigMapName.Namespace,
 			),
 			ReasonExtInitMissing,
-		), nil
+		), nil, nil
 	}
 
 	if error != nil {
-		return metav1.Condition{}, error
+		return metav1.Condition{}, nil, error
 	}
 
 	return newCondition(
 		metav1.ConditionTrue,
 		fmt.Sprintf("DXP wrote ConfigMap %q in namespace %q.", extInitConfigMapName.Name, extInitConfigMapName.Namespace),
 		ReasonProvisioned,
-	), nil
+	), &extInitConfigMap, nil
 }
 
 func readyCondition(conditions []metav1.Condition) metav1.Condition {
@@ -429,6 +463,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) requestsForConfigMap
 	object client.Object,
 ) []reconcile.Request {
 	labels := object.GetLabels()
+
+	if labels[LabelMirror] == "true" {
+		return requestsForMirror(object)
+	}
 
 	metadataType := labels[LabelMetadataType]
 

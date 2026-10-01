@@ -1113,7 +1113,7 @@ func hideFromCache(name string) *interceptor.Funcs {
 
 func newClientExtension(dxpNamespace string, name string, namespace string) *cxv1alpha1.ClientExtension {
 	return &cxv1alpha1.ClientExtension{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, UID: types.UID(namespace + "-" + name)},
 		Spec: cxv1alpha1.ClientExtensionSpec{
 			Configs: map[string]cxv1alpha1.Configuration{
 				"com.liferay.client.extension.type.configuration.CETConfiguration~" + name: {
