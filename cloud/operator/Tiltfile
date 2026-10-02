@@ -248,7 +248,7 @@ k8s_yaml(
         namespace="liferay-system",
         set=[
             "debug=true",
-            "gracePeriod=10m",
+            "expirationGracePeriod=30m",
             "heartbeatInterval=30s",
             "image.repository=liferay/liferay-dxp-operator",
             "marketplace.claimName=marketplace-dev",
@@ -256,6 +256,7 @@ k8s_yaml(
             "onlineActivationWorkflow.enabled=true",
             "podSecurityContext.fsGroup=65532",
             "provisioning.baseURL=https://api.one-uat.liferay.com",
+            "provisioningGracePeriod=10m",
             "retry.maxDelay=1m",
             "securityContext.readOnlyRootFilesystem=false",
         ],

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -45,17 +46,22 @@ import (
 )
 
 const (
-	conditionActivated             = "Activated"
-	conditionAddOnsReady           = "AddOnsReady"
-	conditionGracePeriodExpired    = "GracePeriodExpired"
-	conditionLicenseValid          = "LicenseValid"
-	conditionProvisioningReachable = "ProvisioningReachable"
-	conditionReplicasCountValid    = "ReplicasCountValid"
-	entitlementsSecretSuffix       = "-entitlements"
-	environmentLabel               = "licensing.liferay.com/environment"
-	fieldOwner                     = "liferay-dxp-operator"
-	gracePeriodReplicaCeiling      = 1
-	identitySecretSuffix           = "-identity"
+	annotationPausedReplicas                = "autoscaling.keda.sh/paused-replicas"
+	annotationPausedReplicasOwner           = "licensing.liferay.com/paused-replicas"
+	annotationScaledToZero                  = "licensing.liferay.com/scaled-to-zero"
+	conditionActivated                      = "Activated"
+	conditionAddOnsReady                    = "AddOnsReady"
+	conditionLegacyGracePeriodExpired       = "GracePeriodExpired"
+	conditionLicenseValid                   = "LicenseValid"
+	conditionProvisioningGracePeriodExpired = "ProvisioningGracePeriodExpired"
+	conditionProvisioningReachable          = "ProvisioningReachable"
+	conditionReplicasCountValid             = "ReplicasCountValid"
+	entitlementsSecretSuffix                = "-entitlements"
+	environmentLabel                        = "licensing.liferay.com/environment"
+	expirationGracePeriodReplicaCeiling     = 1
+	fieldOwner                              = "liferay-dxp-operator"
+	identitySecretSuffix                    = "-identity"
+	provisioningGracePeriodReplicaCeiling   = 1
 )
 
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -75,6 +81,10 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) Reconcile(
 	); error != nil {
 		return controllerruntime.Result{}, client.IgnoreNotFound(error)
 	}
+
+	meta.RemoveStatusCondition(
+		&liferayEnvironment.Status.Conditions, conditionLegacyGracePeriodExpired,
+	)
 
 	environmentID, error := liferayEnvironmentReconciler.resolveEnvironmentID(
 		context, liferayEnvironment.Namespace,
@@ -275,6 +285,14 @@ func capReplicaBounds(
 	autoscaling *licensingv1alpha1.Autoscaling,
 	replicaCeiling int32,
 ) replicaBounds {
+	if replicaCeiling <= 0 {
+		return replicaBounds{
+			Maximum: 1,
+			Minimum: 1,
+			Paused:  true,
+		}
+	}
+
 	maximum := max(min(autoscaling.MaxReplicas, replicaCeiling), 1)
 
 	return replicaBounds{
@@ -292,7 +310,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) clearUnreachab
 	}
 
 	if meta.IsStatusConditionTrue(
-		liferayEnvironment.Status.Conditions, conditionGracePeriodExpired,
+		liferayEnvironment.Status.Conditions, conditionProvisioningGracePeriodExpired,
 	) {
 		logf.FromContext(context).Info(
 			"Provisioning recovered; restoring the licensed replica ceiling",
@@ -308,10 +326,37 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) clearUnreachab
 	}
 
 	meta.RemoveStatusCondition(
-		&liferayEnvironment.Status.Conditions, conditionGracePeriodExpired,
+		&liferayEnvironment.Status.Conditions, conditionProvisioningGracePeriodExpired,
 	)
 
 	liferayEnvironment.Status.UnreachableSince = nil
+}
+
+func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) degradeLicense(
+	condition metav1.Condition,
+	context context.Context,
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+	replicaCeiling int32,
+) (controllerruntime.Result, error) {
+	meta.SetStatusCondition(&liferayEnvironment.Status.Conditions, condition)
+
+	liferayEnvironment.Status.Phase = "Degraded"
+
+	requeueAfter, error := liferayEnvironmentReconciler.enforceReplicaCeiling(
+		context, liferayEnvironment, replicaCeiling,
+	)
+
+	if error != nil {
+		return controllerruntime.Result{}, error
+	}
+
+	if requeueAfter == 0 {
+		requeueAfter = liferayEnvironmentReconciler.HeartbeatInterval
+	}
+
+	return liferayEnvironmentReconciler.finishAfter(
+		context, liferayEnvironment, requeueAfter,
+	)
 }
 
 func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceAutoscalerCeiling(
@@ -336,61 +381,6 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceAutosca
 	return liferayEnvironmentReconciler.enforceScaledObjectCeiling(
 		context, liferayEnvironment, replicaBounds,
 	)
-}
-
-func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceGracePeriod(
-	context context.Context,
-	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
-) error {
-	if liferayEnvironment.Status.UnreachableSince == nil {
-		return nil
-	}
-
-	elapsed := time.Since(liferayEnvironment.Status.UnreachableSince.Time)
-
-	if elapsed < liferayEnvironmentReconciler.GracePeriod {
-		return nil
-	}
-
-	if _, error := liferayEnvironmentReconciler.enforceReplicaCeiling(
-		context, liferayEnvironment, gracePeriodReplicaCeiling,
-	); error != nil {
-		return error
-	}
-
-	message := fmt.Sprintf(
-		"Provisioning has been unreachable since %s; scaled %q down to %d replica.",
-		liferayEnvironment.Status.UnreachableSince.Format(time.RFC3339),
-		liferayEnvironment.Spec.WorkloadRef.Name,
-		gracePeriodReplicaCeiling,
-	)
-
-	if !meta.IsStatusConditionTrue(
-		liferayEnvironment.Status.Conditions, conditionGracePeriodExpired,
-	) {
-		logf.FromContext(context).Error(
-			nil, message, "environmentID", liferayEnvironment.Status.EnvironmentID,
-		)
-
-		liferayEnvironmentReconciler.Recorder.Event(
-			liferayEnvironment,
-			corev1.EventTypeWarning,
-			"GracePeriodExpired",
-			message,
-		)
-	}
-
-	meta.SetStatusCondition(
-		&liferayEnvironment.Status.Conditions,
-		metav1.Condition{
-			Message: message,
-			Reason:  "ProvisioningUnreachable",
-			Status:  metav1.ConditionTrue,
-			Type:    conditionGracePeriodExpired,
-		},
-	)
-
-	return nil
 }
 
 func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceHorizontalPodAutoscalerCeiling(
@@ -450,6 +440,34 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceHorizon
 	return nil
 }
 
+func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLastKnownLicense(
+	context context.Context,
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+) error {
+	expirationCeiling, expiredCondition, licenseExpired :=
+		liferayEnvironmentReconciler.evaluateLastKnownLicense(liferayEnvironment, time.Now())
+
+	if !licenseExpired {
+		return nil
+	}
+
+	meta.SetStatusCondition(&liferayEnvironment.Status.Conditions, expiredCondition)
+
+	liferayEnvironment.Status.Phase = "Degraded"
+
+	replicaCeiling := expirationCeiling
+
+	if liferayEnvironment.Status.ReplicaCeiling != nil {
+		replicaCeiling = min(replicaCeiling, *liferayEnvironment.Status.ReplicaCeiling)
+	}
+
+	_, error := liferayEnvironmentReconciler.enforceReplicaCeiling(
+		context, liferayEnvironment, replicaCeiling,
+	)
+
+	return error
+}
+
 func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense(
 	context context.Context,
 	entitlements *provisioning.Entitlements,
@@ -471,20 +489,14 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense
 		liferayEnvironment.Status.License.MaxClusterNodes = nil
 		liferayEnvironment.Status.License.ValidUntil = nil
 
-		meta.SetStatusCondition(
-			&liferayEnvironment.Status.Conditions,
+		return liferayEnvironmentReconciler.degradeLicense(
 			metav1.Condition{
 				Message: error.Error(),
 				Reason:  "Invalid",
 				Status:  metav1.ConditionFalse,
 				Type:    conditionLicenseValid,
 			},
-		)
-
-		liferayEnvironment.Status.Phase = "Degraded"
-
-		return liferayEnvironmentReconciler.finishAfter(
-			context, liferayEnvironment, liferayEnvironmentReconciler.HeartbeatInterval,
+			context, liferayEnvironment, 0,
 		)
 	}
 
@@ -499,8 +511,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense
 		liferayEnvironment.Status.License.MaxClusterNodes = &blocked
 		liferayEnvironment.Status.License.ValidUntil = nil
 
-		meta.SetStatusCondition(
-			&liferayEnvironment.Status.Conditions,
+		return liferayEnvironmentReconciler.degradeLicense(
 			metav1.Condition{
 				Message: fmt.Sprintf(
 					"License owner %q does not match this environment %q.",
@@ -510,24 +521,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense
 				Status: metav1.ConditionFalse,
 				Type:   conditionLicenseValid,
 			},
-		)
-
-		liferayEnvironment.Status.Phase = "Degraded"
-
-		requeueAfter, error := liferayEnvironmentReconciler.enforceReplicaCeiling(
 			context, liferayEnvironment, 0,
-		)
-
-		if error != nil {
-			return controllerruntime.Result{}, error
-		}
-
-		if requeueAfter == 0 {
-			requeueAfter = liferayEnvironmentReconciler.HeartbeatInterval
-		}
-
-		return liferayEnvironmentReconciler.finishAfter(
-			context, liferayEnvironment, requeueAfter,
 		)
 	}
 
@@ -542,20 +536,14 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense
 
 		liferayEnvironment.Status.License.ValidUntil = nil
 
-		meta.SetStatusCondition(
-			&liferayEnvironment.Status.Conditions,
+		return liferayEnvironmentReconciler.degradeLicense(
 			metav1.Condition{
 				Message: error.Error(),
 				Reason:  "Invalid",
 				Status:  metav1.ConditionFalse,
 				Type:    conditionLicenseValid,
 			},
-		)
-
-		liferayEnvironment.Status.Phase = "Degraded"
-
-		return liferayEnvironmentReconciler.finishAfter(
-			context, liferayEnvironment, liferayEnvironmentReconciler.HeartbeatInterval,
+			context, liferayEnvironment, 0,
 		)
 	}
 
@@ -564,28 +552,24 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense
 	liferayEnvironment.Status.License.ValidUntil = &validUntil
 
 	if now.After(expirationDate) {
+		replicaCeiling := expirationReplicaCeiling(
+			expirationDate, liferayEnvironmentReconciler.ExpirationGracePeriod,
+			maxClusterNodes, now.Time,
+		)
+
 		logger.Info(
 			"License expired",
 			"environmentID", environmentID,
 			"expirationDate", expirationDate,
+			"replicaCeiling", replicaCeiling,
 		)
 
-		meta.SetStatusCondition(
-			&liferayEnvironment.Status.Conditions,
-			metav1.Condition{
-				Message: fmt.Sprintf(
-					"License expired on %s.", expirationDate.Format(time.RFC3339),
-				),
-				Reason: "Expired",
-				Status: metav1.ConditionFalse,
-				Type:   conditionLicenseValid,
-			},
-		)
-
-		liferayEnvironment.Status.Phase = "Degraded"
-
-		return liferayEnvironmentReconciler.finishAfter(
-			context, liferayEnvironment, liferayEnvironmentReconciler.HeartbeatInterval,
+		return liferayEnvironmentReconciler.degradeLicense(
+			expiredLicenseCondition(
+				expirationDate, liferayEnvironmentReconciler.ExpirationGracePeriod,
+				now.Time, replicaCeiling,
+			),
+			context, liferayEnvironment, replicaCeiling,
 		)
 	}
 
@@ -609,12 +593,100 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceLicense
 	return controllerruntime.Result{RequeueAfter: requeueAfter}, nil
 }
 
+func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceProvisioningGracePeriod(
+	context context.Context,
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+) error {
+	if liferayEnvironment.Status.UnreachableSince == nil {
+		return nil
+	}
+
+	now := time.Now()
+
+	provisioningGracePeriodExpired := now.Sub(liferayEnvironment.Status.UnreachableSince.Time) >=
+		liferayEnvironmentReconciler.ProvisioningGracePeriod
+
+	expirationCeiling, expiredCondition, licenseExpired :=
+		liferayEnvironmentReconciler.evaluateLastKnownLicense(liferayEnvironment, now)
+
+	if !provisioningGracePeriodExpired && !licenseExpired {
+		return nil
+	}
+
+	var replicaCeilings []int32
+
+	if liferayEnvironment.Status.ReplicaCeiling != nil {
+		replicaCeilings = append(replicaCeilings, *liferayEnvironment.Status.ReplicaCeiling)
+	}
+
+	if provisioningGracePeriodExpired {
+		replicaCeilings = append(replicaCeilings, provisioningGracePeriodReplicaCeiling)
+	}
+
+	if licenseExpired {
+		meta.SetStatusCondition(&liferayEnvironment.Status.Conditions, expiredCondition)
+
+		replicaCeilings = append(replicaCeilings, expirationCeiling)
+	}
+
+	replicaCeiling := slices.Min(replicaCeilings)
+
+	if _, error := liferayEnvironmentReconciler.enforceReplicaCeiling(
+		context, liferayEnvironment, replicaCeiling,
+	); error != nil {
+		return error
+	}
+
+	if !provisioningGracePeriodExpired {
+		return nil
+	}
+
+	message := fmt.Sprintf(
+		"Provisioning has been unreachable since %s; the replica ceiling of %q is %d.",
+		liferayEnvironment.Status.UnreachableSince.Format(time.RFC3339),
+		liferayEnvironment.Spec.WorkloadRef.Name,
+		replicaCeiling,
+	)
+
+	if !meta.IsStatusConditionTrue(
+		liferayEnvironment.Status.Conditions, conditionProvisioningGracePeriodExpired,
+	) {
+		logf.FromContext(context).Error(
+			nil, message, "environmentID", liferayEnvironment.Status.EnvironmentID,
+		)
+
+		liferayEnvironmentReconciler.Recorder.Event(
+			liferayEnvironment,
+			corev1.EventTypeWarning,
+			"ProvisioningGracePeriodExpired",
+			message,
+		)
+	}
+
+	meta.SetStatusCondition(
+		&liferayEnvironment.Status.Conditions,
+		metav1.Condition{
+			Message: message,
+			Reason:  "ProvisioningUnreachable",
+			Status:  metav1.ConditionTrue,
+			Type:    conditionProvisioningGracePeriodExpired,
+		},
+	)
+
+	return nil
+}
+
 func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceReplicaCeiling(
 	context context.Context,
 	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
 	replicaCeiling int32,
 ) (time.Duration, error) {
 	logger := logf.FromContext(context)
+
+	ceilingChanged := liferayEnvironment.Status.ReplicaCeiling == nil ||
+		*liferayEnvironment.Status.ReplicaCeiling != replicaCeiling
+
+	liferayEnvironment.Status.ReplicaCeiling = &replicaCeiling
 
 	statefulSet := &appsv1.StatefulSet{}
 
@@ -654,16 +726,40 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceReplica
 
 	desiredReplicas := resolveDesiredReplicas(liferayEnvironment, statefulSet)
 
+	markedScaledToZero := statefulSet.Annotations[annotationScaledToZero] == "true"
+
+	if markedScaledToZero && replicaCeiling > 0 && liferayEnvironment.Spec.Autoscaling != nil {
+		desiredReplicas = max(desiredReplicas, liferayEnvironment.Spec.Autoscaling.MinReplicas)
+	}
+
 	effectiveReplicas := min(desiredReplicas, replicaCeiling)
 
-	if statefulSet.Spec.Replicas == nil || *statefulSet.Spec.Replicas != effectiveReplicas {
-		liveReplicas := statefulSet.Spec.Replicas
+	markScaledToZero := liferayEnvironment.Spec.Autoscaling != nil && replicaCeiling == 0 &&
+		(markedScaledToZero || statefulSet.Spec.Replicas == nil || *statefulSet.Spec.Replicas > 0)
 
+	replicasChanged := statefulSet.Spec.Replicas == nil ||
+		*statefulSet.Spec.Replicas != effectiveReplicas
+
+	if ceilingChanged || replicasChanged {
 		if error := liferayEnvironmentReconciler.Status().Update(context, liferayEnvironment); error != nil {
 			return 0, error
 		}
+	}
+
+	if replicasChanged || markScaledToZero != markedScaledToZero {
+		liveReplicas := statefulSet.Spec.Replicas
 
 		statefulSet.Spec.Replicas = &effectiveReplicas
+
+		if markScaledToZero {
+			if statefulSet.Annotations == nil {
+				statefulSet.Annotations = map[string]string{}
+			}
+
+			statefulSet.Annotations[annotationScaledToZero] = "true"
+		} else {
+			delete(statefulSet.Annotations, annotationScaledToZero)
+		}
 
 		if error := liferayEnvironmentReconciler.Update(
 			context, statefulSet, client.FieldOwner(fieldOwner),
@@ -747,7 +843,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceReplica
 			&liferayEnvironment.Status.Conditions,
 			metav1.Condition{
 				Message: fmt.Sprintf(
-					"Requested %d replicas exceeds the licensed maximum of %d; capping to %d.",
+					"Requested %d replicas exceeds the replica ceiling of %d; capping to %d.",
 					requestedReplicas, replicaCeiling, replicaCeiling,
 				),
 				Reason: "ExceedsLicensedMaximum",
@@ -798,19 +894,6 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceScaledO
 		return error
 	}
 
-	patchJSON, error := json.Marshal(
-		map[string]any{
-			"spec": map[string]any{
-				"maxReplicaCount": replicaBounds.Maximum,
-				"minReplicaCount": replicaBounds.Minimum,
-			},
-		},
-	)
-
-	if error != nil {
-		return error
-	}
-
 	for index := range scaledObjectList.Items {
 		scaledObject := &scaledObjectList.Items[index]
 
@@ -829,12 +912,43 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceScaledO
 			continue
 		}
 
-		if scaledObjectSpec.MaxReplicaCount != nil &&
+		annotations := scaledObject.GetAnnotations()
+
+		patchAnnotations := map[string]any{}
+
+		if replicaBounds.Paused && annotations[annotationPausedReplicas] != "0" {
+			patchAnnotations[annotationPausedReplicas] = "0"
+			patchAnnotations[annotationPausedReplicasOwner] = "true"
+		}
+
+		if !replicaBounds.Paused && annotations[annotationPausedReplicasOwner] == "true" {
+			patchAnnotations[annotationPausedReplicas] = nil
+			patchAnnotations[annotationPausedReplicasOwner] = nil
+		}
+
+		if len(patchAnnotations) == 0 &&
+			scaledObjectSpec.MaxReplicaCount != nil &&
 			*scaledObjectSpec.MaxReplicaCount == replicaBounds.Maximum &&
 			scaledObjectSpec.MinReplicaCount != nil &&
 			*scaledObjectSpec.MinReplicaCount == replicaBounds.Minimum {
 
 			continue
+		}
+
+		patchJSON, error := json.Marshal(
+			map[string]any{
+				"metadata": map[string]any{
+					"annotations": patchAnnotations,
+				},
+				"spec": map[string]any{
+					"maxReplicaCount": replicaBounds.Maximum,
+					"minReplicaCount": replicaBounds.Minimum,
+				},
+			},
+		)
+
+		if error != nil {
+			return error
 		}
 
 		if error := liferayEnvironmentReconciler.Patch(
@@ -851,6 +965,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) enforceScaledO
 			"autoscaler", scaledObject.GetName(),
 			"maxReplicas", replicaBounds.Maximum,
 			"minReplicas", replicaBounds.Minimum,
+			"paused", replicaBounds.Paused,
 		)
 	}
 
@@ -1020,6 +1135,76 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) environmentDir
 	namespace string,
 ) string {
 	return filepath.Join(liferayEnvironmentReconciler.MarketplaceMountPath, namespace)
+}
+
+func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) evaluateLastKnownLicense(
+	liferayEnvironment *licensingv1alpha1.LiferayEnvironment,
+	now time.Time,
+) (int32, metav1.Condition, bool) {
+	licenseStatus := liferayEnvironment.Status.License
+
+	if licenseStatus.MaxClusterNodes == nil || licenseStatus.ValidUntil == nil ||
+		!now.After(licenseStatus.ValidUntil.Time) {
+
+		return 0, metav1.Condition{}, false
+	}
+
+	expirationCeiling := expirationReplicaCeiling(
+		licenseStatus.ValidUntil.Time, liferayEnvironmentReconciler.ExpirationGracePeriod,
+		*licenseStatus.MaxClusterNodes, now,
+	)
+
+	return expirationCeiling, expiredLicenseCondition(
+		licenseStatus.ValidUntil.Time, liferayEnvironmentReconciler.ExpirationGracePeriod,
+		now, expirationCeiling,
+	), true
+}
+
+func expirationReplicaCeiling(
+	expirationDate time.Time,
+	expirationGracePeriod time.Duration,
+	maxClusterNodes int32,
+	now time.Time,
+) int32 {
+	if !now.After(expirationDate) {
+		return maxClusterNodes
+	}
+
+	if now.Before(expirationDate.Add(expirationGracePeriod)) {
+		return min(expirationGracePeriodReplicaCeiling, maxClusterNodes)
+	}
+
+	return 0
+}
+
+func expiredLicenseCondition(
+	expirationDate time.Time,
+	expirationGracePeriod time.Duration,
+	now time.Time,
+	replicaCeiling int32,
+) metav1.Condition {
+	gracePeriodEnd := expirationDate.Add(expirationGracePeriod)
+
+	message := fmt.Sprintf(
+		"License expired on %s; replicas are capped at %d until the grace period ends on %s.",
+		expirationDate.Format(time.RFC3339), replicaCeiling,
+		gracePeriodEnd.Format(time.RFC3339),
+	)
+
+	if !now.Before(gracePeriodEnd) {
+		message = fmt.Sprintf(
+			"License expired on %s and its grace period ended on %s; replicas are capped at %d.",
+			expirationDate.Format(time.RFC3339), gracePeriodEnd.Format(time.RFC3339),
+			replicaCeiling,
+		)
+	}
+
+	return metav1.Condition{
+		Message: message,
+		Reason:  "Expired",
+		Status:  metav1.ConditionFalse,
+		Type:    conditionLicenseValid,
+	}
 }
 
 func extractLiferayImageTag(image string) string {
@@ -1203,7 +1388,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) handleOnlineAc
 
 		liferayEnvironment.Status.Phase = "Degraded"
 
-		if error := liferayEnvironmentReconciler.enforceGracePeriod(
+		if error := liferayEnvironmentReconciler.enforceProvisioningGracePeriod(
 			context, liferayEnvironment,
 		); error != nil {
 			return nil, controllerruntime.Result{}, error
@@ -1500,19 +1685,21 @@ func scalesWorkload(
 type LiferayEnvironmentReconciler struct {
 	client.Client
 
-	GracePeriod          time.Duration
-	HeartbeatInterval    time.Duration
-	MarketplaceMountPath string
-	Provisioning         provisioning.Client
-	Recorder             record.EventRecorder
-	RetryInitialDelay    time.Duration
-	RetryMaxDelay        time.Duration
-	Syncer               *addon.Syncer
+	ExpirationGracePeriod   time.Duration
+	HeartbeatInterval       time.Duration
+	MarketplaceMountPath    string
+	Provisioning            provisioning.Client
+	ProvisioningGracePeriod time.Duration
+	Recorder                record.EventRecorder
+	RetryInitialDelay       time.Duration
+	RetryMaxDelay           time.Duration
+	Syncer                  *addon.Syncer
 }
 
 type replicaBounds struct {
 	Maximum int32
 	Minimum int32
+	Paused  bool
 }
 
 type scaledObjectScaleTargetRef struct {

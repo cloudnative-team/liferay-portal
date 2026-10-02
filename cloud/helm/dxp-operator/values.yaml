@@ -2,8 +2,8 @@ affinity: {}
 customLabels: {}
 debug: false
 downloadPollInterval: 15s
+expirationGracePeriod: 2160h
 fullnameOverride: ""
-gracePeriod: 168h
 heartbeatInterval: 10m
 image:
     pullPolicy: IfNotPresent
@@ -49,6 +49,7 @@ probes:
     port: 8081
 provisioning:
     baseURL: https://api.one.liferay.com
+provisioningGracePeriod: 168h
 rbac:
     create: true
 replicaCount: 1
