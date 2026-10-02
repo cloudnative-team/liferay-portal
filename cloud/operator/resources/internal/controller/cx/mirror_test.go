@@ -27,7 +27,8 @@ func TestReconcileDeletesExtInitMirrorNoLongerRequired(t *testing.T) {
 	addOAuth2Application(clientExtension, userAgentApplicationPID)
 
 	clientExtensionReconciler := newReconciler(
-		nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"), newExtInit(),
+		nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+		newExtInit("able-oauth-application-user-agent"),
 	)
 
 	reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
@@ -104,9 +105,9 @@ func TestReconcileMirrorsExtInitIntoClientExtensionNamespace(t *testing.T) {
 
 	addOAuth2Application(clientExtension, userAgentApplicationPID)
 
-	extInit := newExtInit()
+	extInit := newExtInit("able-oauth-application-user-agent")
 
-	extInit.Data = map[string]string{"able-oauth-application-user-agent.oauth2.user.agent.client.id": "able-id"}
+	extInit.Data["able-oauth-application-user-agent.oauth2.user.agent.client.id"] = "able-id"
 
 	clientExtensionReconciler := newReconciler(
 		nil, t, clientExtension, extInit, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
@@ -146,13 +147,38 @@ func TestReconcileMirrorsExtInitIntoClientExtensionNamespace(t *testing.T) {
 	}
 }
 
+func TestReconcileMirrorsExtInitWhileAnApplicationIsMissing(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	addOAuth2Application(clientExtension, userAgentApplicationPID)
+
+	extInit := newExtInit()
+
+	extInit.Data["baker-oauth-application-user-agent.oauth2.token.uri"] = "/o/oauth2/token"
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, clientExtension, extInit, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	if phase, _ := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); phase != cxv1alpha1.PhasePending {
+		t.Errorf("phase = %q, want %q", phase, cxv1alpha1.PhasePending)
+	}
+
+	configMap := getConfigMap(clientExtensionReconciler, "able-liferay.com-lxc-ext-init-metadata", "able", t)
+
+	if (configMap == nil) || !maps.Equal(configMap.Data, extInit.Data) {
+		t.Errorf("Expected ext-init to be mirrored as DXP has written it so far, got %v", configMap)
+	}
+}
+
 func TestReconcileMirrorsNothingIntoDxpNamespace(t *testing.T) {
 	clientExtension := newClientExtension("", "able", "liferay-dev")
 
 	addOAuth2Application(clientExtension, userAgentApplicationPID)
 
 	clientExtensionReconciler := newReconciler(
-		nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newExtInit(),
+		nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"),
+		newExtInit("able-oauth-application-user-agent"),
 	)
 
 	if phase, _ := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); phase != cxv1alpha1.PhaseReady {

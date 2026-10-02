@@ -404,7 +404,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 	clientExtension *cxv1alpha1.ClientExtension,
 	context context.Context,
 	dxpNamespace string,
-) (metav1.Condition, error) {
+) (metav1.Condition, *corev1.ConfigMap, error) {
 	externalReferenceCodes := extInitApplicationERCs(clientExtension)
 
 	if len(externalReferenceCodes) == 0 {
@@ -412,7 +412,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 			metav1.ConditionTrue,
 			"The configs declare no OAuth2 application, so they require no ext-init ConfigMap from DXP.",
 			ReasonNoExtInitRequired,
-		), nil
+		), nil, nil
 	}
 
 	var extInitConfigMap corev1.ConfigMap
@@ -422,7 +422,13 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 	if error := clientExtensionReconciler.Get(
 		context, extInitConfigMapName, &extInitConfigMap,
 	); client.IgnoreNotFound(error) != nil {
-		return metav1.Condition{}, error
+		return metav1.Condition{}, nil, error
+	}
+
+	var existingExtInitConfigMap *corev1.ConfigMap
+
+	if extInitConfigMap.ResourceVersion != "" {
+		existingExtInitConfigMap = &extInitConfigMap
 	}
 
 	var missingExternalReferenceCodes []string
@@ -444,14 +450,14 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 				extInitConfigMapName.Namespace,
 			),
 			ReasonExtInitMissing,
-		), nil
+		), existingExtInitConfigMap, nil
 	}
 
 	return newCondition(
 		metav1.ConditionTrue,
 		fmt.Sprintf("DXP wrote ConfigMap %q in namespace %q.", extInitConfigMapName.Name, extInitConfigMapName.Namespace),
 		ReasonProvisioned,
-	), nil
+	), existingExtInitConfigMap, nil
 }
 
 func readyCondition(conditions []metav1.Condition) metav1.Condition {
