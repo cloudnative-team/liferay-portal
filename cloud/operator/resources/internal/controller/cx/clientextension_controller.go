@@ -158,7 +158,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
-	undeletedConfigMapNames, error := clientExtensionReconciler.deleteStaleExtProvisions(
+	undeletedConfigMapNames, error := clientExtensionReconciler.cleanUpStaleExtProvisions(
 		context, currentConfigMapName, ownedExtProvisions,
 	)
 
@@ -313,12 +313,12 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyExtProvision(
 	return nil, configMap.ResourceVersion, nil
 }
 
-func (clientExtensionReconciler *ClientExtensionReconciler) deleteStaleExtProvisions(
+func (clientExtensionReconciler *ClientExtensionReconciler) cleanUpStaleExtProvisions(
 	context context.Context,
 	current types.NamespacedName,
 	ownedExtProvisions []corev1.ConfigMap,
 ) ([]string, error) {
-	var undeletedConfigMapNames []string
+	var forbiddenConfigMapNames []string
 
 	for index := range ownedExtProvisions {
 		configMap := &ownedExtProvisions[index]
@@ -330,8 +330,8 @@ func (clientExtensionReconciler *ClientExtensionReconciler) deleteStaleExtProvis
 		error := clientExtensionReconciler.Delete(context, configMap)
 
 		if apierrors.IsForbidden(error) {
-			undeletedConfigMapNames = append(
-				undeletedConfigMapNames, fmt.Sprintf("%q", client.ObjectKeyFromObject(configMap).String()),
+			forbiddenConfigMapNames = append(
+				forbiddenConfigMapNames, fmt.Sprintf("%q", client.ObjectKeyFromObject(configMap).String()),
 			)
 
 			continue
@@ -342,9 +342,9 @@ func (clientExtensionReconciler *ClientExtensionReconciler) deleteStaleExtProvis
 		}
 	}
 
-	slices.Sort(undeletedConfigMapNames)
+	slices.Sort(forbiddenConfigMapNames)
 
-	return undeletedConfigMapNames, nil
+	return forbiddenConfigMapNames, nil
 }
 
 func extInitGraceRemaining(status *cxv1alpha1.ClientExtensionStatus) time.Duration {
@@ -388,8 +388,8 @@ func (clientExtensionReconciler *ClientExtensionReconciler) mirrorFailedMessage(
 ) string {
 	if apierrors.IsForbidden(mirrorError) {
 		return fmt.Sprintf(
-			"The DXP operator is not permitted to write ConfigMaps in namespace %q, so it cannot mirror DXP's metadata there. Bind ClusterRole %q to ServiceAccount %q in that namespace.",
-			clientExtension.Namespace, deliveryClusterRoleName, clientExtensionReconciler.ServiceAccount,
+			"Mirror DXP metadata forbidden: the DXP operator is not permitted to write ConfigMaps in namespace %q.",
+			clientExtension.Namespace,
 		)
 	}
 

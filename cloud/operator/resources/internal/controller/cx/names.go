@@ -123,6 +123,16 @@ func ownsMirror(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.C
 	)
 }
 
+func ownsMirrorAlone(clientExtension *cxv1alpha1.ClientExtension, configMap *corev1.ConfigMap) bool {
+	return (len(configMap.OwnerReferences) > 0) &&
+		!slices.ContainsFunc(
+			configMap.OwnerReferences,
+			func(ownerReference metav1.OwnerReference) bool {
+				return clientExtension.UID != ownerReference.UID
+			},
+		)
+}
+
 var extInitFactoryPIDs = []string{
 	"com.liferay.oauth2.provider.configuration.OAuth2ProviderApplicationHeadlessServerConfiguration",
 	"com.liferay.oauth2.provider.configuration.OAuth2ProviderApplicationUserAgentConfiguration",

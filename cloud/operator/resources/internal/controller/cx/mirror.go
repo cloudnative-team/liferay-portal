@@ -34,7 +34,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyMirror(
 	_, error := controllerutil.CreateOrUpdate(
 		context, clientExtensionReconciler.Client, configMap,
 		func() error {
-			if (configMap.ResourceVersion != "") && !isMirrorOf(configMap, sourceReference) {
+			if (configMap.ResourceVersion != "") && !mayWriteMirror(clientExtension, configMap, sourceReference) {
 				return mirrorConflictError(configMap, sourceReference)
 			}
 
@@ -80,7 +80,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyMirror(
 			return getError
 		}
 
-		if !isMirrorOf(&existingConfigMap, sourceReference) {
+		if !mayWriteMirror(clientExtension, &existingConfigMap, sourceReference) {
 			return mirrorConflictError(&existingConfigMap, sourceReference)
 		}
 	}
@@ -88,7 +88,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyMirror(
 	return error
 }
 
-func (clientExtensionReconciler *ClientExtensionReconciler) deleteStaleMirrors(
+func (clientExtensionReconciler *ClientExtensionReconciler) cleanUpStaleMirrors(
 	clientExtension *cxv1alpha1.ClientExtension,
 	context context.Context,
 	mirrorNames []string,
@@ -136,6 +136,18 @@ func isMirrorOf(configMap *corev1.ConfigMap, sourceReference string) bool {
 	return (configMap.Labels[LabelMirror] == "true") && (configMap.Annotations[AnnotationSource] == sourceReference)
 }
 
+// mayWriteMirror also allows repointing a mirror that only this client extension
+// uses, which happens when its dxpNamespace moves to another DXP whose
+// ConfigMaps have the same names.
+func mayWriteMirror(
+	clientExtension *cxv1alpha1.ClientExtension,
+	configMap *corev1.ConfigMap,
+	sourceReference string,
+) bool {
+	return isMirrorOf(configMap, sourceReference) ||
+		((configMap.Labels[LabelMirror] == "true") && ownsMirrorAlone(clientExtension, configMap))
+}
+
 func mirrorConflictError(configMap *corev1.ConfigMap, sourceReference string) error {
 	return fmt.Errorf("configmap %q exists and is not the operator's mirror of %q", configMap.Name, sourceReference)
 }
@@ -147,7 +159,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) mirrorMetadata(
 	extInit *corev1.ConfigMap,
 ) error {
 	if clientExtension.Namespace == dxpMetadata.Namespace {
-		return clientExtensionReconciler.deleteStaleMirrors(clientExtension, context, nil)
+		return clientExtensionReconciler.cleanUpStaleMirrors(clientExtension, context, nil)
 	}
 
 	if error := clientExtensionReconciler.applyMirror(clientExtension, context, false, dxpMetadata); error != nil {
@@ -164,7 +176,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) mirrorMetadata(
 		mirrorNames = append(mirrorNames, extInit.Name)
 	}
 
-	return clientExtensionReconciler.deleteStaleMirrors(clientExtension, context, mirrorNames)
+	return clientExtensionReconciler.cleanUpStaleMirrors(clientExtension, context, mirrorNames)
 }
 
 func requestsForMirror(object client.Object) []reconcile.Request {

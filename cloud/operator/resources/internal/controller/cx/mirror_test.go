@@ -204,6 +204,44 @@ func TestReconcileMirrorsNothingIntoDxpNamespace(t *testing.T) {
 	}
 }
 
+func TestReconcileRefusesToRepointSharedMirror(t *testing.T) {
+	able := newClientExtension("liferay-dev", "able", "able")
+	baker := newClientExtension("liferay-dev", "baker", "able")
+
+	uatNamespace := newDxpNamespace("able")
+
+	uatNamespace.Name = "liferay-uat"
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, able, baker,
+		newDxpMetadata("liferay-dev", "liferay.com"), newDxpMetadata("liferay-uat", "liferay.com"),
+		newDxpNamespace("able"), uatNamespace,
+	)
+
+	reconcileClientExtension(able, clientExtensionReconciler, t)
+	reconcileClientExtension(baker, clientExtensionReconciler, t)
+
+	updatedClientExtension := getClientExtension(able, clientExtensionReconciler, t)
+
+	updatedClientExtension.Spec.DxpNamespace = "liferay-uat"
+
+	if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
+		t.Fatal(error)
+	}
+
+	reconcileClientExtension(able, clientExtensionReconciler, t)
+
+	if provisioned := getCondition(able, clientExtensionReconciler, cxv1alpha1.ConditionProvisioned, t); (provisioned == nil) || (provisioned.Reason != ReasonMirrorFailed) {
+		t.Errorf("Provisioned = %v, want reason %s: baker still uses the mirror of liferay-dev", provisioned, ReasonMirrorFailed)
+	}
+
+	configMap := getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t)
+
+	if source := configMap.Annotations[AnnotationSource]; source != "liferay-dev/liferay.com-lxc-dxp-metadata" {
+		t.Errorf("source = %q, want the mirror baker uses left alone", source)
+	}
+}
+
 func TestReconcileReleasesStaleDxpMetadataMirror(t *testing.T) {
 	able := newClientExtension("liferay-dev", "able", "able")
 	baker := newClientExtension("liferay-dev", "baker", "able")
@@ -274,6 +312,47 @@ func TestReconcileReplacesMirrorDataWhenSourceChanges(t *testing.T) {
 
 	if !maps.Equal(configMap.Data, extInit.Data) {
 		t.Errorf("data = %v, want %v: a key DXP removed must not linger in the mirror", configMap.Data, extInit.Data)
+	}
+}
+
+func TestReconcileRepointsItsOwnMirrorWhenDxpNamespaceChanges(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	uatDxpMetadata := newDxpMetadata("liferay-uat", "liferay.com")
+
+	uatDxpMetadata.Data = map[string]string{"com.liferay.lxc.dxp.mainDomain": "uat.example.com"}
+
+	uatNamespace := newDxpNamespace("able")
+
+	uatNamespace.Name = "liferay-uat"
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), uatDxpMetadata,
+		newDxpNamespace("able"), uatNamespace,
+	)
+
+	reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	updatedClientExtension := getClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	updatedClientExtension.Spec.DxpNamespace = "liferay-uat"
+
+	if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
+		t.Fatal(error)
+	}
+
+	if phase, _ := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); phase != cxv1alpha1.PhaseReady {
+		t.Errorf("phase = %q, want %q", phase, cxv1alpha1.PhaseReady)
+	}
+
+	configMap := getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t)
+
+	if source := configMap.Annotations[AnnotationSource]; source != "liferay-uat/liferay.com-lxc-dxp-metadata" {
+		t.Errorf("source = %q, want %q", source, "liferay-uat/liferay.com-lxc-dxp-metadata")
+	}
+
+	if !maps.Equal(configMap.Data, uatDxpMetadata.Data) {
+		t.Errorf("data = %v, want %v", configMap.Data, uatDxpMetadata.Data)
 	}
 }
 
@@ -365,8 +444,6 @@ func TestReconcileReportsMirrorNotPermitted(t *testing.T) {
 		t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
 	)
 
-	clientExtensionReconciler.ServiceAccount = "liferay-system/dxp-operator"
-
 	reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
 
 	provisioned := getCondition(clientExtension, clientExtensionReconciler, cxv1alpha1.ConditionProvisioned, t)
@@ -375,14 +452,8 @@ func TestReconcileReportsMirrorNotPermitted(t *testing.T) {
 		t.Fatalf("Provisioned = %v, want reason %s", provisioned, ReasonMirrorFailed)
 	}
 
-	for _, message := range []string{
-		`namespace "able"`,
-		`ClusterRole "client-extension-delivery-cluster-role"`,
-		`ServiceAccount "liferay-system/dxp-operator"`,
-	} {
-		if !strings.Contains(provisioned.Message, message) {
-			t.Errorf("Expected the message to contain %q, got %q", message, provisioned.Message)
-		}
+	if want := `Mirror DXP metadata forbidden: the DXP operator is not permitted to write ConfigMaps in namespace "able".`; provisioned.Message != want {
+		t.Errorf("Provisioned message = %q, want %q", provisioned.Message, want)
 	}
 }
 
