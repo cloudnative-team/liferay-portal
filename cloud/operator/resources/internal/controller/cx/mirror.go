@@ -11,10 +11,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	controllerutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	reconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+func (mirrorOwnedElsewhereError *mirrorOwnedElsewhereError) Error() string {
+	return mirrorOwnedElsewhereError.message
+}
 
 func (clientExtensionReconciler *ClientExtensionReconciler) applyMirror(
 	clientExtension *cxv1alpha1.ClientExtension,
@@ -68,7 +73,9 @@ func (clientExtensionReconciler *ClientExtensionReconciler) applyMirror(
 	var alreadyOwnedError *controllerutil.AlreadyOwnedError
 
 	if errors.As(error, &alreadyOwnedError) {
-		return fmt.Errorf("configmap %q mirrors %q for another client extension", configMap.Name, sourceReference)
+		return &mirrorOwnedElsewhereError{
+			message: fmt.Sprintf("configmap %q mirrors %q for another client extension", configMap.Name, sourceReference),
+		}
 	}
 
 	if apierrors.IsAlreadyExists(error) {
@@ -124,7 +131,9 @@ func (clientExtensionReconciler *ClientExtensionReconciler) cleanUpStaleMirrors(
 			continue
 		}
 
-		if error := clientExtensionReconciler.Delete(context, configMap); client.IgnoreNotFound(error) != nil {
+		if error := clientExtensionReconciler.Delete(
+			context, configMap, client.Preconditions{ResourceVersion: &configMap.ResourceVersion},
+		); client.IgnoreNotFound(error) != nil {
 			return error
 		}
 	}
@@ -149,7 +158,11 @@ func mayWriteMirror(
 }
 
 func mirrorConflictError(configMap *corev1.ConfigMap, sourceReference string) error {
-	return fmt.Errorf("configmap %q exists and is not the operator's mirror of %q", configMap.Name, sourceReference)
+	return &mirrorOwnedElsewhereError{
+		message: fmt.Sprintf(
+			"configmap %q exists and is not the operator's mirror of %q", configMap.Name, sourceReference,
+		),
+	}
 }
 
 func (clientExtensionReconciler *ClientExtensionReconciler) mirrorMetadata(
@@ -183,7 +196,9 @@ func requestsForMirror(object client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 
 	for _, ownerReference := range object.GetOwnerReferences() {
-		if (cxv1alpha1.SchemeBuilder.GroupVersion.String() != ownerReference.APIVersion) ||
+		groupVersion, error := schema.ParseGroupVersion(ownerReference.APIVersion)
+
+		if (error != nil) || (cxv1alpha1.SchemeBuilder.GroupVersion.Group != groupVersion.Group) ||
 			(ownerReference.Kind != "ClientExtension") {
 
 			continue
@@ -195,4 +210,8 @@ func requestsForMirror(object client.Object) []reconcile.Request {
 	}
 
 	return requests
+}
+
+type mirrorOwnedElsewhereError struct {
+	message string
 }

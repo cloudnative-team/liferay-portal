@@ -72,13 +72,17 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 	}
 
 	if refusedReason != "" {
-		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
+		if error := clientExtensionReconciler.updateStatus(
 			&clientExtension, context,
 			newCondition(
 				metav1.ConditionFalse, refusalMessage(&clientExtension, dxpNamespace, refusedReason), refusedReason,
 			),
 			"", nil,
-		)
+		); error != nil {
+			return controllerruntime.Result{}, error
+		}
+
+		return controllerruntime.Result{}, clientExtensionReconciler.cleanUpStaleMirrors(&clientExtension, context, nil)
 	}
 
 	var dxpMetadata corev1.ConfigMap
@@ -92,19 +96,23 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		&dxpMetadata,
 	)
 
-	if apierrors.IsNotFound(error) {
-		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
+	if client.IgnoreNotFound(error) != nil {
+		return controllerruntime.Result{}, error
+	}
+
+	if apierrors.IsNotFound(error) || (dxpMetadata.Labels[LabelMirror] == "true") {
+		if error := clientExtensionReconciler.updateStatus(
 			&clientExtension, context,
 			newCondition(
 				metav1.ConditionFalse, unknownVirtualInstanceMessage(&clientExtension, dxpNamespace),
 				ReasonUnknownVirtualInstance,
 			),
 			"", nil,
-		)
-	}
+		); error != nil {
+			return controllerruntime.Result{}, error
+		}
 
-	if error != nil {
-		return controllerruntime.Result{}, error
+		return controllerruntime.Result{}, clientExtensionReconciler.cleanUpStaleMirrors(&clientExtension, context, nil)
 	}
 
 	payload, error := json.MarshalIndent(clientExtension.Spec.Configs, "", "\t")
@@ -158,7 +166,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
-	undeletedConfigMapNames, error := clientExtensionReconciler.cleanUpStaleExtProvisions(
+	forbiddenConfigMapNames, error := clientExtensionReconciler.cleanUpStaleExtProvisions(
 		context, currentConfigMapName, ownedExtProvisions,
 	)
 
@@ -170,10 +178,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		"Delivered to ConfigMap %q in namespace %q.", currentConfigMapName.Name, currentConfigMapName.Namespace,
 	)
 
-	if len(undeletedConfigMapNames) > 0 {
+	if len(forbiddenConfigMapNames) > 0 {
 		message += fmt.Sprintf(
 			" Unable to delete the stale ConfigMaps %s: the DXP operator is no longer permitted to write in their namespace.",
-			strings.Join(undeletedConfigMapNames, ", "),
+			strings.Join(forbiddenConfigMapNames, ", "),
 		)
 	}
 
@@ -189,17 +197,17 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	mirrorError := clientExtensionReconciler.mirrorMetadata(&clientExtension, context, &dxpMetadata, extInitConfigMap)
 
-	if apierrors.IsAlreadyExists(mirrorError) || apierrors.IsConflict(mirrorError) {
-		return controllerruntime.Result{}, mirrorError
-	}
+	var mirrorOwnedElsewhereError *mirrorOwnedElsewhereError
 
-	if mirrorError != nil {
+	if apierrors.IsForbidden(mirrorError) || errors.As(mirrorError, &mirrorOwnedElsewhereError) {
 		provisionedCondition = newCondition(
 			metav1.ConditionFalse, clientExtensionReconciler.mirrorFailedMessage(&clientExtension, mirrorError),
 			ReasonMirrorFailed,
 		)
 
 		result.RequeueAfter = refusalRequeueInterval
+	} else if mirrorError != nil {
+		return controllerruntime.Result{}, mirrorError
 	}
 
 	if error := clientExtensionReconciler.updateStatus(

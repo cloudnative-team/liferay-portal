@@ -56,6 +56,154 @@ func TestReconcileDeletesExtInitMirrorNoLongerRequired(t *testing.T) {
 	}
 }
 
+func TestReconcileDeletesMirrorsWhenRefused(t *testing.T) {
+	testCases := map[string]struct {
+		refuse     func(clientExtensionReconciler *ClientExtensionReconciler)
+		wantReason string
+	}{
+		"the DXP namespace no longer permits it": {
+			refuse: func(clientExtensionReconciler *ClientExtensionReconciler) {
+				dxpNamespace := newDxpNamespace("")
+
+				if error := clientExtensionReconciler.Update(context.Background(), dxpNamespace); error != nil {
+					t.Fatal(error)
+				}
+			},
+			wantReason: ReasonNamespaceNotPermitted,
+		},
+		"the virtual instance disappears": {
+			refuse: func(clientExtensionReconciler *ClientExtensionReconciler) {
+				if error := clientExtensionReconciler.Delete(
+					context.Background(), newDxpMetadata("liferay-dev", "liferay.com"),
+				); error != nil {
+					t.Fatal(error)
+				}
+			},
+			wantReason: ReasonUnknownVirtualInstance,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+			addOAuth2Application(clientExtension, userAgentApplicationPID)
+
+			clientExtensionReconciler := newReconciler(
+				nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+				newExtInit("able-oauth-application-user-agent"),
+			)
+
+			reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+			testCase.refuse(clientExtensionReconciler)
+
+			if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != testCase.wantReason {
+				t.Errorf("Delivered reason = %q, want %q", reason, testCase.wantReason)
+			}
+
+			for _, name := range []string{"able-liferay.com-lxc-ext-init-metadata", "liferay.com-lxc-dxp-metadata"} {
+				if getConfigMap(clientExtensionReconciler, name, "able", t) != nil {
+					t.Errorf("Expected the mirror %s to be deleted once the client extension is refused", name)
+				}
+			}
+		})
+	}
+}
+
+func TestReconcileIgnoresMirrorAsDxpMetadata(t *testing.T) {
+	able := newClientExtension("liferay-dev", "able", "able")
+	baker := newClientExtension("", "baker", "able")
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, able, baker, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	reconcileClientExtension(able, clientExtensionReconciler, t)
+
+	if getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t) == nil {
+		t.Fatal("Expected the dxp metadata mirror")
+	}
+
+	if _, reason := reconcileClientExtension(baker, clientExtensionReconciler, t); reason != ReasonUnknownVirtualInstance {
+		t.Errorf("Delivered reason = %q, want %q: a mirror does not make its namespace a DXP", reason, ReasonUnknownVirtualInstance)
+	}
+
+	if getConfigMap(clientExtensionReconciler, "baker-liferay.com-lxc-ext-provision-metadata", "able", t) != nil {
+		t.Error("Expected no ext-provision ConfigMap beside a mirror")
+	}
+}
+
+func TestReconcileKeepsMirrorClaimedAfterTheCacheRead(t *testing.T) {
+	able := newClientExtension("liferay-dev", "able", "able")
+
+	claimBehindTheCache := false
+
+	clientExtensionReconciler := newReconciler(
+		&interceptor.Funcs{
+			List: func(
+				context context.Context, client client.WithWatch, list client.ObjectList,
+				options ...client.ListOption,
+			) error {
+				if error := client.List(context, list, options...); error != nil {
+					return error
+				}
+
+				configMapList, ok := list.(*corev1.ConfigMapList)
+
+				if !ok || !claimBehindTheCache {
+					return nil
+				}
+
+				for _, configMap := range configMapList.Items {
+					if (configMap.Name != "liferay.com-lxc-dxp-metadata") || (configMap.Namespace != "able") {
+						continue
+					}
+
+					claimBehindTheCache = false
+
+					configMap.OwnerReferences = append(
+						configMap.OwnerReferences,
+						metav1.OwnerReference{
+							APIVersion: "cx.liferay.com/v1alpha1", Kind: "ClientExtension", Name: "baker", UID: "able-baker",
+						},
+					)
+
+					if error := client.Update(context, &configMap); error != nil {
+						return error
+					}
+				}
+
+				return nil
+			},
+		},
+		t, able, newDxpMetadata("liferay-dev", "liferay.com"), newDxpMetadata("liferay-dev", "other.test"),
+		newDxpNamespace("able"),
+	)
+
+	reconcileClientExtension(able, clientExtensionReconciler, t)
+
+	updatedClientExtension := getClientExtension(able, clientExtensionReconciler, t)
+
+	updatedClientExtension.Spec.VirtualInstanceID = "other.test"
+
+	if error := clientExtensionReconciler.Update(context.Background(), updatedClientExtension); error != nil {
+		t.Fatal(error)
+	}
+
+	claimBehindTheCache = true
+
+	if _, error := clientExtensionReconciler.Reconcile(
+		context.Background(), controllerruntime.Request{NamespacedName: client.ObjectKeyFromObject(able)},
+	); !apierrors.IsConflict(error) {
+		t.Errorf("Reconcile() error = %v, want a conflict", error)
+	}
+
+	if getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t) == nil {
+		t.Error("Expected the mirror another client extension claimed after the cache read to remain")
+	}
+}
+
 func TestReconcileMirrorsDxpMetadataIntoClientExtensionNamespace(t *testing.T) {
 	clientExtension := newClientExtension("liferay-dev", "able", "able")
 
@@ -457,6 +605,36 @@ func TestReconcileReportsMirrorNotPermitted(t *testing.T) {
 	}
 }
 
+func TestReconcileRetriesTransientMirrorError(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	clientExtensionReconciler := newReconciler(
+		&interceptor.Funcs{
+			Create: func(
+				context context.Context, client client.WithWatch, object client.Object,
+				options ...client.CreateOption,
+			) error {
+				if _, ok := object.(*corev1.ConfigMap); ok && (object.GetNamespace() == "able") {
+					return apierrors.NewServiceUnavailable("etcd is unavailable")
+				}
+
+				return client.Create(context, object, options...)
+			},
+		},
+		t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	if _, error := clientExtensionReconciler.Reconcile(
+		context.Background(), controllerruntime.Request{NamespacedName: client.ObjectKeyFromObject(clientExtension)},
+	); !apierrors.IsServiceUnavailable(error) {
+		t.Errorf("Reconcile() error = %v, want it returned for a retry with backoff", error)
+	}
+
+	if provisioned := getCondition(clientExtension, clientExtensionReconciler, cxv1alpha1.ConditionProvisioned, t); (provisioned != nil) && (provisioned.Reason == ReasonMirrorFailed) {
+		t.Errorf("Provisioned = %v, want no %s for a transient error", provisioned, ReasonMirrorFailed)
+	}
+}
+
 func TestReconcileSharesDxpMetadataMirrorBetweenClientExtensions(t *testing.T) {
 	able := newClientExtension("liferay-dev", "able", "able")
 	baker := newClientExtension("liferay-dev", "baker", "able")
@@ -497,6 +675,8 @@ func TestRequestsForConfigMapMapsMirrorToItsOwners(t *testing.T) {
 				{APIVersion: "cx.liferay.com/v1alpha1", Kind: "ClientExtension", Name: "able", UID: "able-able"},
 				{APIVersion: "apps/v1", Kind: "Deployment", Name: "delta", UID: "able-delta"},
 				{APIVersion: "cx.liferay.com/v1alpha1", Kind: "ClientExtension", Name: "baker", UID: "able-baker"},
+				{APIVersion: "cx.liferay.com/v1beta1", Kind: "ClientExtension", Name: "charlie", UID: "able-charlie"},
+				{APIVersion: "other.liferay.com/v1alpha1", Kind: "ClientExtension", Name: "dog", UID: "able-dog"},
 			},
 		},
 	}
@@ -504,6 +684,7 @@ func TestRequestsForConfigMapMapsMirrorToItsOwners(t *testing.T) {
 	want := []reconcile.Request{
 		{NamespacedName: types.NamespacedName{Name: "able", Namespace: "able"}},
 		{NamespacedName: types.NamespacedName{Name: "baker", Namespace: "able"}},
+		{NamespacedName: types.NamespacedName{Name: "charlie", Namespace: "able"}},
 	}
 
 	if got := clientExtensionReconciler.requestsForConfigMap(context.Background(), configMap); !reflect.DeepEqual(got, want) {
