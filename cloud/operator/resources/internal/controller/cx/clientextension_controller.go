@@ -82,7 +82,20 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 			return controllerruntime.Result{}, error
 		}
 
-		return controllerruntime.Result{}, clientExtensionReconciler.cleanUpStaleMirrors(&clientExtension, context, nil)
+		// The refusal already says what is wrong, so a namespace that no longer
+		// lets the operator delete its mirrors is not retried.
+
+		if error := clientExtensionReconciler.cleanUpStaleMirrors(
+			&clientExtension, context, nil,
+		); apierrors.IsForbidden(error) {
+			controllerruntime.LoggerFrom(context).Info(
+				"Unable to delete the mirrors of a refused client extension", "namespace", clientExtension.Namespace,
+			)
+		} else if error != nil {
+			return controllerruntime.Result{}, error
+		}
+
+		return controllerruntime.Result{}, nil
 	}
 
 	var dxpMetadata corev1.ConfigMap
@@ -100,19 +113,19 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		return controllerruntime.Result{}, error
 	}
 
+	// Mirrors stay when the virtual instance disappears, as the ext-provision
+	// ConfigMap does: the dxp metadata can be missing only briefly, and pods
+	// that restart meanwhile still need them.
+
 	if apierrors.IsNotFound(error) || (dxpMetadata.Labels[LabelMirror] == "true") {
-		if error := clientExtensionReconciler.updateStatus(
+		return controllerruntime.Result{}, clientExtensionReconciler.updateStatus(
 			&clientExtension, context,
 			newCondition(
 				metav1.ConditionFalse, unknownVirtualInstanceMessage(&clientExtension, dxpNamespace),
 				ReasonUnknownVirtualInstance,
 			),
 			"", nil,
-		); error != nil {
-			return controllerruntime.Result{}, error
-		}
-
-		return controllerruntime.Result{}, clientExtensionReconciler.cleanUpStaleMirrors(&clientExtension, context, nil)
+		)
 	}
 
 	payload, error := json.MarshalIndent(clientExtension.Spec.Configs, "", "\t")

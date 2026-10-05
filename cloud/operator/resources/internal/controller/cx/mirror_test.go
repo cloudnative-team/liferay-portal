@@ -71,15 +71,13 @@ func TestReconcileDeletesMirrorsWhenRefused(t *testing.T) {
 			},
 			wantReason: ReasonNamespaceNotPermitted,
 		},
-		"the virtual instance disappears": {
+		"the DXP namespace no longer exists": {
 			refuse: func(clientExtensionReconciler *ClientExtensionReconciler) {
-				if error := clientExtensionReconciler.Delete(
-					context.Background(), newDxpMetadata("liferay-dev", "liferay.com"),
-				); error != nil {
+				if error := clientExtensionReconciler.Delete(context.Background(), newDxpNamespace("able")); error != nil {
 					t.Fatal(error)
 				}
 			},
-			wantReason: ReasonUnknownVirtualInstance,
+			wantReason: ReasonDxpNamespaceNotFound,
 		},
 	}
 
@@ -201,6 +199,81 @@ func TestReconcileKeepsMirrorClaimedAfterTheCacheRead(t *testing.T) {
 
 	if getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t) == nil {
 		t.Error("Expected the mirror another client extension claimed after the cache read to remain")
+	}
+}
+
+func TestReconcileKeepsMirrorsWhenVirtualInstanceDisappears(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	addOAuth2Application(clientExtension, userAgentApplicationPID)
+
+	clientExtensionReconciler := newReconciler(
+		nil, t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+		newExtInit("able-oauth-application-user-agent"),
+	)
+
+	reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	if error := clientExtensionReconciler.Delete(
+		context.Background(), newDxpMetadata("liferay-dev", "liferay.com"),
+	); error != nil {
+		t.Fatal(error)
+	}
+
+	if _, reason := reconcileClientExtension(clientExtension, clientExtensionReconciler, t); reason != ReasonUnknownVirtualInstance {
+		t.Errorf("Delivered reason = %q, want %q", reason, ReasonUnknownVirtualInstance)
+	}
+
+	for _, name := range []string{"able-liferay.com-lxc-ext-init-metadata", "liferay.com-lxc-dxp-metadata"} {
+		if getConfigMap(clientExtensionReconciler, name, "able", t) == nil {
+			t.Errorf("Expected the mirror %s to remain while the virtual instance is missing, which may be brief", name)
+		}
+	}
+}
+
+func TestReconcileLeavesMirrorsItMayNotDeleteWhenRefused(t *testing.T) {
+	clientExtension := newClientExtension("liferay-dev", "able", "able")
+
+	refused := false
+
+	clientExtensionReconciler := newReconciler(
+		&interceptor.Funcs{
+			Delete: func(
+				context context.Context, client client.WithWatch, object client.Object,
+				options ...client.DeleteOption,
+			) error {
+				if _, ok := object.(*corev1.ConfigMap); ok && refused && (object.GetNamespace() == "able") {
+					return apierrors.NewForbidden(corev1.Resource("configmaps"), object.GetName(), errors.New("no RoleBinding"))
+				}
+
+				return client.Delete(context, object, options...)
+			},
+		},
+		t, clientExtension, newDxpMetadata("liferay-dev", "liferay.com"), newDxpNamespace("able"),
+	)
+
+	reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
+
+	if error := clientExtensionReconciler.Update(context.Background(), newDxpNamespace("")); error != nil {
+		t.Fatal(error)
+	}
+
+	refused = true
+
+	result, error := clientExtensionReconciler.Reconcile(
+		context.Background(), controllerruntime.Request{NamespacedName: client.ObjectKeyFromObject(clientExtension)},
+	)
+
+	if (error != nil) || (result != (controllerruntime.Result{})) {
+		t.Errorf("Reconcile() = %+v, %v, want no retry: the refusal already reports what is wrong", result, error)
+	}
+
+	if delivered := getDelivered(clientExtension, clientExtensionReconciler, t); delivered.Reason != ReasonNamespaceNotPermitted {
+		t.Errorf("Delivered reason = %q, want %q", delivered.Reason, ReasonNamespaceNotPermitted)
+	}
+
+	if getConfigMap(clientExtensionReconciler, "liferay.com-lxc-dxp-metadata", "able", t) == nil {
+		t.Error("Expected the mirror the operator may not delete to remain")
 	}
 }
 
