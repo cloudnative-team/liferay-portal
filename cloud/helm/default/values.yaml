@@ -439,6 +439,8 @@ network:
     forceHttpsRedirect: false
     gatewayName: ""
     hostnames: []
+    hsts:
+        enabled: true
     perHostnameRoutes: false
     securityPolicyAuthorizationSpec: {}
     sessionPersistence:
