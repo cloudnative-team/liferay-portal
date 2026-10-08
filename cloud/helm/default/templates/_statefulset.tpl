@@ -296,15 +296,28 @@ spec:
             sectionName: {{ printf "%s-%s" $ctx.statefulset.network.endpointRef $slug }}
     rules:
         -   backendRefs:
-                -   name: {{ include "liferay.name" $ctx.root }}{{ $suffix }}
+                -   group: ""
+                    kind: Service
+                    name: {{ include "liferay.name" $ctx.root }}{{ $suffix }}
                     port: {{ $backendPort }}
+                    weight: 1
+            {{- if $ctx.statefulset.network.hsts.enabled }}
+            filters:
+                -   responseHeaderModifier:
+                        set:
+                            -   name: Strict-Transport-Security
+                                value: max-age=31536000; includeSubDomains; preload
+                    type: ResponseHeaderModifier
+            {{- end }}
             matches:
                 -   path:
                         type: PathPrefix
                         value: /
             {{- with $ctx.statefulset.network.sessionPersistence }}
+            {{- if or (not (hasKey . "enabled")) .enabled }}
             sessionPersistence:
-                {{- toYaml . | nindent 16 }}
+                {{- omit . "enabled" | toYaml | nindent 16 }}
+            {{- end }}
             {{- end }}
             {{- with $ctx.statefulset.network.timeouts }}
             timeouts:
@@ -341,15 +354,28 @@ spec:
         {{- end }}
     rules:
         -   backendRefs:
-                -   name: {{ include "liferay.name" .root }}{{ $suffix }}
+                -   group: ""
+                    kind: Service
+                    name: {{ include "liferay.name" .root }}{{ $suffix }}
                     port: {{ $backendPort }}
+                    weight: 1
+            {{- if .statefulset.network.hsts.enabled }}
+            filters:
+                -   responseHeaderModifier:
+                        set:
+                            -   name: Strict-Transport-Security
+                                value: max-age=31536000; includeSubDomains; preload
+                    type: ResponseHeaderModifier
+            {{- end }}
             matches:
                 -   path:
                         type: PathPrefix
                         value: /
             {{- with .statefulset.network.sessionPersistence }}
+            {{- if or (not (hasKey . "enabled")) .enabled }}
             sessionPersistence:
-                {{- toYaml . | nindent 16 }}
+                {{- omit . "enabled" | toYaml | nindent 16 }}
+            {{- end }}
             {{- end }}
             {{- with .statefulset.network.timeouts }}
             timeouts:
