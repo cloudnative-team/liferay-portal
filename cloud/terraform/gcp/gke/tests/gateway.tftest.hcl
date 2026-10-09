@@ -63,10 +63,121 @@ run "should_honor_a_custom_gateway_namespace" {
 		condition=kubernetes_pod_disruption_budget_v1.envoy_proxy_pdb.metadata[0].namespace == "custom-gw"
 		error_message="The Envoy proxy PDB must be created in the configured gateway_namespace"
 	}
+	assert {
+		condition=kubernetes_network_policy_v1.default_deny_ingress.metadata[0].namespace == "custom-gw"
+		error_message="default-deny-ingress must be created in the configured gateway_namespace"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_ingress.metadata[0].namespace == "custom-gw"
+		error_message="envoy-gateway-ingress must be created in the configured gateway_namespace"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_metrics_ingress.metadata[0].namespace == "custom-gw"
+		error_message="envoy-gateway-metrics-ingress must be created in the configured gateway_namespace"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_proxy_ingress.metadata[0].namespace == "custom-gw"
+		error_message="envoy-proxy-ingress must be created in the configured gateway_namespace"
+	}
 	command=plan
 	variables {
 		gateway_namespace="custom-gw"
 	}
+}
+run "should_honor_a_custom_metrics_scrape_namespace" {
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_metrics_ingress.spec[0].ingress[0].from[0].namespace_selector[0].match_labels["kubernetes.io/metadata.name"] == "custom-scrape"
+		error_message="envoy-gateway-metrics-ingress must honor a custom metrics_scrape_config.namespace. GKE fixes the managed collection namespace at gmp-system today, but alloy scrapes the same Envoy pods from inside the observability namespace on the other clouds, so the source has to be overridable rather than literal"
+	}
+	command=plan
+	variables {
+		metrics_scrape_config={
+			namespace="custom-scrape"
+		}
+	}
+}
+run "should_omit_the_metrics_rule_when_scraping_is_disabled" {
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_gateway_metrics_ingress.spec[0].ingress) == 0
+		error_message="envoy-gateway-metrics-ingress must declare no ingress rule when metrics_scrape_config.enabled is false, leaving the namespace-wide deny in force rather than admitting a scraper that is not deployed"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_metrics_ingress.metadata[0].name == "envoy-gateway-metrics-ingress"
+		error_message="envoy-gateway-metrics-ingress must still be created when scraping is disabled, so that enabling it later adds a rule rather than a resource"
+	}
+	command=plan
+	variables {
+		metrics_scrape_config={
+			enabled=false
+		}
+	}
+}
+run "should_scope_the_envoy_gateway_network_policies_correctly" {
+	assert {
+		condition=length(kubernetes_network_policy_v1.default_deny_ingress.spec[0].ingress) == 0
+		error_message="default-deny-ingress must declare zero ingress rules — any rule at all would allow something"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.default_deny_ingress.spec[0].policy_types) == 1 && kubernetes_network_policy_v1.default_deny_ingress.spec[0].policy_types[0] == "Ingress"
+		error_message="default-deny-ingress must constrain Ingress only; an Egress policyType would cut the control plane's own outbound calls, which nothing here intends to restrict"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].pod_selector[0].match_labels["app.kubernetes.io/name"] == "gateway-helm"
+		error_message="envoy-gateway-ingress must select the control plane by app.kubernetes.io/name=gateway-helm — the chart labels the pod after the chart, not after the component, so envoy-gateway would match nothing"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress) == 2
+		error_message="envoy-gateway-ingress must carry two rules: the API server reaching the topology injector, and the proxies reaching xDS; both target the same pod so they belong in one policy named after it"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[0].from) == 2
+		error_message="envoy-gateway-ingress must allow two sources on the webhook port: the control plane CIDR and the konnectivity agents"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[0].from[1].pod_selector[0].match_labels["k8s-app"] == "konnectivity-agent"
+		error_message="envoy-gateway-ingress must allow the kube-system konnectivity-agent pods — on GKE the API server reaches in-cluster webhooks through them, so the call arrives from an agent pod IP and never from master_ipv4_cidr_block; the topology injector defaults failurePolicy to Ignore, so a dropped call fails silently and adds a 10s timeout to every pod binding in the namespace"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[0].from[1].namespace_selector[0].match_labels["kubernetes.io/metadata.name"] == "kube-system"
+		error_message="envoy-gateway-ingress must name kube-system on the konnectivity peer as a literal. Asserting only the podSelector leaves the peer matching konnectivity-agent pods inside envoy-gateway-system, of which there are none, so the API server would be blocked while every assertion still passed — the topology injector defaults failurePolicy to Ignore, so that failure is silent"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[0].ports[0].port == "webhook"
+		error_message="envoy-gateway-ingress must allow the webhook by its declared container port name. The control plane names it webhook at 9443, and a name follows the chart if upstream moves the port, where a literal would silently point at a dead number"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].from[0].pod_selector[0].match_labels) == 2 && kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].from[0].pod_selector[0].match_labels["app.kubernetes.io/managed-by"] == "envoy-gateway" && kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].from[0].pod_selector[0].match_labels["app.kubernetes.io/name"] == "envoy"
+		error_message="envoy-gateway-ingress must select the proxies by managed-by and name only — the pods also carry gateway.envoyproxy.io/owning-gateway-name, and pinning that would silently block xDS for every environment beyond the first"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].ports) == 3
+		error_message="envoy-gateway-ingress must allow xDS plus ratelimit and wasm; neither of the latter is configured today, and including them costs nothing while removing two latent silent failures"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].ports[0].port == "grpc" && kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].ports[1].port == "ratelimit" && kubernetes_network_policy_v1.envoy_gateway_ingress.spec[0].ingress[1].ports[2].port == "wasm"
+		error_message="envoy-gateway-ingress must name the three xDS ports as the control plane declares them, grpc 18000, ratelimit 18001 and wasm 18002, so the rule follows a port change in the chart instead of pointing at a stale number"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_metrics_ingress.spec[0].ingress[0].from[0].namespace_selector[0].match_labels["kubernetes.io/metadata.name"] == "gmp-system"
+		error_message="envoy-gateway-metrics-ingress must default to the GMP collector namespace, which GKE fixes at gmp-system whenever managed_prometheus is enabled on the cluster — a ClusterPodMonitoring selects app.kubernetes.io/managed-by=envoy-gateway and does reach the proxy pods, so omitting this is a confirmed scrape regression"
+	}
+	assert {
+		condition=kubernetes_network_policy_v1.envoy_gateway_metrics_ingress.spec[0].ingress[0].ports[0].port == "metrics"
+		error_message="envoy-gateway-metrics-ingress must scope its allow to the metrics port by name. Both the control plane and the generated proxies declare metrics at 19001, and a named port resolves per pod against the container declaration, so a pod that stopped declaring it would lose the allow rather than have a stale number allowed against it"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_proxy_ingress.spec[0].ingress[0].from) == 0
+		error_message="envoy-proxy-ingress must declare NO from peers, which admits every source. An ipBlock of 0.0.0.0/0 looks equivalent and is not: it is IPv4 only, and on Dataplane V2 Cilium resolves a CIDR peer to the world identity, so in-cluster pods are not matched by it and hairpin traffic to the gateway is dropped"
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_proxy_ingress.spec[0].ingress[0].ports) == 0
+		error_message="envoy-proxy-ingress must declare NO ports. Listener container ports are the Gateway listener port plus 10000 and come from endpoints defined in the infrastructure GitOps repo, which this module cannot see; an enumerated list covers today and silently drops traffic the day an environment adds a listener. Do not tighten this."
+	}
+	assert {
+		condition=length(kubernetes_network_policy_v1.envoy_proxy_ingress.spec[0].pod_selector[0].match_labels) == 2 && kubernetes_network_policy_v1.envoy_proxy_ingress.spec[0].pod_selector[0].match_labels["app.kubernetes.io/managed-by"] == "envoy-gateway" && kubernetes_network_policy_v1.envoy_proxy_ingress.spec[0].pod_selector[0].match_labels["app.kubernetes.io/name"] == "envoy"
+		error_message="envoy-proxy-ingress must select the proxies by the two stable labels only"
+	}
+	command=plan
 }
 run "should_set_the_envoy_gateway_helm_values" {
 	assert {
