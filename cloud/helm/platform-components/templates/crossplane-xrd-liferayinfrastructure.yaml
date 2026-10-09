@@ -93,6 +93,13 @@ spec:
                                                 -   password
                                                 -   workloadIdentity
                                             type: string
+                                        engine:
+                                            enum:
+                                                -   postgresql
+                                            type: string
+                                            x-kubernetes-validations:
+                                                -   message: engine is immutable
+                                                    rule: self == oldSelf
                                         highAvailability:
                                             default: false
                                             type: boolean
@@ -117,6 +124,9 @@ spec:
                                         -   storageGB
                                         -   version
                                     type: object
+                                    x-kubernetes-validations:
+                                        -   message: authentication must be password when engine is mysql
+                                            rule: "!has(self.engine) || self.engine != 'mysql' || !has(self.authentication) || self.authentication != 'workloadIdentity'"
                                 environmentId:
                                     minLength: 1
                                     type: string

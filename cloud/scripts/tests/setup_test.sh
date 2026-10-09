@@ -21,10 +21,19 @@ function main {
 	for script in "${scripts_dir}/setup_aws.sh" "${scripts_dir}/setup_azure.sh" "${scripts_dir}/setup_gcp.sh"
 	do
 		_run_test "${script}" _test_aborts_with_malformed_config_json
+		_run_test "${script}" _test_aborts_with_malformed_setup_properties
 		_run_test "${script}" _test_aborts_with_missing_config_file
 		_run_test "${script}" _test_aborts_with_missing_required_utility
 		_run_test "${script}" _test_aborts_with_no_arguments
+		_run_test "${script}" _test_aborts_with_unsupported_setup_component
+		_run_test "${script}" _test_aborts_with_unsupported_setup_property
+		_run_test "${script}" _test_aborts_with_unsupported_setup_property_value
 	done
+
+	_run_test "${scripts_dir}/setup_azure.sh" _test_aborts_with_missing_setup_property
+
+	_run_test "${scripts_dir}/_setup_properties.sh" _test_resolves_per_provider_setup_property_defaults
+	_run_test "${scripts_dir}/_setup_properties.sh" _test_validates_per_provider_setup_property_values
 
 	echo ""
 	echo "Results: ${pass} passed, ${fail} failed."
@@ -35,6 +44,53 @@ function main {
 	fi
 
 	return 1
+}
+
+function _has_rejected_setup_properties {
+	local expected_message=${3}
+	local script=${1}
+	local setup_json=${2}
+
+	local config_json
+	local exit_code
+	local output
+	local result
+
+	config_json=$( \
+		jq \
+			--argjson setup "${setup_json}" \
+			--null-input \
+			'{deployment_name: "test", options: {version: "9.9.9"}, region: "eastus2", setup: $setup, subscription_id: "test", tenant_id: "test", variables: {}}')
+	result=$(_run_setup_test "${script}" "${config_json}")
+	exit_code=$(echo "${result}" | head --lines=1)
+	output=$(echo "${result}" | tail --lines=+2)
+
+	if [[ "${exit_code}" -ne 0 ]] &&
+	   [[ "${output}" == *"${expected_message}"* ]] &&
+	   [[ "${output}" != *"Attempting to log"* ]] &&
+	   [[ "${output}" != *"Reusing the active"* ]]
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+function _make_cloud_dir {
+	local registry_json=${2}
+	local scripts_dir=${1}
+
+	local cloud_dir
+
+	cloud_dir=$(mktemp --directory)
+
+	mkdir --parents "${cloud_dir}/terraform/azure/aks" "${cloud_dir}/terraform/azure/platform"
+
+	cp --recursive "${scripts_dir}" "${cloud_dir}/scripts"
+
+	printf '%s' "${registry_json}" > "${cloud_dir}/scripts/setup_properties.json"
+
+	echo "${cloud_dir}"
 }
 
 function _make_stub_path {
@@ -193,6 +249,12 @@ function _test_aborts_with_malformed_config_json {
 	return 1
 }
 
+function _test_aborts_with_malformed_setup_properties {
+	_has_rejected_setup_properties "${1}" '"mysql"' 'The configuration JSON file key "setup" must be an object.' || return 1
+	_has_rejected_setup_properties "${1}" '{"database": "mysql"}' 'The setup component "database" must be an object.' || return 1
+	_has_rejected_setup_properties "${1}" '{"database": {"engine": ["mysql"]}}' 'The setup property "database.engine" must be a boolean, a number, or a string.'
+}
+
 function _test_aborts_with_missing_config_file {
 	local exit_code=0
 	local output
@@ -233,6 +295,10 @@ function _test_aborts_with_missing_required_utility {
 	return 1
 }
 
+function _test_aborts_with_missing_setup_property {
+	_has_rejected_setup_properties "${1}" '{}' 'The setup property "database.engine" is required.'
+}
+
 function _test_aborts_with_no_arguments {
 	local exit_code=0
 	local output
@@ -259,6 +325,89 @@ function _test_aborts_with_old_terraform_version {
 	output=$(echo "${result}" | tail -n +2)
 
 	if [ ${exit_code} -ne 0 ] && [[ ${output} == *"is older than"* ]]
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+function _test_aborts_with_unsupported_setup_component {
+	_has_rejected_setup_properties "${1}" '{"search": {"engine": "opensearch"}}' 'The setup component "search" is not supported by version 9.9.9.'
+}
+
+function _test_aborts_with_unsupported_setup_property {
+	_has_rejected_setup_properties "${1}" '{"database": {"engine": "postgresql", "version": "16"}}' 'The setup property "database.version" is not supported by version 9.9.9.'
+}
+
+function _test_aborts_with_unsupported_setup_property_value {
+	_has_rejected_setup_properties "${1}" '{"database": {"engine": "mysql"}}' 'The value "mysql" of the setup property "database.engine" is not supported on'
+}
+
+function _test_resolves_per_provider_setup_property_defaults {
+	local scripts_dir
+
+	scripts_dir=$(dirname "${1}")
+
+	local cloud_dir
+
+	cloud_dir=$(_make_cloud_dir "${scripts_dir}" "$(jq '."database.engine".default = {aws: "postgresql", azure: "mysql"}' "${scripts_dir}/setup_properties.json")")
+
+	local engines=""
+
+	local setup_json
+
+	for setup_json in '{}' '{"database": {"engine": "postgresql"}}'
+	do
+		jq \
+			--argjson setup "${setup_json}" \
+			--null-input \
+			'{setup: $setup}' > "${cloud_dir}/config.json"
+
+		local provider
+
+		for provider in aws azure gcp
+		do
+			engines+=$(bash -c 'source "${1}" && get_resolved_setup_properties "${2}" "${3}"' _ "${cloud_dir}/scripts/_setup_properties.sh" "${cloud_dir}/config.json" "${provider}" | jq --raw-output '.database.engine // "none"')
+			engines+=" "
+		done
+	done
+
+	rm --force --recursive "${cloud_dir}"
+
+	if [ "${engines}" == "postgresql mysql none postgresql postgresql postgresql " ]
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+function _test_validates_per_provider_setup_property_values {
+	local scripts_dir
+
+	scripts_dir=$(dirname "${1}")
+
+	local cloud_dir
+
+	cloud_dir=$(_make_cloud_dir "${scripts_dir}" "$(jq '."database.engine".values = {aws: ["postgresql"], azure: ["mysql", "postgresql"]}' "${scripts_dir}/setup_properties.json")")
+
+	jq --null-input '{setup: {database: {engine: "mysql"}}}' > "${cloud_dir}/config.json"
+
+	local outputs=()
+
+	local provider
+
+	for provider in aws azure gcp
+	do
+		outputs+=("$(bash -c 'source "${1}" && validate_setup_properties "${2}" "${3}" && echo "valid"' _ "${cloud_dir}/scripts/_setup_properties.sh" "${cloud_dir}/config.json" "${provider}" 2>&1)")
+	done
+
+	rm --force --recursive "${cloud_dir}"
+
+	if [ "${outputs[0]}" == 'The value "mysql" of the setup property "database.engine" is not supported on aws. Supported values: postgresql.' ] &&
+	   [ "${outputs[1]}" == "valid" ] &&
+	   [ "${outputs[2]}" == 'The setup property "database.engine" is not supported on gcp.' ]
 	then
 		return 0
 	fi

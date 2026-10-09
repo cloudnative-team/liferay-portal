@@ -86,7 +86,9 @@ jobs:
                         if [[ "${provider}" == "aws" ]]
                         then
                             files=(
+                                cloud/scripts/_setup_properties.sh
                                 cloud/scripts/setup_aws.sh
+                                cloud/scripts/setup_properties.json
                                 cloud/terraform/aws/eks/*
                                 cloud/terraform/aws/gitops/platform/*
                                 cloud/terraform/aws/gitops/resources/*
@@ -95,8 +97,10 @@ jobs:
                         then
                             files=(
                                 cloud/scripts/_azure_common.sh
+                                cloud/scripts/_setup_properties.sh
                                 cloud/scripts/config.json.defaults
                                 cloud/scripts/setup_azure.sh
+                                cloud/scripts/setup_properties.json
                                 cloud/scripts/teardown_azure.sh
                                 cloud/terraform/azure/aks/*
                                 cloud/terraform/azure/platform/*
@@ -105,7 +109,9 @@ jobs:
                         elif [[ "${provider}" == "gcp" ]]
                         then
                             files=(
+                                cloud/scripts/_setup_properties.sh
                                 cloud/scripts/setup_gcp.sh
+                                cloud/scripts/setup_properties.json
                                 cloud/terraform/gcp/gitops/platform/*
                                 cloud/terraform/gcp/gitops/resources/*
                                 cloud/terraform/gcp/gke/*

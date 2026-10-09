@@ -1,0 +1,11 @@
+{
+	"database.engine": {
+		"default": {
+			"aws": "postgresql",
+			"gcp": "postgresql"
+		},
+		"values": [
+			"postgresql"
+		]
+	}
+}
