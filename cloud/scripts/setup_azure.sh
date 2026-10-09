@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_azure_common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_setup_properties.sh"
 
 _CONFIG_JSON_DEFAULTS_FILE="${SCRIPTS_DIR}/config.json.defaults"
 
@@ -23,6 +24,8 @@ function main {
 	check_utils az helm jq terraform
 
 	validate_config_json "${1}"
+
+	validate_setup_properties "${1}" azure
 
 	local configuration_json_file
 
@@ -415,12 +418,17 @@ function _install_liferay_platform_chart {
 
 	observability_parameters=$(_get_observability_parameters "${platform_module_outputs}" "${tenant_id}")
 
+	local setup_platform_values
+
+	setup_platform_values=$(get_setup_properties_platform_values "${configuration_json_file}" azure)
+
 	jq \
 		--argjson artifact_values "${artifact_values}" \
 		--argjson keda_operator_application "${keda_operator_application}" \
 		--argjson liferay_parameters "${liferay_parameters}" \
 		--argjson observability_parameters "${observability_parameters}" \
 		--argjson platform_module_outputs "${platform_module_outputs}" \
+		--argjson setup_platform_values "${setup_platform_values}" \
 		--null-input \
 		--slurpfile configuration "${configuration_json_file}" \
 		'{
@@ -475,7 +483,7 @@ function _install_liferay_platform_chart {
 						},
 						keda: $keda_operator_application
 					}
-				})
+				} + $setup_platform_values)
 			}
 		} * $artifact_values' \
 	| helm \

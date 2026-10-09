@@ -22,7 +22,9 @@ function main {
 	fi
 
 	local aws_bootstrap_sources=(
+		"${ROOT_CLOUD_DIR}/scripts/_setup_properties.sh"
 		"${ROOT_CLOUD_DIR}/scripts/setup_aws.sh"
+		"${ROOT_CLOUD_DIR}/scripts/setup_properties.json"
 		"${ROOT_CLOUD_DIR}/terraform/aws/eks"
 		"${ROOT_CLOUD_DIR}/terraform/aws/gitops/platform"
 		"${ROOT_CLOUD_DIR}/terraform/aws/gitops/resources"
@@ -32,8 +34,10 @@ function main {
 
 	local azure_bootstrap_sources=(
 		"${ROOT_CLOUD_DIR}/scripts/_azure_common.sh"
+		"${ROOT_CLOUD_DIR}/scripts/_setup_properties.sh"
 		"${ROOT_CLOUD_DIR}/scripts/config.json.defaults"
 		"${ROOT_CLOUD_DIR}/scripts/setup_azure.sh"
+		"${ROOT_CLOUD_DIR}/scripts/setup_properties.json"
 		"${ROOT_CLOUD_DIR}/terraform/azure/aks"
 		"${ROOT_CLOUD_DIR}/terraform/azure/platform"
 		"${ROOT_CLOUD_DIR}/terraform/modules/argocd"
@@ -42,7 +46,9 @@ function main {
 	_check_bootstrap "azure" "${azure_bootstrap_sources[@]}"
 
 	local gcp_bootstrap_sources=(
+		"${ROOT_CLOUD_DIR}/scripts/_setup_properties.sh"
 		"${ROOT_CLOUD_DIR}/scripts/setup_gcp.sh"
+		"${ROOT_CLOUD_DIR}/scripts/setup_properties.json"
 		"${ROOT_CLOUD_DIR}/terraform/gcp/gke"
 		"${ROOT_CLOUD_DIR}/terraform/gcp/gitops/platform"
 		"${ROOT_CLOUD_DIR}/terraform/gcp/gitops/resources"
