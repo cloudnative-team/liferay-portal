@@ -151,7 +151,7 @@ spec:
                                     -   name: PGHOST
                                         value: {{ $activeDatabaseFqdn }}
                                     -   name: PGPORT
-                                        value: "5432"
+                                        value: {{ $databaseEngineProfile.port | quote }}
                                     -   name: PGSSLMODE
                                         value: require
                                     -   name: PGUSER
