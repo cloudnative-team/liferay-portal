@@ -4,8 +4,11 @@
 			"aws": "postgresql",
 			"gcp": "postgresql"
 		},
+		"immutable": true,
+		"unrecordedValue": "postgresql",
 		"values": [
 			"postgresql"
-		]
+		],
+		"xrPath": "spec.database.engine"
 	}
 }

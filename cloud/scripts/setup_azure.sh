@@ -21,7 +21,7 @@ function main {
 		exit 1
 	fi
 
-	check_utils az helm jq terraform
+	check_utils az helm jq kubectl terraform
 
 	validate_config_json "${1}"
 
@@ -36,6 +36,8 @@ function main {
 	generate_tfvars "${configuration_json_file}" "platform"
 
 	az_login "${configuration_json_file}"
+
+	_check_setup_properties_lock "${configuration_json_file}"
 
 	local terraform_args=()
 
@@ -74,6 +76,55 @@ function main {
 	_set_up_azure_platform "${terraform_args[@]}"
 
 	_install_liferay_platform_chart "${configuration_json_file}"
+}
+
+function _check_setup_properties_lock {
+	local configuration_json_file=${1}
+
+	local deployment_name
+
+	deployment_name=$(jq --raw-output '.deployment_name' "${configuration_json_file}")
+
+	local cluster_name="${deployment_name}-aks"
+
+	local exit_code=0
+	local output
+
+	output=$( \
+		az aks show \
+			--name "${cluster_name}" \
+			--output none \
+			--resource-group "${deployment_name}" 2>&1) || exit_code=${?}
+
+	if [[ "${exit_code}" -eq 3 ]]
+	then
+		echo "The AKS cluster ${cluster_name} does not exist. Skipping the setup properties check."
+
+		return
+	fi
+
+	if [[ "${exit_code}" -ne 0 ]]
+	then
+		echo "Unable to look up the AKS cluster ${cluster_name}. ${output}" >&2
+
+		exit 1
+	fi
+
+	echo "Checking the setup properties against the AKS cluster ${cluster_name}."
+
+	if ! az aks get-credentials \
+			--name "${cluster_name}" \
+			--overwrite-existing \
+			--resource-group "${deployment_name}"
+	then
+		echo "Unable to get the credentials of the AKS cluster ${cluster_name}." >&2
+
+		exit 1
+	fi
+
+	assert_setup_properties_unchanged "${configuration_json_file}" azure
+
+	echo "The setup properties match the existing deployment."
 }
 
 function _configure_storage_account {
