@@ -1,3 +1,20 @@
+{{- define "database.engine" -}}
+{{- dig "setup" "database" "engine" "" (.Values.global | default dict) | default "" -}}
+{{- end -}}
+
+{{- define "database.validateEngine" -}}
+{{- if hasKey .Values.database "engine" -}}
+{{- fail "The value \"database.engine\" must not be set because it is set by config.json (setup.database.engine)" -}}
+{{- end -}}
+{{- $engine := include "database.engine" . -}}
+{{- if not $engine -}}
+{{- fail "The value \"global.setup.database.engine\" must be set by config.json (setup.database.engine)" -}}
+{{- end -}}
+{{- if not (has $engine (list "postgresql")) -}}
+{{- fail (printf "Unsupported database engine: %s" $engine) -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "elasticsearch.containerSecurityContext" -}}
 allowPrivilegeEscalation: false
 capabilities:

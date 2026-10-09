@@ -1,3 +1,4 @@
+{{- include "database.validateEngine" . -}}
 {{- if .Values.enabled -}}
 apiVersion: liferay.com/v1alpha1
 kind: LiferayInfrastructure
@@ -17,7 +18,7 @@ spec:
         {{- . | toYaml | nindent 8 }}
     {{- end }}
     database:
-        {{- .Values.database | toYaml | nindent 8 }}
+        {{- merge (dict "engine" (include "database.engine" .)) .Values.database | toYaml | nindent 8 }}
     environmentId: {{ .Values.environmentId | quote }}
     {{- if hasKey .Values "forceDestroy" }}
     forceDestroy: {{ .Values.forceDestroy }}

@@ -8,6 +8,32 @@ templates:
 tests:
     -   asserts:
             -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.engine.enum
+                    value:
+                        -   postgresql
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.engine.type
+                    value: string
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.engine.x-kubernetes-validations[0].message
+                    value: engine is immutable
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.engine.x-kubernetes-validations[0].rule
+                    value: self == oldSelf
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   notContains:
+                    content: engine
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.required
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+            -   notExists:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.engine.default
+                template: templates/crossplane-xrd-liferayinfrastructure.yaml
+        it: Declares the database engine as an immutable choice without a default
+    -   asserts:
+            -   equal:
                     path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.backup.properties.enabled.default
                     value: false
                 template: templates/crossplane-xrd-liferayinfrastructure.yaml

@@ -27,6 +27,9 @@ spec:
                     {{- end }}
                     -   name: deploymentName
                         value: {{ .Values.deploymentContext.deploymentName | quote }}
+                    {{- with include "liferay-platform.setupParameters" . }}
+                    {{- . | nindent 20 }}
+                    {{- end }}
                 valueFiles:
                     -   $values/{{ .Values.gitops.layout.system }}/{{ .Values.gitops.layout.infrastructureProviderValuesFilename }}
         -   ref: values

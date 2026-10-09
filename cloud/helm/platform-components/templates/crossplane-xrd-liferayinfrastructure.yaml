@@ -86,6 +86,13 @@ spec:
                                 database:
                                     default: {}
                                     properties:
+                                        engine:
+                                            enum:
+                                                -   postgresql
+                                            type: string
+                                            x-kubernetes-validations:
+                                                -   message: engine is immutable
+                                                    rule: self == oldSelf
                                         highAvailability:
                                             default: false
                                             type: boolean
