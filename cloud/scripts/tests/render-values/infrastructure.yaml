@@ -15,6 +15,10 @@ gateway:
             xForwardedFor:
                 numTrustedHops: 1
     name: liferay-example-dev-gateway
+global:
+    setup:
+        database:
+            engine: postgresql
 license:
     externalSecretKey: liferay-licenses-liferay-example
 overlayBucket:

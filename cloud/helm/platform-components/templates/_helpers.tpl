@@ -53,6 +53,18 @@ liferay.com/project: liferay-cloud-native
 {{- end -}}
 {{- end -}}
 
+{{- define "liferay-platform.setupParameters" -}}
+{{- $parameters := list -}}
+{{- range $component, $properties := .Values.setup -}}
+{{- range $property, $value := $properties -}}
+{{- $parameters = append $parameters (dict "name" (printf "global.setup.%s.%s" $component $property) "value" (toString $value)) -}}
+{{- end -}}
+{{- end -}}
+{{- with $parameters -}}
+{{- toYaml . -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "liferay-platform.sourceRepoBase" -}}
 {{- if hasPrefix "oci://" . -}}
 {{- $parts := splitList "/" (trimPrefix "oci://" .) -}}

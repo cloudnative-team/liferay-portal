@@ -379,3 +379,4 @@ operatorApplications:
                     requests:
                         cpu: 15m
                         memory: 128Mi
+setup: {}
