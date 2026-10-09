@@ -95,6 +95,22 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
+                    pattern: "\\$deploymentDatabaseEngine := dig \"setup\" \"database\" \"engine\" \"\" \\$env"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "\\{\\{- if ne \\$databaseEngine \\$deploymentDatabaseEngine -\\}\\}\\s+\\{\\{- fail [^\\n]+of the deployment \\(setup.database.engine\\), and changing it is not supported"
+        it: Fails when the database engine of the composite resource differs from the database engine of the deployment
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "\\{\\{- if not \\$deploymentDatabaseEngine -\\}\\}\\s+\\{\\{- fail \"The deployment has no database engine, so set setup.database.engine in config.json\" -\\}\\}"
+        it: Fails when the deployment has no database engine
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
                     pattern: "composition-resource-name: liferay-backup-restore-identity\\s"
             -   documentIndex: 0
                 matchRegex:
@@ -322,6 +338,16 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: "kind: Account"
         it: Implements the shared Liferay APIs through the packaged function pipeline
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "\\$databaseEngine := \\$xr.spec.database.engine \\| default \\$deploymentDatabaseEngine"
+            -   documentIndex: 0
+                notMatchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "default \"postgresql\""
+        it: Inherits the database engine of the deployment when the composite resource sets none
     -   asserts:
             -   documentIndex: 0
                 matchRegex:
@@ -586,14 +612,18 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: DATABASE_ENDPOINT
             -   documentIndex: 0
-                notMatchRegex:
+                matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: DATABASE_PORT
+                    pattern: "DATABASE_ENGINE: \\{\\{ \\$databaseEngine \\| quote \\}\\}"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "DATABASE_PORT: \\{\\{ \\$databaseEngineProfile.port \\| quote \\}\\}"
             -   documentIndex: 0
                 notMatchRegex:
                     path: spec.pipeline[1].input.inline.template
                     pattern: DATABASE_USERNAME
-        it: Publishes only the database endpoint it discovered from Azure
+        it: Publishes the database endpoint it discovered from Azure with the engine and port Liferay connects with
     -   asserts:
             -   documentIndex: 0
                 matchRegex:
@@ -766,6 +796,16 @@ tests:
                     path: spec.pipeline[1].input.inline.template
                     pattern: "tags:\\s+\\{\\{- with \\$storage\\.tags \\}\\}\\s+\\{\\{- \\. \\| toYaml \\| nindent 12 \\}\\}\\s+\\{\\{- end \\}\\}\\s+active: [^\\n]+\\s+data-plane: \\{\\{ \\$dataPlane \\}\\}\\s+should-back-up: \"true\""
         it: Tags each storage account with its data plane over the custom storage tags
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "\\$databaseEngineProfile := index \\(dict \"postgresql\" \\(dict \"port\" \"5432\"\\)\\) \\$databaseEngine"
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "name: PGPORT\\s+value: \\{\\{ \\$databaseEngineProfile.port \\| quote \\}\\}"
+        it: Takes the database port from the engine profile
     -   asserts:
             -   documentIndex: 0
                 matchRegex:

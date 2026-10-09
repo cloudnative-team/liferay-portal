@@ -5,6 +5,8 @@ set -o errtrace
 set -o nounset
 set -o pipefail
 
+source "$(dirname "${BASH_SOURCE[0]}")/_setup_properties.sh"
+
 trap "_recover_kubectl_context \${?}" ERR
 
 _GCP_DEPLOYMENT_NAME=""
@@ -29,6 +31,8 @@ function main {
 	_check_terraform_version "1.10.0"
 
 	_validate_config_json "${1}"
+
+	validate_setup_properties "${1}" gcp
 
 	_generate_tfvars "${1}" "${_SCRIPTS_DIR}/global_terraform.tfvars"
 
