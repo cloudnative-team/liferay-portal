@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_azure_common.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/_database_engine.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_database_engine_common.sh"
 
 _CONFIG_JSON_DEFAULTS_FILE="${SCRIPTS_DIR}/config.json.defaults"
 

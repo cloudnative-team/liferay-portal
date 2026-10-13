@@ -29,7 +29,7 @@ function main {
 	_run_test "${scripts_dir}/setup_azure.sh" _test_aborts_with_missing_database_engine
 	_run_test "${scripts_dir}/setup_azure.sh" _test_aborts_with_unsupported_database_engine
 
-	_run_test "${scripts_dir}/_database_engine.sh" _test_accepts_supported_database_engine
+	_run_test "${scripts_dir}/_database_engine_common.sh" _test_accepts_supported_database_engine
 
 	echo ""
 	echo "Results: ${pass} passed, ${fail} failed."
