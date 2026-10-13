@@ -5,6 +5,7 @@ set -o nounset
 set -o pipefail
 
 source "$(dirname "${BASH_SOURCE[0]}")/_azure_common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/_database_engine.sh"
 
 _CONFIG_JSON_DEFAULTS_FILE="${SCRIPTS_DIR}/config.json.defaults"
 
@@ -24,7 +25,7 @@ function main {
 
 	validate_config_json "${1}"
 
-	_validate_database_engine "${1}"
+	validate_database_engine "${1}"
 
 	local configuration_json_file
 
@@ -417,7 +418,12 @@ function _install_liferay_platform_chart {
 
 	observability_parameters=$(_get_observability_parameters "${platform_module_outputs}" "${tenant_id}")
 
+	local database_engine
+
+	database_engine=$(get_database_engine "${configuration_json_file}")
+
 	jq \
+		--arg database_engine "${database_engine}" \
 		--argjson artifact_values "${artifact_values}" \
 		--argjson keda_operator_application "${keda_operator_application}" \
 		--argjson liferay_parameters "${liferay_parameters}" \
@@ -479,7 +485,7 @@ function _install_liferay_platform_chart {
 					},
 					setup: {
 						database: {
-							engine: $configuration[0].setup.database.engine
+							engine: $database_engine
 						}
 					}
 				})
@@ -537,28 +543,6 @@ function _set_up_azure_platform {
 	echo "Liferay platform setup complete."
 
 	pop_directory
-}
-
-function _validate_database_engine {
-	local configuration_json_file=${1}
-
-	local database_engine
-
-	database_engine=$(jq --raw-output '.setup?.database?.engine? // empty' "${configuration_json_file}")
-
-	if [ -z "${database_engine}" ]
-	then
-		echo "The configuration JSON file must contain a key named \"setup.database.engine\"." >&2
-
-		exit 1
-	fi
-
-	if [ "${database_engine}" != "postgresql" ]
-	then
-		echo "The database engine \"${database_engine}\" is not supported. The supported database engine is \"postgresql\"." >&2
-
-		exit 1
-	fi
 }
 
 main "${@}"
