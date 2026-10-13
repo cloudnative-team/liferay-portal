@@ -21,7 +21,7 @@ function validate_database_engine {
 
 	if [ -z "${database_engine}" ]
 	then
-		echo "The configuration JSON file must contain a key named \"setup.database.engine\"." >&2
+		echo "The configuration JSON file must contain a key named \"setup.database.engine\" with one of the supported database engines: ${_SUPPORTED_DATABASE_ENGINES[*]}." >&2
 
 		exit 1
 	fi

@@ -250,7 +250,7 @@ function _test_aborts_with_missing_config_file {
 }
 
 function _test_aborts_with_missing_database_engine {
-	_has_rejected_database_engine "${1}" '{}' 'The configuration JSON file must contain a key named "setup.database.engine".'
+	_has_rejected_database_engine "${1}" '{}' 'The configuration JSON file must contain a key named "setup.database.engine" with one of the supported database engines: postgresql.'
 }
 
 function _test_aborts_with_missing_required_utility {
