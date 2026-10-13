@@ -39,7 +39,7 @@ function assert_database_engine_unchanged {
 
 	if [ -n "${changed_database_engines}" ]
 	then
-		echo "The configuration JSON file requests the database engine \"${database_engine}\", but this deployment already uses another one (${changed_database_engines}). Changing the database engine is not supported. Restore setup.database.engine, or use a new deployment_name." >&2
+		echo "Changing the database engine from \"${changed_database_engines}\" to \"${database_engine}\" on an existing deployment is not supported." >&2
 
 		exit 1
 	fi
@@ -60,7 +60,7 @@ function validate_database_engine {
 
 	if [ -z "${database_engine}" ]
 	then
-		echo "The configuration JSON file must contain a key named \"setup.database.engine\" with one of the supported database engines: ${_SUPPORTED_DATABASE_ENGINES[*]}." >&2
+		echo "The config.json file must contain a key named \"setup.database.engine\" with one of the supported database engines: ${_SUPPORTED_DATABASE_ENGINES[*]}." >&2
 
 		exit 1
 	fi
@@ -75,7 +75,7 @@ function validate_database_engine {
 		fi
 	done
 
-	echo "The database engine \"${database_engine}\" is not supported. Supported database engines: ${_SUPPORTED_DATABASE_ENGINES[*]}." >&2
+	echo "The database engine \"${database_engine}\" is not supported. Use one of the supported database engines: ${_SUPPORTED_DATABASE_ENGINES[*]}." >&2
 
 	exit 1
 }
