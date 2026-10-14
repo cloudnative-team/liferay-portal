@@ -26,10 +26,45 @@ function main {
 		_run_test "${script}" _test_aborts_with_no_arguments
 	done
 
+	_run_test "${scripts_dir}/setup_azure.sh" _test_aborts_with_missing_database_engine
+	_run_test "${scripts_dir}/setup_azure.sh" _test_aborts_with_unsupported_database_engine
+
+	_run_test "${scripts_dir}/_database_engine_common.sh" _test_accepts_supported_database_engine
+
 	echo ""
 	echo "Results: ${pass} passed, ${fail} failed."
 
 	if [ ${fail} -eq 0 ]
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+function _has_rejected_database_engine {
+	local expected_message=${3}
+	local script=${1}
+	local setup_json=${2}
+
+	local config_json
+	local exit_code
+	local output
+	local result
+
+	config_json=$( \
+		jq \
+			--argjson setup "${setup_json}" \
+			--null-input \
+			'{deployment_name: "test", region: "eastus2", setup: $setup, subscription_id: "test", tenant_id: "test"}')
+	result=$(_run_setup_test "${script}" "${config_json}")
+	exit_code=$(echo "${result}" | head --lines=1)
+	output=$(echo "${result}" | tail --lines=+2)
+
+	if [[ "${exit_code}" -ne 0 ]] &&
+	   [[ "${output}" == *"${expected_message}"* ]] &&
+	   [[ "${output}" != *"Attempting to log"* ]] &&
+	   [[ "${output}" != *"Reusing the active"* ]]
 	then
 		return 0
 	fi
@@ -214,6 +249,10 @@ function _test_aborts_with_missing_config_file {
 	return 1
 }
 
+function _test_aborts_with_missing_database_engine {
+	_has_rejected_database_engine "${1}" '{}' 'The configuration JSON file must contain a key named "setup.database.engine" with one of the supported database engines: postgresql.'
+}
+
 function _test_aborts_with_missing_required_utility {
 	local config_json
 	local exit_code
@@ -259,6 +298,31 @@ function _test_aborts_with_old_terraform_version {
 	output=$(echo "${result}" | tail -n +2)
 
 	if [ ${exit_code} -ne 0 ] && [[ ${output} == *"is older than"* ]]
+	then
+		return 0
+	fi
+
+	return 1
+}
+
+function _test_aborts_with_unsupported_database_engine {
+	_has_rejected_database_engine "${1}" '{"database": {"engine": "mysql"}}' 'The database engine "mysql" is not supported. Supported database engines: postgresql.'
+}
+
+function _test_accepts_supported_database_engine {
+	local tmpdir
+
+	tmpdir=$(mktemp --directory)
+
+	jq --null-input '{setup: {database: {engine: "postgresql"}}}' > "${tmpdir}/config.json"
+
+	local output
+
+	output=$(bash -c 'source "${1}" && validate_database_engine "${2}" && get_database_engine "${2}"' _ "${1}" "${tmpdir}/config.json" 2>&1)
+
+	rm --force --recursive "${tmpdir}"
+
+	if [ "${output}" == "postgresql" ]
 	then
 		return 0
 	fi
