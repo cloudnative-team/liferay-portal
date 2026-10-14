@@ -1,0 +1,66 @@
+set:
+    observability.gcp.projectId: liferay-test
+    observability.grafana.route.main.hostnames:
+        -   monitoring.example.com
+    observability.grafana.route.redirect.hostnames:
+        -   monitoring.example.com
+suite: Gateway
+templates:
+    -   templates/gateway/envoy-policies.yaml
+    -   templates/gateway/gateway.yaml
+    -   templates/gateway/gke-policies.yaml
+tests:
+    -   asserts:
+            -   failedTemplate:
+                    errorMessage: observability.grafana.route.main.parentRefs must reference the other gateway
+                template: templates/gateway/gateway.yaml
+        it: Fails when a Grafana route references another gateway
+        set:
+            gateway.name: other
+    -   asserts:
+            -   failedTemplate:
+                    errorMessage: observability.grafana.route.main.hostnames must be set when gateway.enabled is true
+                template: templates/gateway/gateway.yaml
+        it: Fails when the Grafana route has no hostname
+        set:
+            observability.grafana.route.main.hostnames: []
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Renders no gateway objects when the gateway is disabled
+        set:
+            gateway.enabled: false
+    -   asserts:
+            -   equal:
+                    path: spec.gatewayClassName
+                    value: envoy-gateway-l4
+                template: templates/gateway/gateway.yaml
+            -   hasDocuments:
+                    count: 3
+                template: templates/gateway/envoy-policies.yaml
+            -   hasDocuments:
+                    count: 0
+                template: templates/gateway/gke-policies.yaml
+        it: Renders the Envoy traffic policies when the provider is envoy
+    -   asserts:
+            -   equal:
+                    path: spec.gatewayClassName
+                    value: gke-l7-global-external-managed
+                template: templates/gateway/gateway.yaml
+            -   hasDocuments:
+                    count: 0
+                template: templates/gateway/envoy-policies.yaml
+            -   hasDocuments:
+                    count: 3
+                template: templates/gateway/gke-policies.yaml
+        it: Renders the GKE policies when the provider is gke
+        set:
+            gateway.provider: gke
+    -   asserts:
+            -   equal:
+                    path: spec.gatewayClassName
+                    value: custom-class
+                template: templates/gateway/gateway.yaml
+        it: Uses gateway.gatewayClassName when it is set
+        set:
+            gateway.gatewayClassName: custom-class

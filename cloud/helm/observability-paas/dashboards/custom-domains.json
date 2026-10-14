@@ -1,0 +1,390 @@
+{
+	"annotations": {
+		"list": [
+			{
+				"builtIn": 1,
+				"datasource": {
+					"type": "grafana",
+					"uid": "-- Grafana --"
+				},
+				"enable": true,
+				"hide": true,
+				"iconColor": "rgba(0, 211, 255, 1)",
+				"name": "Annotations & Alerts",
+				"type": "dashboard"
+			}
+		]
+	},
+	"editable": true,
+	"fiscalYearStartMonth": 0,
+	"graphTooltip": 0,
+	"links": [
+	],
+	"panels": [
+		{
+			"fieldConfig": {
+				"defaults": {
+				},
+				"overrides": [
+				]
+			},
+			"gridPos": {
+				"h": 5,
+				"w": 24,
+				"x": 0,
+				"y": 0
+			},
+			"id": 2,
+			"options": {
+				"code": {
+					"language": "plaintext",
+					"showLineNumbers": false,
+					"showMiniMap": false
+				},
+				"content": "<div style=\"padding: 16px 24px; background-color: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; font-family: 'Inter', system-ui, sans-serif; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; width: 100%; box-sizing: border-box; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);\">\n\n  <a href=\"/d/central-hub/central-hub\" style=\"background-color: #f8fafc; border: 2px solid #3274d9; border-radius: 10px; padding: 16px; text-decoration: none; display: flex; flex-direction: column; height: 100%; box-sizing: border-box;\">\n    <div style=\"margin-bottom: 8px; height: 28px; display: flex; align-items: center;\">\n      <span style=\"font-size: 24px;\">🏠</span>\n    </div>\n    <div style=\"color: #1e3a8a; font-weight: 800; font-size: 16px; margin-bottom: 2px;\">Central Hub</div>\n    <div style=\"color: #64748b; font-size: 12px; line-height: 1.3;\">Platform overview.</div>\n  </a>\n  <div style=\"margin-left: 24px;\">\n    <h2 style=\"margin: 0; color: #111827; font-size: 20px; font-weight: 800;\">Custom Domains</h2>\n    <p style=\"margin: 4px 0 0 0; color: #4b5563; font-size: 13px;\">Domain configuration and SSL status across the platform.</p>\n  </div>\n  <div style=\"display: flex; align-items: center; gap: 8px; margin-left: auto;\">\n    <span style=\"color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;\">Environment:</span>\n    <span style=\"color: #111827; font-size: 14px; font-weight: 700; background: #e2e8f0; padding: 4px 10px; border-radius: 6px;\">${environment:text}</span>\n  </div>\n</div>",
+				"mode": "markdown"
+			},
+			"pluginVersion": "12.4.2",
+			"title": "",
+			"transparent": true,
+			"type": "text"
+		},
+		{
+			"fieldConfig": {
+				"defaults": {
+				},
+				"overrides": [
+				]
+			},
+			"gridPos": {
+				"h": 20,
+				"w": 12,
+				"x": 0,
+				"y": 5
+			},
+			"id": 3,
+			"options": {
+				"code": {
+					"language": "plaintext",
+					"showLineNumbers": false,
+					"showMiniMap": false
+				},
+				"content": "<div style=\"padding: 24px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; font-family: 'Inter', system-ui, sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,0.05); box-sizing: border-box; width: 100%;\">\n\n  <div style=\"margin-bottom: 20px; border-left: 6px solid #3274d9; padding-left: 16px;\">\n    <h2 style=\"margin: 0; color: #111827; font-size: 20px; font-weight: 800; letter-spacing: -0.3px;\">Adding a custom domain</h2>\n    <p style=\"margin: 4px 0 0 0; color: #4b5563; font-size: 13px; line-height: 1.5;\">\n      Make your environment accessible under your own domain (e.g. <code style=\"background:#f3f4f6;padding:1px 6px;border-radius:3px;font-size:12px;\">app.yourcompany.com</code>) in three steps.\n    </p>\n  </div>\n\n  <ol style=\"padding-left: 20px; margin: 0; color: #1f2937; font-size: 13px; line-height: 1.7;\">\n    <li style=\"margin-bottom: 14px;\">\n      <strong>Declare the domain in your <code style=\"background:#f3f4f6;padding:1px 6px;border-radius:3px;font-size:12px;\">liferay.yaml</code>.</strong> Add it under <code style=\"background:#f3f4f6;padding:1px 6px;border-radius:3px;font-size:12px;\">networks.domains</code>:\n      <pre style=\"background: #f3f4f6; padding: 12px; border-radius: 6px; margin: 8px 0; font-size: 12px; overflow-x: auto;\">networks:\n  domains:\n    - app.yourcompany.com</pre>\n      After the deploy, the domain appears in the table above within a few minutes.\n    </li>\n    <li style=\"margin-bottom: 14px;\">\n      <strong>Create two CNAME records at your DNS provider.</strong> One points your domain to the environment we provisioned, the other allows the platform to issue and renew the SSL certificate automatically:\n      <pre style=\"background: #f3f4f6; padding: 12px; border-radius: 6px; margin: 8px 0; font-size: 12px; overflow-x: auto;\">app.yourcompany.com.                  CNAME   liferay-${environment}.${dns_zone}.\n_acme-challenge.app.yourcompany.com.  CNAME   _acme-challenge.app.yourcompany.com.${dns_zone}.</pre>\n      Replace <code style=\"background:#f3f4f6;padding:1px 6px;border-radius:3px;font-size:12px;\">app.yourcompany.com</code> with your own domain. The targets above already match the <strong>${environment}</strong> environment selected at the top.\n    </li>\n    <li>\n      <strong>Wait a few minutes.</strong> Once both records propagate, your domain becomes accessible over HTTPS — no further action required.\n    </li>\n  </ol>\n\n  <div style=\"background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; margin-top: 20px; font-size: 13px; color: #92400e;\">\n    <strong>⚠️ Heads up:</strong> until both CNAMEs are in place, the domain shows up in the table above but HTTPS will not work yet.\n  </div>\n\n</div>",
+				"mode": "html"
+			},
+			"pluginVersion": "12.4.2",
+			"title": "",
+			"transparent": true,
+			"type": "text"
+		},
+		{
+			"datasource": {
+				"type": "prometheus",
+				"uid": "${DS_PROMETHEUS}"
+			},
+			"fieldConfig": {
+				"defaults": {
+					"color": {
+						"mode": "thresholds"
+					},
+					"custom": {
+						"align": "auto",
+						"cellOptions": {
+							"type": "auto"
+						},
+						"footer": {
+							"reducers": [
+							]
+						},
+						"inspect": false
+					},
+					"mappings": [
+					],
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{
+								"color": "green",
+								"value": 0
+							},
+							{
+								"color": "red",
+								"value": 80
+							}
+						]
+					}
+				},
+				"overrides": [
+					{
+						"matcher": {
+							"id": "byName",
+							"options": "Status"
+						},
+						"properties": [
+							{
+								"id": "mappings",
+								"value": [
+									{
+										"options": {
+											"False": {
+												"color": "red",
+												"index": 1,
+												"text": "Failed"
+											},
+											"True": {
+												"color": "green",
+												"index": 0,
+												"text": "Ready"
+											},
+											"Unknown": {
+												"color": "orange",
+												"index": 2,
+												"text": "Issuing"
+											}
+										},
+										"type": "value"
+									},
+									{
+										"options": {
+											"match": "null",
+											"result": {
+												"color": "blue",
+												"index": 3,
+												"text": "Pending"
+											}
+										},
+										"type": "special"
+									},
+									{
+										"options": {
+											"match": "empty",
+											"result": {
+												"color": "blue",
+												"index": 4,
+												"text": "Pending"
+											}
+										},
+										"type": "special"
+									}
+								]
+							},
+							{
+								"id": "custom.cellOptions",
+								"value": {
+									"type": "color-text"
+								}
+							}
+						]
+					}
+				]
+			},
+			"gridPos": {
+				"h": 14,
+				"w": 12,
+				"x": 12,
+				"y": 5
+			},
+			"id": 1,
+			"options": {
+				"cellHeight": "sm",
+				"showHeader": true
+			},
+			"pluginVersion": "12.4.2",
+			"targets": [
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${DS_PROMETHEUS}"
+					},
+					"editorMode": "code",
+					"exemplar": false,
+					"expr": "sum by (hostname) (\n  last_over_time(kube_customresource_httproute_info[1h])\n  and on (exported_namespace) last_over_time(kube_namespace_labels{label_environment_id=\"$environment\"}[1h])\n)",
+					"format": "table",
+					"instant": true,
+					"legendFormat": "__auto",
+					"range": false,
+					"refId": "A"
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${DS_PROMETHEUS}"
+					},
+					"editorMode": "code",
+					"exemplar": false,
+					"expr": "group by (hostname, condition) (\n  (\n    last_over_time(kube_customresource_certificate_dnsname_info[1h])\n    and on (exported_namespace) last_over_time(kube_namespace_labels{label_environment_id=\"$environment\"}[1h])\n  )\n  * on (name, exported_namespace) group_left(condition)\n  (last_over_time(certmanager_certificate_ready_status[1h]) > 0)\n)",
+					"format": "table",
+					"instant": true,
+					"legendFormat": "__auto",
+					"range": false,
+					"refId": "B"
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${DS_PROMETHEUS}"
+					},
+					"editorMode": "code",
+					"exemplar": false,
+					"expr": "sum by (hostname) (\n  (\n    last_over_time(kube_customresource_certificate_dnsname_info[1h])\n    and on (exported_namespace) last_over_time(kube_namespace_labels{label_environment_id=\"$environment\"}[1h])\n  )\n  * on (name, exported_namespace) group_left\n  last_over_time(certmanager_certificate_expiration_timestamp_seconds[1h])\n) * 1000",
+					"format": "table",
+					"instant": true,
+					"legendFormat": "__auto",
+					"range": false,
+					"refId": "C"
+				},
+				{
+					"datasource": {
+						"type": "prometheus",
+						"uid": "${DS_PROMETHEUS}"
+					},
+					"editorMode": "code",
+					"exemplar": false,
+					"expr": "group by (hostname, reason) (\n  label_replace(\n    last_over_time(certmanager_certificate_challenge_status[1h]) == 1,\n    \"hostname\", \"$1\", \"domain\", \"(.+)\"\n  )\n  and on (exported_namespace, hostname) (\n    last_over_time(kube_customresource_certificate_dnsname_info{hostname!~\".+\\\\.${dns_zone}\"}[1h])\n    and on (exported_namespace) last_over_time(kube_namespace_labels{label_environment_id=\"$environment\"}[1h])\n  )\n)",
+					"format": "table",
+					"instant": true,
+					"legendFormat": "__auto",
+					"range": false,
+					"refId": "D"
+				}
+			],
+			"title": "Custom Domains",
+			"transformations": [
+				{
+					"id": "joinByField",
+					"options": {
+						"byField": "hostname",
+						"mode": "outerTabular"
+					}
+				},
+				{
+					"id": "convertFieldType",
+					"options": {
+						"conversions": [
+							{
+								"destinationType": "time",
+								"targetField": "Value #C"
+							}
+						],
+						"fields": {
+						}
+					}
+				},
+				{
+					"id": "organize",
+					"options": {
+						"excludeByName": {
+							"Time 1": true,
+							"Time 2": true,
+							"Time 3": true,
+							"Time 4": true,
+							"Value #A": true,
+							"Value #B": true,
+							"Value #D": true
+						},
+						"includeByName": {
+						},
+						"indexByName": {
+							"Value #C": 4,
+							"condition": 2,
+							"hostname": 0,
+							"name": 1,
+							"reason": 3
+						},
+						"renameByName": {
+							"Value #C": "Expires",
+							"condition": "Status",
+							"hostname": "Hostname",
+							"name": "",
+							"reason": "Reason"
+						}
+					}
+				}
+			],
+			"transparent": true,
+			"type": "table"
+		}
+	],
+	"preload": false,
+	"schemaVersion": 42,
+	"tags": [
+		"Liferay",
+		"Custom Domains"
+	],
+	"templating": {
+		"list": [
+			{
+				"allowCustomValue": false,
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${DS_PROMETHEUS}"
+				},
+				"definition": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},label_environment_id)",
+				"label": "Environment",
+				"name": "environment",
+				"options": [
+				],
+				"query": {
+					"qryType": 1,
+					"query": "label_values(kube_namespace_labels{label_project_customer=\"yes\"},label_environment_id)",
+					"refId": "PrometheusVariableQueryEditor-VariableQuery"
+				},
+				"refresh": 1,
+				"regex": "",
+				"regexApplyTo": "value",
+				"sort": 1,
+				"type": "query"
+			},
+			{
+				"allowCustomValue": false,
+				"current": {
+					"text": "",
+					"value": ""
+				},
+				"datasource": {
+					"type": "prometheus",
+					"uid": "${DS_PROMETHEUS}"
+				},
+				"definition": "label_values(lcp:cluster_info:1h,dns_zones)",
+				"hide": 2,
+				"label": "DNS Zone",
+				"name": "dns_zone",
+				"options": [
+				],
+				"query": {
+					"qryType": 1,
+					"query": "label_values(lcp:cluster_info:1h,dns_zones)",
+					"refId": "PrometheusVariableQueryEditor-VariableQuery"
+				},
+				"refresh": 1,
+				"regex": "",
+				"regexApplyTo": "value",
+				"type": "query"
+			}
+		]
+	},
+	"time": {
+		"from": "now-1h",
+		"to": "now"
+	},
+	"timepicker": {
+		"refresh_intervals": [
+			"1m",
+			"5m",
+			"15m",
+			"30m",
+			"1h",
+			"2h",
+			"1d"
+		]
+	},
+	"timezone": "browser",
+	"title": "Custom Domains",
+	"uid": "custom-domains",
+	"version": 1,
+	"weekStart": ""
+}

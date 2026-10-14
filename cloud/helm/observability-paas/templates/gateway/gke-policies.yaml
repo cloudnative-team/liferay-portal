@@ -1,0 +1,47 @@
+{{- if and .Values.gateway.enabled (eq .Values.gateway.provider "gke") -}}
+{{- $grafanaFullname := include "observability-paas.grafana.fullname" . -}}
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+    labels:
+        {{- include "observability-paas.grafana.labels" . | nindent 8 }}
+    name: {{ $grafanaFullname | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    default:
+        {{- toYaml .Values.gateway.gke.healthCheck | nindent 8 }}
+    targetRef:
+        group: ""
+        kind: Service
+        name: {{ $grafanaFullname | quote }}
+---
+apiVersion: networking.gke.io/v1
+kind: GCPGatewayPolicy
+metadata:
+    labels:
+        {{- include "observability-paas.grafana.labels" . | nindent 8 }}
+    name: {{ $grafanaFullname | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    default:
+        {{- toYaml .Values.gateway.gke.gatewayPolicy | nindent 8 }}
+    targetRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: {{ include "observability-paas.gateway.name" . | quote }}
+---
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+    labels:
+        {{- include "observability-paas.grafana.labels" . | nindent 8 }}
+    name: {{ $grafanaFullname | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    default:
+        {{- toYaml .Values.gateway.gke.backendPolicy | nindent 8 }}
+    targetRef:
+        group: ""
+        kind: Service
+        name: {{ $grafanaFullname | quote }}
+{{- end -}}

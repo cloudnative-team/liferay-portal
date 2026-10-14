@@ -1,0 +1,24 @@
+{{- $observability := index .Subcharts "observability" -}}
+{{- $datasourceUid := include "observability.datasourceUid" $observability -}}
+{{- range $key, $entry := .Values.dashboards }}
+{{- if not (eq $entry.enabled false) }}
+{{- $raw := $.Files.Get $entry.file -}}
+{{- if not $raw -}}
+{{- fail (printf "Dashboard file %s not found in chart" $entry.file) -}}
+{{- end }}
+---
+apiVersion: v1
+data:
+    {{ $key }}.json: |
+        {{- $raw | replace "${DS_PROMETHEUS}" $datasourceUid | nindent 8 }}
+kind: ConfigMap
+metadata:
+    annotations:
+        grafana_folder: {{ $observability.Values.dashboards.folder | quote }}
+    labels:
+        {{- include "observability-paas.labels" $ | nindent 8 }}
+        grafana_dashboard: "true"
+    name: {{ printf "%s-dashboard-%s" (include "observability-paas.fullname" $) $key | trunc 63 | trimSuffix "-" | quote }}
+    namespace: {{ include "observability-paas.namespace" $ | quote }}
+{{- end }}
+{{- end }}

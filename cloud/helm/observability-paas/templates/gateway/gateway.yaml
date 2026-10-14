@@ -1,0 +1,48 @@
+{{- if .Values.gateway.enabled -}}
+{{- $gatewayName := include "observability-paas.gateway.name" . -}}
+{{- $hostname := required "observability.grafana.route.main.hostnames must be set when gateway.enabled is true" (include "observability-paas.grafana.hostname" .) -}}
+{{- range $routeName, $route := (index (index .Subcharts "observability").Subcharts "grafana").Values.route -}}
+{{- if $route.enabled -}}
+{{- range $route.parentRefs -}}
+{{- if ne .name $gatewayName -}}
+{{- fail (printf "observability.grafana.route.%s.parentRefs must reference the %s gateway" $routeName $gatewayName) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+    {{- with .Values.gateway.annotations }}
+    annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    labels:
+        {{- include "observability-paas.grafana.labels" . | nindent 8 }}
+    name: {{ $gatewayName | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    gatewayClassName: {{ include "observability-paas.gateway.className" . | quote }}
+    listeners:
+        -   allowedRoutes:
+                kinds:
+                    -   group: gateway.networking.k8s.io
+                        kind: HTTPRoute
+            hostname: {{ $hostname | quote }}
+            name: http
+            port: 80
+            protocol: HTTP
+        -   allowedRoutes:
+                kinds:
+                    -   group: gateway.networking.k8s.io
+                        kind: HTTPRoute
+            hostname: {{ $hostname | quote }}
+            name: https
+            port: 443
+            protocol: HTTPS
+            tls:
+                certificateRefs:
+                    -   group: ""
+                        kind: Secret
+                        name: {{ printf "%s-tls" (include "observability-paas.grafana.fullname" .) | quote }}
+{{- end -}}

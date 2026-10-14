@@ -1,0 +1,76 @@
+set:
+    observability.gcp.projectId: liferay-test
+    observability.grafana.route.main.hostnames:
+        -   monitoring.example.com
+    observability.grafana.route.redirect.hostnames:
+        -   monitoring.example.com
+suite: Grafana
+templates:
+    -   templates/grafana/dashboards-configmap.yaml
+    -   templates/grafana/smtp-external-secret.yaml
+    -   templates/grafana/sso-external-secret.yaml
+tests:
+    -   asserts:
+            -   failedTemplate:
+                    errorMessage: observability.grafana.smtp.existingSecret must be set when smtp.enabled is true
+                template: templates/grafana/smtp-external-secret.yaml
+        it: Fails when SMTP is enabled without a Grafana SMTP secret
+        set:
+            observability.grafana.smtp.existingSecret: ""
+    -   asserts:
+            -   equal:
+                    path: metadata.name
+                    value: custom-smtp
+                template: templates/grafana/smtp-external-secret.yaml
+            -   equal:
+                    path: spec.target.name
+                    value: custom-smtp
+                template: templates/grafana/smtp-external-secret.yaml
+        it: Names the SMTP external secret after the Grafana SMTP secret
+        set:
+            observability.grafana.smtp.existingSecret: custom-smtp
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+                template: templates/grafana/smtp-external-secret.yaml
+        it: Renders no SMTP external secret when SMTP is disabled
+        set:
+            smtp.enabled: false
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+                template: templates/grafana/sso-external-secret.yaml
+        it: Renders no SSO external secret when SSO is disabled
+    -   asserts:
+            -   equal:
+                    path: metadata.name
+                    value: grafana-oidc
+                template: templates/grafana/sso-external-secret.yaml
+        it: Renders the SSO external secret when SSO is enabled
+        set:
+            sso.enabled: true
+    -   asserts:
+            -   hasDocuments:
+                    count: 2
+                template: templates/grafana/dashboards-configmap.yaml
+        it: Skips a dashboard when its enabled is false
+        set:
+            dashboards.builds.enabled: false
+    -   asserts:
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-builds
+                matchRegex:
+                    path: data["builds.json"]
+                    pattern: "\"uid\": \"custom-uid\""
+                template: templates/grafana/dashboards-configmap.yaml
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-builds
+                notMatchRegex:
+                    path: data["builds.json"]
+                    pattern: DS_PROMETHEUS
+                template: templates/grafana/dashboards-configmap.yaml
+        it: Substitutes the observability datasource UID into the dashboards
+        set:
+            observability.datasource.uid: custom-uid
