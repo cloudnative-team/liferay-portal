@@ -1,4 +1,7 @@
 {{- if .Values.enabled -}}
+{{- if hasKey .Values.database "engine" -}}
+{{- fail "The value \"database.engine\" must not be set per environment because the database engine applies to the whole deployment" -}}
+{{- end -}}
 apiVersion: liferay.com/v1alpha1
 kind: LiferayInfrastructure
 metadata:
