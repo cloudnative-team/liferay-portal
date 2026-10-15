@@ -31,7 +31,7 @@ sidecar.opentelemetry.io/inject: "false"
 
 {{- define "liferay-platform.databaseEngine" -}}
 {{- $engine := required "The value \"database.engine\" must be set to the database engine of the deployment" .Values.database.engine -}}
-{{- if not (has $engine (list "postgresql")) -}}
+{{- if not (has $engine (list "mysql" "postgresql")) -}}
 {{- fail (printf "The value %q contains an unsupported database engine: %s" "database.engine" $engine) -}}
 {{- end -}}
 {{- $engine -}}
