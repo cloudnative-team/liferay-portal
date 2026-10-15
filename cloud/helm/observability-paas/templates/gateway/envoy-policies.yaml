@@ -10,9 +10,12 @@ metadata:
 spec:
     ingress:
         -   from:
-                -   podSelector:
+                -   namespaceSelector: {}
+                    podSelector:
                         matchLabels:
                             app.kubernetes.io/name: envoy
+                            gateway.envoyproxy.io/owning-gateway-name: {{ include "observability-paas.gateway.name" . | quote }}
+                            gateway.envoyproxy.io/owning-gateway-namespace: {{ include "observability-paas.namespace" . | quote }}
     podSelector:
         matchLabels:
             {{- include "observability-paas.grafana.selectorLabels" . | nindent 12 }}

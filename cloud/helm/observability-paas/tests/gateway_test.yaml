@@ -25,6 +25,19 @@ tests:
         set:
             observability.grafana.route.main.hostnames: []
     -   asserts:
+            -   documentIndex: 0
+                equal:
+                    path: spec.ingress[0].from[0]
+                    value:
+                        namespaceSelector: {}
+                        podSelector:
+                            matchLabels:
+                                app.kubernetes.io/name: envoy
+                                gateway.envoyproxy.io/owning-gateway-name: monitoring-stack-grafana-gateway
+                                gateway.envoyproxy.io/owning-gateway-namespace: NAMESPACE
+                template: templates/gateway/envoy-policies.yaml
+        it: Lets only the Envoy proxies of the gateway reach Grafana from any namespace
+    -   asserts:
             -   hasDocuments:
                     count: 0
         it: Renders no gateway objects when the gateway is disabled
