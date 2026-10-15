@@ -11,10 +11,36 @@ set:
         resourceGroupName: liferay-test
         subscriptionId: 00000000-0000-0000-0000-000000000000
         tenantId: 33333333-3333-3333-3333-333333333333
+    global:
+        setup:
+            database:
+                engine: postgresql
 suite: Environment Config
 templates:
     -   templates/environment-config.yaml
 tests:
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: The value "global.setup.database.engine" must be set by config.json \(setup.database.engine\)
+        it: Fails when the deployment sets no database engine
+        set:
+            global: null
+    -   asserts:
+            -   equal:
+                    path: data.setup
+                    value:
+                        database:
+                            engine: mysql
+                        search:
+                            engine: opensearch
+        it: Records every setup property of the deployment for the compositions and the engine lock
+        set:
+            global:
+                setup:
+                    database:
+                        engine: mysql
+                    search:
+                        engine: opensearch
     -   asserts:
             -   equal:
                     path: data
@@ -25,6 +51,9 @@ tests:
                         oidcIssuerUrl: https://oidc.example.com/tenant/
                         region: eastus
                         resourceGroupName: liferay-test
+                        setup:
+                            database:
+                                engine: postgresql
                         subscriptionId: 00000000-0000-0000-0000-000000000000
                         tenantId: 33333333-3333-3333-3333-333333333333
             -   equal:

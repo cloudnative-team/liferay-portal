@@ -18,6 +18,10 @@ gateway:
     clientTrafficPolicySpec:
         enableProxyProtocol: true
     name: liferay-example-dev-gateway
+global:
+    setup:
+        database:
+            engine: postgresql
 license:
     externalSecretKey: liferay-licenses-liferay-example
 overlayBucket:

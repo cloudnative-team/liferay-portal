@@ -1,6 +1,11 @@
 release:
     name: my-release
     namespace: my-namespace
+set:
+    global:
+        setup:
+            database:
+                engine: postgresql
 suite: LiferayInfrastructure
 templates:
     -   templates/liferayinfrastructure.yaml
@@ -13,6 +18,28 @@ tests:
             -   notExists:
                     path: spec.orphanOnDelete
         it: Leaves unset settings to the composite resource defaults
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: The value "database.engine" must not be set because it is set by config.json \(setup.database.engine\)
+        it: Fails when the GitOps values set the database engine
+        set:
+            database:
+                engine: postgresql
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: "Unsupported database engine: oracle"
+        it: Fails when the database engine of the deployment is unsupported
+        set:
+            global:
+                setup:
+                    database:
+                        engine: oracle
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: The value "global.setup.database.engine" must be set by config.json \(setup.database.engine\)
+        it: Fails when the deployment sets no database engine
+        set:
+            global: null
     -   asserts:
             -   equal:
                     path: metadata.name
@@ -130,6 +157,11 @@ tests:
                 instanceType: GP_Standard_B2s
                 storageGB: 64
                 version: "17"
+    -   asserts:
+            -   equal:
+                    path: spec.database.engine
+                    value: postgresql
+        it: Stamps the database engine of the deployment onto the composite resource
     -   asserts:
             -   isAPIVersion:
                     of: liferay.com/v1alpha1

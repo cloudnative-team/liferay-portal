@@ -142,3 +142,86 @@ tests:
         set:
             observability:
                 enabled: true
+    -   asserts:
+            -   notContains:
+                    any: true
+                    content:
+                        name: global.setup.database.engine
+                    path: spec.sources[0].helm.parameters
+                template: templates/application-infrastructure-provider.yaml
+            -   notContains:
+                    any: true
+                    content:
+                        name: global.setup.database.engine
+                    path: spec.template.spec.sources[0].helm.parameters
+                template: templates/applicationset-infrastructure.yaml
+            -   notContains:
+                    any: true
+                    content:
+                        name: global.setup.database.engine
+                    path: spec.template.spec.sources[0].helm.parameters
+                template: templates/applicationset-liferay.yaml
+        it: Omits the setup parameters when the deployment sets no setup properties
+        set:
+            gitops:
+                repository:
+                    url: https://github.com/example/liferay-gitops.git
+            infrastructure:
+                repoURL: oci://example-registry/liferay-azure-infrastructure
+            infrastructureProvider:
+                repoURL: oci://example-registry/liferay-azure-infrastructure-provider
+            liferay:
+                repoURL: oci://example-registry/liferay-azure
+    -   asserts:
+            -   contains:
+                    content:
+                        name: global.setup.database.engine
+                        value: mysql
+                    path: spec.sources[0].helm.parameters
+                template: templates/application-infrastructure-provider.yaml
+            -   contains:
+                    content:
+                        name: global.setup.search.engine
+                        value: opensearch
+                    path: spec.sources[0].helm.parameters
+                template: templates/application-infrastructure-provider.yaml
+            -   contains:
+                    content:
+                        name: global.setup.database.engine
+                        value: mysql
+                    path: spec.template.spec.sources[0].helm.parameters
+                template: templates/applicationset-infrastructure.yaml
+            -   contains:
+                    content:
+                        name: global.setup.search.engine
+                        value: opensearch
+                    path: spec.template.spec.sources[0].helm.parameters
+                template: templates/applicationset-infrastructure.yaml
+            -   contains:
+                    content:
+                        name: global.setup.database.engine
+                        value: mysql
+                    path: spec.template.spec.sources[0].helm.parameters
+                template: templates/applicationset-liferay.yaml
+            -   contains:
+                    content:
+                        name: global.setup.search.engine
+                        value: opensearch
+                    path: spec.template.spec.sources[0].helm.parameters
+                template: templates/applicationset-liferay.yaml
+        it: Passes every setup property to the infrastructure provider, infrastructure and Liferay applications as a global parameter
+        set:
+            gitops:
+                repository:
+                    url: https://github.com/example/liferay-gitops.git
+            infrastructure:
+                repoURL: oci://example-registry/liferay-azure-infrastructure
+            infrastructureProvider:
+                repoURL: oci://example-registry/liferay-azure-infrastructure-provider
+            liferay:
+                repoURL: oci://example-registry/liferay-azure
+            setup:
+                database:
+                    engine: mysql
+                search:
+                    engine: opensearch

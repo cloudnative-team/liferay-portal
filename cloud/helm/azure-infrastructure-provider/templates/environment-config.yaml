@@ -1,3 +1,4 @@
+{{- $_ := dig "setup" "database" "engine" "" (.Values.global | default dict) | required "The value \"global.setup.database.engine\" must be set by config.json (setup.database.engine)" -}}
 apiVersion: apiextensions.crossplane.io/v1beta1
 data:
     databasePrivateDnsZoneId: {{ printf "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/privateDnsZones/%s" $.Values.deploymentContext.subscriptionId $.Values.deploymentContext.resourceGroupName (include "network.databasePrivateDnsZoneName" $) }}
@@ -5,6 +6,8 @@ data:
     {{- range $key := list "deploymentName" "oidcIssuerUrl" "region" "resourceGroupName" "subscriptionId" "tenantId" }}
     {{ $key }}: {{ index $.Values.deploymentContext $key | quote }}
     {{- end }}
+    setup:
+        {{- dig "setup" dict (.Values.global | default dict) | toYaml | nindent 8 }}
 kind: EnvironmentConfig
 metadata:
     annotations:

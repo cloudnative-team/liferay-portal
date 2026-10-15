@@ -9,6 +9,7 @@
 
 {{- $backup := $xr.spec.backup -}}
 {{- $cmkEnabled := $xr.spec.cmk.enabled -}}
+{{- $deploymentDatabaseEngine := dig "setup" "database" "engine" "" $env -}}
 {{- $environmentId := $xr.spec.environmentId -}}
 {{- $managementPolicies := $xr.spec.orphanOnDelete | ternary (list "Create" "Observe" "Update") (list "*") | toJson -}}
 {{- $namespace := $xr.metadata.namespace -}}
@@ -22,10 +23,20 @@
 
 {{- $activeDataPlane := $targetActiveDataPlane -}}
 {{- $backupRetentionDays := max 7 (min 35 (int $backup.retentionDays)) -}}
+{{- $databaseEngine := $xr.spec.database.engine | default $deploymentDatabaseEngine -}}
+{{- $databaseEngineProfile := index (dict "postgresql" (dict "port" "5432")) $databaseEngine -}}
 {{- $dataPlanes := list $targetActiveDataPlane -}}
 {{- $overlayStorageAccountName := printf "%.9s%.6sovl%s" ($env.deploymentName | replace "-" "" | lower) ($projectId | replace "-" "" | lower) (printf "%s-%s" $env.deploymentName $projectId | sha256sum | trunc 6) -}}
 {{- $projectIdFull := printf "%s-%s" $projectId $environmentId -}}
 {{- $targetInactiveDataPlane := (eq $targetActiveDataPlane "blue") | ternary "green" "blue" -}}
+
+{{- if not $deploymentDatabaseEngine -}}
+    {{- fail "The deployment has no database engine, so set setup.database.engine in config.json" -}}
+{{- end }}
+
+{{- if ne $databaseEngine $deploymentDatabaseEngine -}}
+    {{- fail (printf "The database engine \"%s\" of \"%s\" does not match the database engine \"%s\" of the deployment (setup.database.engine), and changing it is not supported" $databaseEngine $xr.metadata.name $deploymentDatabaseEngine) -}}
+{{- end }}
 
 {{- if (eq $restorePhase "promoting") -}}
     {{- $dataPlanes = list "blue" "green" -}}
