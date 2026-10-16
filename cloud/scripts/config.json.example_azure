@@ -8,6 +8,9 @@
 	},
 	"platformComponents": {
 		"values": {
+			"database": {
+				"engine": "postgresql"
+			},
 			"gitops": {
 				"repository": {
 					"url": "https://github.com/example/liferay-gitops.git"

@@ -7,6 +7,16 @@
 {{- fail "Azure has no managed OpenSearch, so search.engine must be elasticsearch" -}}
 {{- end -}}
 
+{{- if not $env.databaseEngine -}}
+{{- fail "The environment config has no database engine, so \"database.engine\" must be set on the infrastructure provider" -}}
+{{- end -}}
+
+{{- range $observedResource := $observedResources -}}
+    {{- if and (hasPrefix "dbforpostgresql." (dig "resource" "apiVersion" "" $observedResource)) (ne $env.databaseEngine "postgresql") -}}
+        {{- fail (printf "Unable to change the database engine of the deployment from \"postgresql\" to %q because the environment already has a PostgreSQL database. Create a new deployment to use another database engine." $env.databaseEngine) -}}
+    {{- end -}}
+{{- end -}}
+
 {{- $backup := $xr.spec.backup -}}
 {{- $cmkEnabled := $xr.spec.cmk.enabled -}}
 {{- $environmentId := $xr.spec.environmentId -}}
