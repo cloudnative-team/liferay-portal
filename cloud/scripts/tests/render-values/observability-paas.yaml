@@ -1,5 +1,6 @@
 observability:
     gcp:
+        clusterName: liferay-example-gke
         projectId: liferay-example
     grafana:
         route:
