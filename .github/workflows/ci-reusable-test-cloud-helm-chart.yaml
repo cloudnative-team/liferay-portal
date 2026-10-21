@@ -71,6 +71,7 @@ jobs:
                     -   gcp-infrastructure-provider
                     -   infrastructure
                     -   observability
+                    -   observability-paas
                     -   platform
                     -   platform-components
 on:
