@@ -19,6 +19,38 @@ tests:
         set:
             observability.grafana.smtp.existingSecret: ""
     -   asserts:
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-builds
+                matchRegex:
+                    path: data["builds.json"]
+                    pattern: "Build ID:"
+                template: templates/grafana/dashboards-configmap.yaml
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-builds
+                notMatchRegex:
+                    path: data["builds.json"]
+                    pattern: HEADER_HTML
+                template: templates/grafana/dashboards-configmap.yaml
+        it: Labels the builds dashboard header with the build ID
+    -   asserts:
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-secrets
+                matchRegex:
+                    path: data["secrets.json"]
+                    pattern: cd.[$][{]dns_zone[}]/secrets
+                template: templates/grafana/dashboards-configmap.yaml
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-secrets
+                notMatchRegex:
+                    path: data["secrets.json"]
+                    pattern: HEADER_HTML
+                template: templates/grafana/dashboards-configmap.yaml
+        it: Links the secrets dashboard header to secret management in ArgoCD
+    -   asserts:
             -   equal:
                     path: metadata.name
                     value: custom-smtp
@@ -50,6 +82,22 @@ tests:
         it: Renders the SSO external secret when SSO is enabled
         set:
             sso.enabled: true
+    -   asserts:
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-custom-domains
+                matchRegex:
+                    path: data["custom-domains.json"]
+                    pattern: cdg-panel
+                template: templates/grafana/dashboards-configmap.yaml
+            -   documentSelector:
+                    path: metadata.name
+                    value: RELEASE-NAME-observability-paas-dashboard-custom-domains
+                notMatchRegex:
+                    path: data["custom-domains.json"]
+                    pattern: CUSTOM_DOMAINS_GUIDE_HTML
+                template: templates/grafana/dashboards-configmap.yaml
+        it: Renders the custom domains guide from its HTML file
     -   asserts:
             -   documentSelector:
                     path: metadata.name

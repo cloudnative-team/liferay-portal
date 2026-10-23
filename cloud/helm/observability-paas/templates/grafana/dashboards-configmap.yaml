@@ -1,17 +1,29 @@
 {{- $observability := index .Subcharts "observability" -}}
 {{- $clusterPattern := include "observability.clusterPattern" $observability -}}
+{{- $dashboardHeaders := dict
+    "builds" (dict "label" "Build ID" "subtitle" "Execution timeline and step-level diagnostics." "title" "Build Details" "value" "$build_id")
+    "custom-domains" (dict "subtitle" "Domain configuration and SSL status across the platform." "title" "Custom Domains")
+    "secrets" (dict "links" (list (dict "emoji" "🔐" "href" "https://cd.${dns_zone}/secrets" "subtitle" "Manage Secrets in ArgoCD" "title" "Secret Management")) "subtitle" "Inventory and lifecycle of deployed Secrets." "title" "Secrets")
+-}}
 {{- $datasourceUid := include "observability.datasourceUid" $observability -}}
 {{- range $key, $entry := .Values.dashboards }}
 {{- if not (eq $entry.enabled false) }}
 {{- $raw := $.Files.Get $entry.file -}}
 {{- if not $raw -}}
 {{- fail (printf "Dashboard file %s not found in chart" $entry.file) -}}
+{{- end -}}
+{{- $rendered := $raw | replace "${CLUSTER}" $clusterPattern | replace "${DS_PROMETHEUS}" $datasourceUid -}}
+{{- if hasKey $dashboardHeaders $key -}}
+{{- $rendered = $rendered | replace "\"${HEADER_HTML}\"" (tpl ($observability.Files.Get "dashboards/html/dashboard-header.html") (index $dashboardHeaders $key) | toJson) -}}
+{{- end -}}
+{{- if eq $key "custom-domains" -}}
+{{- $rendered = $rendered | replace "\"${CUSTOM_DOMAINS_GUIDE_HTML}\"" ($.Files.Get "dashboards/html/custom-domains-guide.html" | toJson) -}}
 {{- end }}
 ---
 apiVersion: v1
 data:
     {{ $key }}.json: |
-        {{- $raw | replace "${CLUSTER}" $clusterPattern | replace "${DS_PROMETHEUS}" $datasourceUid | nindent 8 }}
+        {{- $rendered | nindent 8 }}
 kind: ConfigMap
 metadata:
     annotations:
