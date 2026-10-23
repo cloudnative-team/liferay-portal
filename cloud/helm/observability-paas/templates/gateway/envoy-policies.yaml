@@ -22,6 +22,24 @@ spec:
     policyTypes:
         -   Ingress
 ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    labels:
+        {{- include "observability-paas.labels" . | nindent 8 }}
+    name: {{ printf "%s-ingress" (include "observability-paas.gateway.name" .) | trunc 63 | trimSuffix "-" | quote }}
+    namespace: {{ include "observability-paas.namespace" . | quote }}
+spec:
+    ingress:
+        -   {}
+    podSelector:
+        matchLabels:
+            app.kubernetes.io/name: envoy
+            gateway.envoyproxy.io/owning-gateway-name: {{ include "observability-paas.gateway.name" . | quote }}
+            gateway.envoyproxy.io/owning-gateway-namespace: {{ include "observability-paas.namespace" . | quote }}
+    policyTypes:
+        -   Ingress
+---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: ClientTrafficPolicy
 metadata:

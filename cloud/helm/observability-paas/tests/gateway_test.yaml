@@ -39,6 +39,22 @@ tests:
                 template: templates/gateway/envoy-policies.yaml
         it: Lets only the Envoy proxies of the gateway reach Grafana from any namespace
     -   asserts:
+            -   documentIndex: 1
+                equal:
+                    path: spec
+                    value:
+                        ingress:
+                            -   {}
+                        podSelector:
+                            matchLabels:
+                                app.kubernetes.io/name: envoy
+                                gateway.envoyproxy.io/owning-gateway-name: monitoring-stack-grafana-gateway
+                                gateway.envoyproxy.io/owning-gateway-namespace: NAMESPACE
+                        policyTypes:
+                            -   Ingress
+                template: templates/gateway/envoy-policies.yaml
+        it: Opens the Envoy proxies of the gateway in the release namespace to inbound traffic
+    -   asserts:
             -   hasDocuments:
                     count: 0
         it: Renders no gateway objects when the gateway is disabled
@@ -50,7 +66,7 @@ tests:
                     value: envoy-gateway-l4
                 template: templates/gateway/gateway.yaml
             -   hasDocuments:
-                    count: 3
+                    count: 4
                 template: templates/gateway/envoy-policies.yaml
             -   hasDocuments:
                     count: 0
