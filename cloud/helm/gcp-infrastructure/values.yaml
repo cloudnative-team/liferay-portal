@@ -27,6 +27,7 @@ deletionProtection: true
 enabled: true
 endpoints: {}
 environmentId: ""
+extensionSecrets: []
 externalSecretCreationPolicy: Owner
 forceDestroy: false
 gateway:
