@@ -3,7 +3,8 @@ release:
     namespace: my-namespace
 suite: Elasticsearch
 templates:
-    -   templates/elasticsearch.yaml
+    -   templates/search/elasticsearch.yaml
+    -   templates/search/namespace.yaml
 tests:
     -   asserts:
             -   contains:
@@ -29,6 +30,42 @@ tests:
                         value: one
                     -   name: ES_SETTING_TWO
                         value: two
+        template: templates/search/elasticsearch.yaml
+    -   asserts:
+            -   isSubset:
+                    content:
+                        component: search
+                        environmentId: env1
+                        projectId: proj1
+                        workload_class: standard
+                    path: metadata.labels
+            -   isSubset:
+                    content:
+                        component: search
+                        environmentId: env1
+                        projectId: proj1
+                        workload_class: standard
+                    path: spec.nodeSets[0].podTemplate.metadata.labels
+        it: Labels the Elasticsearch resource and its pods with the search labels
+        set:
+            environmentId: env1
+            projectId: proj1
+        template: templates/search/elasticsearch.yaml
+    -   asserts:
+            -   isSubset:
+                    content:
+                        component: search
+                        environmentId: env1
+                        name: my-namespace-elasticsearch
+                        pod-security.kubernetes.io/enforce: restricted
+                        projectId: proj1
+                        workload_class: standard
+                    path: metadata.labels
+        it: Labels the dedicated Elasticsearch namespace with the search labels
+        set:
+            environmentId: env1
+            projectId: proj1
+        template: templates/search/namespace.yaml
     -   asserts:
             -   equal:
                     path: metadata.name
@@ -39,6 +76,7 @@ tests:
         it: Names the Elasticsearch resource after the configured name override
         set:
             search.elasticsearch.name: custom-es
+        template: templates/search/elasticsearch.yaml
     -   asserts:
             -   equal:
                     path: metadata.name
@@ -58,12 +96,18 @@ tests:
             path: kind
             value: Elasticsearch
         it: Names the Elasticsearch resource after the release and dedicated namespace
+        template: templates/search/elasticsearch.yaml
     -   asserts:
             -   hasDocuments:
                     count: 0
         it: Omits the Elasticsearch resources when search is disabled
         set:
             search.elasticsearch.enabled: false
+    -   asserts:
+            -   notExists:
+                    path: spec.nodeSets[0].config
+        it: Omits the node set config by default
+        template: templates/search/elasticsearch.yaml
     -   asserts:
             -   equal:
                     path: spec.nodeSets[0].volumeClaimTemplates[0].spec.storageClassName
@@ -74,6 +118,17 @@ tests:
         it: Overrides the data volume storage class
         set:
             persistence.storageClassName: hyperdisk-balanced-rwo
+        template: templates/search/elasticsearch.yaml
+    -   asserts:
+            -   equal:
+                    path: spec.nodeSets[0].config
+                    value:
+                        indices.query.bool.max_clause_count: 4096
+        it: Passes the node set config through
+        set:
+            search.elasticsearch.config:
+                indices.query.bool.max_clause_count: 4096
+        template: templates/search/elasticsearch.yaml
     -   asserts:
             -   equal:
                     path: metadata.name
@@ -84,10 +139,17 @@ tests:
             path: kind
             value: Namespace
         it: Provisions the dedicated Elasticsearch namespace
+        template: templates/search/namespace.yaml
     -   asserts:
             -   hasDocuments:
-                    count: 2
-        it: Renders both the Elasticsearch resource and its namespace by default
+                    count: 1
+        it: Renders the Elasticsearch resource by default
+        template: templates/search/elasticsearch.yaml
+    -   asserts:
+            -   hasDocuments:
+                    count: 1
+        it: Renders the dedicated Elasticsearch namespace by default
+        template: templates/search/namespace.yaml
     -   asserts:
             -   equal:
                     path: spec.nodeSets[0].volumeClaimTemplates[0].spec.storageClassName
@@ -96,3 +158,4 @@ tests:
             path: kind
             value: Elasticsearch
         it: Requests the standard-rwo storage class on the data volume by default
+        template: templates/search/elasticsearch.yaml

@@ -1,5 +1,4 @@
 {{- $search := .Values.search.elasticsearch -}}
-{{- $elasticsearchNamespace := printf "%s-elasticsearch" .Release.Namespace -}}
 {{- if and .Values.enabled $search.enabled }}
 apiVersion: elasticsearch.k8s.elastic.co/v1
 kind: Elasticsearch
@@ -7,20 +6,28 @@ metadata:
     annotations:
         argocd.argoproj.io/sync-wave: "-25"
         {{- $search.annotations | toYaml | nindent 8 }}
-    name: {{ include "elasticsearch.name" . }}
-    namespace: {{ $elasticsearchNamespace }}
+    labels:
+        {{- include "search.labels" . | nindent 8 }}
+    name: {{ include "search.name" . }}
+    namespace: {{ include "search.namespace" . }}
 spec:
     http:
         tls:
             selfSignedCertificate:
                 disabled: true
     nodeSets:
-        -   count: {{ $search.nodeCount }}
+        -   {{- with $search.config }}
+            config:
+                {{- toYaml . | nindent 16 }}
+            {{- end }}
+            count: {{ $search.nodeCount }}
             name: default
             podTemplate:
                 metadata:
                     annotations:
                         {{- $search.annotations | toYaml | nindent 24 }}
+                    labels:
+                        {{- include "search.labels" . | nindent 24 }}
                 spec:
                     containers:
                         -   env:
@@ -77,14 +84,4 @@ spec:
                                 storage: {{ $search.volumeSize }}
                         storageClassName: {{ .Values.persistence.storageClassName }}
     version: {{ $search.version }}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-    annotations:
-        argocd.argoproj.io/sync-wave: "-25"
-    labels:
-        name: {{ $elasticsearchNamespace }}
-        pod-security.kubernetes.io/enforce: restricted
-    name: {{ $elasticsearchNamespace }}
 {{- end -}}

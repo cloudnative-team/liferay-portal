@@ -86,6 +86,7 @@ search:
             instrumentation.opentelemetry.io/inject-nodejs: "false"
             instrumentation.opentelemetry.io/inject-python: "false"
             sidecar.opentelemetry.io/inject: "false"
+        config: {}
         enabled: true
         nodeCount: 1
         podSecurityContext:

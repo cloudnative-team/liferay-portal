@@ -1,5 +1,6 @@
-{{- define "elasticsearch.name" -}}
-{{- .Values.search.elasticsearch.name | default (printf "%s-es" .Release.Name) | trunc 63 | trimSuffix "-" -}}
+{{- define "liferay.commonLabels" -}}
+environmentId: {{ .Values.environmentId }}
+projectId: {{ .Values.projectId }}
 {{- end -}}
 
 {{- define "liferay.hostnameSlug" -}}
