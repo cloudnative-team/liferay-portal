@@ -56,6 +56,10 @@ spec:
                                 {{- end }}
                             securityContext:
                                 {{- $search.securityContext | toYaml | nindent 32 }}
+                            {{- with $search.extraVolumeMounts }}
+                            volumeMounts:
+                                {{- toYaml . | nindent 32 }}
+                            {{- end }}
                     initContainers:
                         -   command:
                                 -   sh
@@ -71,8 +75,15 @@ spec:
                             name: install-plugins
                             securityContext:
                                 {{- $search.securityContext | toYaml | nindent 32 }}
+                        {{- with $search.extraInitContainers }}
+                        {{- toYaml . | nindent 24 }}
+                        {{- end }}
                     securityContext:
                         {{- $search.podSecurityContext | toYaml | nindent 24 }}
+                    {{- with $search.extraVolumes }}
+                    volumes:
+                        {{- toYaml . | nindent 24 }}
+                    {{- end }}
             volumeClaimTemplates:
                 -   metadata:
                         name: elasticsearch-data

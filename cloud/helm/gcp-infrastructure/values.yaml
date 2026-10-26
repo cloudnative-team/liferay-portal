@@ -169,6 +169,9 @@ search:
                 requests:
                     cpu: 50m
                     memory: 128Mi
+        extraInitContainers: []
+        extraVolumeMounts: []
+        extraVolumes: []
         nodeCount: 1
         podSecurityContext:
             fsGroup: 1000
