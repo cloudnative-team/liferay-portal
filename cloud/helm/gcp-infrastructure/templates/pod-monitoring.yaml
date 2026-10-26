@@ -1,12 +1,19 @@
 {{- if .Values.enabled -}}
 {{- $interval := .Values.podMonitoring.interval -}}
 {{- range $name, $instance := .Values.podMonitoring.instances }}
+{{- $enabled := "true" }}
+
+{{- if hasKey $instance "enabled" }}
+{{- $enabled = tpl (toString $instance.enabled) $ }}
+{{- end }}
+
+{{- if eq $enabled "true" }}
 ---
 apiVersion: monitoring.googleapis.com/v1
 kind: PodMonitoring
 metadata:
     name: {{ $name }}
-    namespace: {{ $.Release.Namespace }}
+    namespace: {{ tpl ($instance.namespace | default $.Release.Namespace) $ }}
 spec:
     endpoints:
         -   interval: {{ $interval }}
@@ -14,7 +21,7 @@ spec:
             metricRelabeling:
             {{- range . }}
                 -   action: {{ .action }}
-                    regex: {{ .regex | quote }}
+                    regex: {{ .regex | replace "\n" "" | replace " " "" | quote }}
                     sourceLabels:
                     {{- range .sourceLabels }}
                         -   {{ . }}
@@ -30,5 +37,6 @@ spec:
             {{- range $k, $v := $instance.matchLabels }}
             {{ $k }}: {{ $v | quote }}
             {{- end }}
+{{- end }}
 {{- end }}
 {{- end -}}
