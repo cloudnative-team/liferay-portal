@@ -83,6 +83,17 @@ spec:
                     -   name: secret-key
                     -   name: secret-name
             name: write-secret
+            {{- with $onlineActivationWorkflow.securityContext }}
+            podSpecPatch: |
+                containers:
+                    -   name: wait
+                        securityContext:
+                            {{- toYaml . | nindent 28 }}
+                initContainers:
+                    -   name: init
+                        securityContext:
+                            {{- toYaml . | nindent 28 }}
+            {{- end }}
             script:
                 command: [sh]
                 image: {{ $image | quote }}

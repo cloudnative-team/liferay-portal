@@ -17,6 +17,8 @@ tests:
             onlineActivationWorkflow.enabled: true
     -   asserts:
             -   notExists:
+                    path: spec.templates[4].podSpecPatch
+            -   notExists:
                     path: spec.templates[4].script.securityContext
             -   notExists:
                     path: spec.templates[4].securityContext
@@ -42,6 +44,27 @@ tests:
         it: Omits the cluster workflow template unless the online activation workflow is enabled
         set:
             onlineActivationWorkflow.enabled: false
+    -   asserts:
+            -   equal:
+                    path: spec.templates[4].podSpecPatch
+                    value: |
+                        containers:
+                            -   name: wait
+                                securityContext:
+                                    allowPrivilegeEscalation: false
+                                    capabilities:
+                                      drop:
+                                      - ALL
+                        initContainers:
+                            -   name: init
+                                securityContext:
+                                    allowPrivilegeEscalation: false
+                                    capabilities:
+                                      drop:
+                                      - ALL
+        it: Patches the container security context into the Argo executor containers, which the template fields do not reach
+        set:
+            onlineActivationWorkflow.enabled: true
     -   asserts:
             -   equal:
                     path: spec.templates[0].steps[0][0].name
