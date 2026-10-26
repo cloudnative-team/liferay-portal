@@ -128,6 +128,7 @@ projectId: ""
 region: ""
 search:
     elasticsearch:
+        allowedIngress: []
         annotations:
             instrumentation.opentelemetry.io/inject-dotnet: "false"
             instrumentation.opentelemetry.io/inject-java: "false"
