@@ -88,8 +88,16 @@ spec:
                 image: {{ $image | quote }}
                 resources:
                     {{- $onlineActivationWorkflow.resources | toYaml | nindent 20 }}
+                {{- with $onlineActivationWorkflow.securityContext }}
+                securityContext:
+                    {{- toYaml . | nindent 20 }}
+                {{- end }}
                 source: |-
                     {{- tpl (.Files.Get "scripts/online-activation-write-secret.sh") . | nindent 20 }}
+            {{- with $onlineActivationWorkflow.podSecurityContext }}
+            securityContext:
+                {{- toYaml . | nindent 16 }}
+            {{- end }}
     ttlStrategy:
         secondsAfterCompletion: {{ $onlineActivationWorkflow.ttlSecondsAfterCompletion }}
 {{- end -}}

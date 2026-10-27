@@ -246,8 +246,16 @@
 					},
 					"type": "object"
 				},
+				"podSecurityContext": {
+					"description": "Pod security context for the script step. The default passes the restricted Pod Security Standard.",
+					"type": "object"
+				},
 				"resources": {
 					"description": "Resource requests and limits for the workflow steps.",
+					"type": "object"
+				},
+				"securityContext": {
+					"description": "Container security context for the script step. The default passes the restricted Pod Security Standard.",
 					"type": "object"
 				},
 				"serviceAccountName": {

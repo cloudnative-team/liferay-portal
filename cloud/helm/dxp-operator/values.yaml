@@ -35,6 +35,11 @@ onlineActivationWorkflow:
     image:
         repository: dtzar/helm-kubectl
         tag: 4.1.1
+    podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 8737
+        seccompProfile:
+            type: RuntimeDefault
     resources:
         limits:
             cpu: 250m
@@ -42,6 +47,11 @@ onlineActivationWorkflow:
         requests:
             cpu: 100m
             memory: 128Mi
+    securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+            drop:
+                -   ALL
     serviceAccountName: online-activation-service-account
     ttlSecondsAfterCompletion: 3600
     waitTimeoutSeconds: 300
