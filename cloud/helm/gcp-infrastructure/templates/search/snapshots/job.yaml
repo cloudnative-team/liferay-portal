@@ -1,0 +1,54 @@
+{{- $search := .Values.search.elasticsearch -}}
+{{- if and .Values.enabled $search.enabled $search.snapshots.enabled (eq $search.snapshots.registration "job") -}}
+{{- $snapshots := $search.snapshots -}}
+{{- $policy := dict "config" (dict "include_global_state" true "indices" $snapshots.indices) "name" "<daily-snapshot-{now/d}>" "repository" "snapshots" "retention" (dict "expire_after" $snapshots.retention.expireAfter "max_count" (int $snapshots.retention.maxCount) "min_count" (int $snapshots.retention.minCount)) "schedule" $snapshots.schedule -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+    annotations:
+        argocd.argoproj.io/hook: PostSync
+        argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    labels:
+        {{- include "search.labels" . | nindent 8 }}
+    name: {{ include "search.name" . }}-snapshots
+    namespace: {{ .Release.Namespace }}
+spec:
+    activeDeadlineSeconds: 900
+    backoffLimit: 5
+    template:
+        metadata:
+            labels:
+                {{- include "search.labels" . | nindent 16 }}
+        spec:
+            containers:
+                -   command:
+                        -   bash
+                        -   -c
+                        -   |-
+                            {{- .Files.Get "scripts/search-snapshots.sh" | nindent 28 }}
+                    env:
+                        -   name: SNAPSHOT_BUCKET
+                            valueFrom:
+                                configMapKeyRef:
+                                    key: bucket
+                                    name: search-snapshots
+                        -   name: SNAPSHOT_POLICY
+                            value: {{ $policy | toJson | quote }}
+                    envFrom:
+                        -   secretRef:
+                                name: search-connection-details
+                    image: docker.elastic.co/elasticsearch/elasticsearch:{{ $search.version }}
+                    name: search-snapshots
+                    resources:
+                        limits:
+                            cpu: 200m
+                            memory: 128Mi
+                        requests:
+                            cpu: 50m
+                            memory: 64Mi
+                    securityContext:
+                        {{- $search.securityContext | toYaml | nindent 24 }}
+            restartPolicy: Never
+            securityContext:
+                {{- $search.podSecurityContext | toYaml | nindent 16 }}
+{{- end -}}

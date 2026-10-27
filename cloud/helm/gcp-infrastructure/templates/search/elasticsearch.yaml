@@ -80,6 +80,7 @@ spec:
                         {{- end }}
                     securityContext:
                         {{- $search.podSecurityContext | toYaml | nindent 24 }}
+                    serviceAccountName: elasticsearch
                     {{- with $search.extraVolumes }}
                     volumes:
                         {{- toYaml . | nindent 24 }}

@@ -7,6 +7,19 @@ templates:
 tests:
     -   asserts:
             -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.search.properties.snapshots.properties.registration.default
+                    value: job
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.search.properties.snapshots.properties.registration.enum
+                    value:
+                        -   job
+                        -   stackConfigPolicy
+        documentSelector:
+            path: kind
+            value: CompositeResourceDefinition
+        it: Accepts a job or a stack config policy for the search snapshots and defaults to a job
+    -   asserts:
+            -   equal:
                     path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.database.properties.availabilityType.default
                     value: ZONAL
             -   equal:
@@ -42,3 +55,27 @@ tests:
             path: kind
             value: CompositeResourceDefinition
         it: Disables automated database backups by default
+    -   asserts:
+            -   equal:
+                    path: spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.search.properties.snapshots.properties.enabled.default
+                    value: false
+        documentSelector:
+            path: kind
+            value: CompositeResourceDefinition
+        it: Disables search snapshots by default
+    -   asserts:
+            -   matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: subject/ns/%s/sa/elasticsearch
+        documentSelector:
+            path: kind
+            value: Composition
+        it: Grants the Elasticsearch service account access to the search snapshots bucket
+    -   asserts:
+            -   matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: "kind: StackConfigPolicy"
+        documentSelector:
+            path: kind
+            value: Composition
+        it: Registers the search snapshots through a stack config policy on request

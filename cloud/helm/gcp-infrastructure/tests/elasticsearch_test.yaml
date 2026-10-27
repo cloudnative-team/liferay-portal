@@ -5,6 +5,7 @@ suite: Elasticsearch
 templates:
     -   templates/search/elasticsearch.yaml
     -   templates/search/namespace.yaml
+    -   templates/search/service-account.yaml
 tests:
     -   asserts:
             -   equal:
@@ -59,6 +60,20 @@ tests:
                     -   name: ES_SETTING_TWO
                         value: two
         template: templates/search/elasticsearch.yaml
+    -   asserts:
+            -   equal:
+                    path: automountServiceAccountToken
+                    value: false
+            -   equal:
+                    path: metadata.name
+                    value: elasticsearch
+            -   equal:
+                    path: metadata.namespace
+                    value: my-namespace-elasticsearch
+            -   isKind:
+                    of: ServiceAccount
+        it: Creates the Elasticsearch service account without a token
+        template: templates/search/service-account.yaml
     -   asserts:
             -   isSubset:
                     content:
@@ -196,4 +211,10 @@ tests:
             path: kind
             value: Elasticsearch
         it: Requests the standard-rwo storage class on the data volume by default
+        template: templates/search/elasticsearch.yaml
+    -   asserts:
+            -   equal:
+                    path: spec.nodeSets[0].podTemplate.spec.serviceAccountName
+                    value: elasticsearch
+        it: Runs the Elasticsearch pods as the Elasticsearch service account
         template: templates/search/elasticsearch.yaml

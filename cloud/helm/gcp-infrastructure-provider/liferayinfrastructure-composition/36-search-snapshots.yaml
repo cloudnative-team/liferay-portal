@@ -1,0 +1,105 @@
+{{- $searchSnapshots := (($xr.spec.search | default dict).snapshots | default dict) }}
+{{- if $searchSnapshots.enabled }}
+{{- $searchSnapshotsBucketName := printf "%s-search-snapshots" $baseName }}
+apiVersion: storage.gcp.m.upbound.io/v1beta1
+kind: Bucket
+metadata:
+    annotations:
+        gotemplating.fn.crossplane.io/composition-resource-name: search-snapshots-bucket
+    labels:
+        {{- $labels | toYaml | nindent 8 }}
+    name: {{ $searchSnapshotsBucketName }}
+spec:
+    forProvider:
+        {{- if $cmkEnabled }}
+        encryption:
+            defaultKmsKeyName: {{ $cmkKeyName | quote }}
+        {{- end }}
+        forceDestroy: {{ $forceDestroy }}
+        labels:
+            {{- $labels | toYaml | nindent 12 }}
+        location: {{ $region }}
+        storageClass: STANDARD
+        uniformBucketLevelAccess: true
+    managementPolicies: {{ $managementPolicies }}
+---
+apiVersion: storage.gcp.m.upbound.io/v1beta1
+kind: BucketIAMMember
+metadata:
+    annotations:
+        gotemplating.fn.crossplane.io/composition-resource-name: search-snapshots-bucket-object-user
+    labels:
+        {{- $labels | toYaml | nindent 8 }}
+spec:
+    forProvider:
+        bucket: {{ $searchSnapshotsBucketName }}
+        member: {{ printf "principal://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s.svc.id.goog/subject/ns/%s/sa/elasticsearch" $env.projectNumber $env.projectId $searchNamespace | quote }}
+        role: roles/storage.objectUser
+    managementPolicies: {{ $managementPolicies }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+    annotations:
+        gotemplating.fn.crossplane.io/composition-resource-name: search-snapshots-config-map
+    labels:
+        {{- $labels | toYaml | nindent 8 }}
+    name: {{ $xr.metadata.name }}-search-snapshots
+spec:
+    forProvider:
+        manifest:
+            apiVersion: v1
+            data:
+                bucket: {{ $searchSnapshotsBucketName }}
+            kind: ConfigMap
+            metadata:
+                labels:
+                    {{- $labels | toYaml | nindent 20 }}
+                name: search-snapshots
+                namespace: {{ $namespace }}
+    managementPolicies: {{ $managementPolicies }}
+{{- if eq $searchSnapshots.registration "stackConfigPolicy" }}
+---
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: Object
+metadata:
+    annotations:
+        gotemplating.fn.crossplane.io/composition-resource-name: search-snapshots-stack-config-policy
+    labels:
+        {{- $labels | toYaml | nindent 8 }}
+    name: {{ $xr.metadata.name }}-search-snapshots-stack-config-policy
+spec:
+    forProvider:
+        manifest:
+            apiVersion: stackconfigpolicy.k8s.elastic.co/v1alpha1
+            kind: StackConfigPolicy
+            metadata:
+                labels:
+                    {{- $labels | toYaml | nindent 20 }}
+                name: search-snapshots
+                namespace: {{ $searchNamespace }}
+            spec:
+                elasticsearch:
+                    snapshotLifecyclePolicies:
+                        daily-snapshots:
+                            config:
+                                include_global_state: true
+                                indices: {{ $searchSnapshots.indices | quote }}
+                            name: <daily-snapshot-{now/d}>
+                            repository: snapshots
+                            retention:
+                                expire_after: {{ $searchSnapshots.retention.expireAfter | quote }}
+                                max_count: {{ $searchSnapshots.retention.maxCount }}
+                                min_count: {{ $searchSnapshots.retention.minCount }}
+                            schedule: {{ $searchSnapshots.schedule | quote }}
+                    snapshotRepositories:
+                        snapshots:
+                            settings:
+                                bucket: {{ $searchSnapshotsBucketName }}
+                            type: gcs
+                resourceSelector:
+                    matchLabels:
+                        component: search
+    managementPolicies: {{ $managementPolicies }}
+{{- end }}
+{{- end }}

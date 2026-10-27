@@ -6,12 +6,51 @@ templates:
     -   templates/liferayinfrastructure.yaml
 tests:
     -   asserts:
+            -   isEmpty:
+                    path: spec.backup.vaultTags
+            -   isEmpty:
+                    path: spec.storage.tags
+        it: Defaults the storage tags and backup vault tags to empty maps
+    -   asserts:
             -   equal:
                     path: spec.database.rootPasswordSecretName
                     value: my-release-db-root-password
         it: Derives the database root password secret name from the release
         set:
             enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.search.snapshots.enabled
+                    value: false
+        it: Disables search snapshots by default
+    -   asserts:
+            -   equal:
+                    path: spec.search.snapshots.enabled
+                    value: false
+        it: Disables search snapshots when search is disabled
+        set:
+            search.elasticsearch.enabled: false
+            search.elasticsearch.snapshots.enabled: true
+    -   asserts:
+            -   equal:
+                    path: spec.search.snapshots.enabled
+                    value: true
+        it: Enables search snapshots on request
+        set:
+            search.elasticsearch.snapshots.enabled: true
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: "\"search.elasticsearch.snapshots.retention.minCount\" must not exceed"
+        it: Fails when the minimum snapshot count exceeds the maximum
+        set:
+            search.elasticsearch.snapshots.retention.maxCount: 3
+            search.elasticsearch.snapshots.retention.minCount: 5
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: "\"search.elasticsearch.snapshots.registration\" must be \"job\" or \"stackConfigPolicy\""
+        it: Fails when the snapshot registration is unknown
+        set:
+            search.elasticsearch.snapshots.registration: operator
     -   asserts:
             -   equal:
                     path: metadata.name
@@ -34,6 +73,27 @@ tests:
             enabled: false
     -   asserts:
             -   equal:
+                    path: spec.search.snapshots
+                    value:
+                        enabled: true
+                        indices: liferay-0-*
+                        registration: stackConfigPolicy
+                        retention:
+                            expireAfter: 14d
+                            maxCount: 60
+                            minCount: 10
+                        schedule: 0 0 3 * * ?
+        it: Passes the snapshot registration, indices, retention and schedule
+        set:
+            search.elasticsearch.snapshots.enabled: true
+            search.elasticsearch.snapshots.indices: liferay-0-*
+            search.elasticsearch.snapshots.registration: stackConfigPolicy
+            search.elasticsearch.snapshots.retention.expireAfter: 14d
+            search.elasticsearch.snapshots.retention.maxCount: 60
+            search.elasticsearch.snapshots.retention.minCount: 10
+            search.elasticsearch.snapshots.schedule: 0 0 3 * * ?
+    -   asserts:
+            -   equal:
                     path: spec.commonTags.environment_id
                     value: env-123
             -   equal:
@@ -43,13 +103,6 @@ tests:
         set:
             environmentId: env-123
             projectId: proj-456
-    -   asserts:
-            -   equal:
-                    path: spec.backup.enabled
-                    value: true
-        it: Reflects an enabled backup configuration
-        set:
-            backup.enabled: true
     -   asserts:
             -   equal:
                     path: spec.backup.vaultTags.spend_area
@@ -62,8 +115,9 @@ tests:
             backup.vaultTags.spend_area: storage
             storage.tags.resource_type: backup
     -   asserts:
-            -   isEmpty:
-                    path: spec.backup.vaultTags
-            -   isEmpty:
-                    path: spec.storage.tags
-        it: Defaults the storage tags and backup vault tags to empty maps
+            -   equal:
+                    path: spec.backup.enabled
+                    value: true
+        it: Reflects an enabled backup configuration
+        set:
+            backup.enabled: true

@@ -189,6 +189,15 @@ search:
                     -   ALL
             privileged: false
             readOnlyRootFilesystem: false
+        snapshots:
+            enabled: false
+            indices: liferay-*
+            registration: job
+            retention:
+                expireAfter: 7d
+                maxCount: 30
+                minCount: 5
+            schedule: 0 30 1 * * ?
         version: 8.19.11
         volumeSize: 10Gi
 secretNames: []

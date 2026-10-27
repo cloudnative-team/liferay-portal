@@ -114,6 +114,34 @@ spec:
                                         -   provisioning
                                         -   provisioning-database-user
                                     type: string
+                                search:
+                                    properties:
+                                        snapshots:
+                                            properties:
+                                                enabled:
+                                                    default: false
+                                                    type: boolean
+                                                indices:
+                                                    type: string
+                                                registration:
+                                                    default: job
+                                                    enum:
+                                                        -   job
+                                                        -   stackConfigPolicy
+                                                    type: string
+                                                retention:
+                                                    properties:
+                                                        expireAfter:
+                                                            type: string
+                                                        maxCount:
+                                                            type: integer
+                                                        minCount:
+                                                            type: integer
+                                                    type: object
+                                                schedule:
+                                                    type: string
+                                            type: object
+                                    type: object
                                 storage:
                                     properties:
                                         enableVersioning:

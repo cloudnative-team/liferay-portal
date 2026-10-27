@@ -1,4 +1,14 @@
 {{- if .Values.enabled -}}
+{{- $snapshots := .Values.search.elasticsearch.snapshots -}}
+
+{{- if not (has $snapshots.registration (list "job" "stackConfigPolicy")) -}}
+{{- fail "\"search.elasticsearch.snapshots.registration\" must be \"job\" or \"stackConfigPolicy\"" -}}
+{{- end -}}
+
+{{- if gt (int $snapshots.retention.minCount) (int $snapshots.retention.maxCount) -}}
+{{- fail "\"search.elasticsearch.snapshots.retention.minCount\" must not exceed \"search.elasticsearch.snapshots.retention.maxCount\"" -}}
+{{- end -}}
+
 apiVersion: gcp.liferay.com/v1alpha1
 kind: LiferayInfrastructure
 metadata:
@@ -29,5 +39,12 @@ spec:
         enabled: {{ .Values.overlayAccess.enabled }}
     projectId: {{ .Values.projectId }}
     region: {{ .Values.region }}
+    search:
+        snapshots:
+            enabled: {{ and .Values.search.elasticsearch.enabled $snapshots.enabled }}
+            indices: {{ $snapshots.indices | quote }}
+            registration: {{ $snapshots.registration }}
+            retention: {{ $snapshots.retention | toYaml | nindent 16 }}
+            schedule: {{ $snapshots.schedule | quote }}
     storage: {{ .Values.storage | toYaml | nindent 8 }}
 {{- end -}}
