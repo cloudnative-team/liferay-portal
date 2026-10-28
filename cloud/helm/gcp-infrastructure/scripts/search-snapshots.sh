@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 function delete_search_api {
-	echo "Deleting ${1}."
+	echo "Deleting ${1}"
 
 	local status_code
 
@@ -21,7 +21,7 @@ function delete_search_api {
 
 	echo ""
 
-	if [ "${status_code}" != "200" ] && [ "${status_code}" != "404" ]
+	if [[ ${status_code} != 200 ]] && [[ ${status_code} != 404 ]]
 	then
 		echo "Unable to delete ${1}. The status code was ${status_code}."
 
@@ -30,7 +30,7 @@ function delete_search_api {
 }
 
 function main {
-	if [ "${SNAPSHOT_ENABLED}" == "true" ]
+	if [[ ${SNAPSHOT_ENABLED} == true ]]
 	then
 		put_search_api "_snapshot/snapshots" "{\"settings\": {\"bucket\": \"${SNAPSHOT_BUCKET}\"}, \"type\": \"gcs\"}"
 
@@ -43,7 +43,7 @@ function main {
 }
 
 function put_search_api {
-	echo "Updating ${1}."
+	echo "Updating ${1}"
 
 	curl \
 		--data "${2}" \
