@@ -1,0 +1,87 @@
+release:
+    name: my-release
+    namespace: my-namespace
+suite: Search Snapshots
+templates:
+    -   templates/search/snapshots/job.yaml
+tests:
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the snapshots job when a stack config policy registers the snapshots
+        set:
+            search.elasticsearch.snapshots.enabled: true
+            search.elasticsearch.snapshots.registration: stackConfigPolicy
+    -   asserts:
+            -   hasDocuments:
+                    count: 0
+        it: Omits the snapshots job when search is disabled
+        set:
+            search.elasticsearch.enabled: false
+            search.elasticsearch.snapshots.enabled: true
+    -   asserts:
+            -   equal:
+                    path: metadata.annotations["argocd.argoproj.io/hook"]
+                    value: PostSync
+            -   equal:
+                    path: metadata.name
+                    value: my-release-es-snapshots
+            -   equal:
+                    path: metadata.namespace
+                    value: my-namespace
+            -   equal:
+                    path: spec.template.spec.containers[0].env[0].valueFrom.configMapKeyRef
+                    value:
+                        key: bucket
+                        name: search-snapshots
+            -   equal:
+                    path: spec.template.spec.containers[0].env[1]
+                    value:
+                        name: SNAPSHOT_ENABLED
+                        value: "true"
+            -   equal:
+                    path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+                    value: search-connection-details
+            -   equal:
+                    path: spec.template.spec.containers[0].image
+                    value: docker.elastic.co/elasticsearch/elasticsearch:8.19.11
+            -   matchRegex:
+                    path: spec.template.spec.containers[0].command[2]
+                    pattern: _snapshot/snapshots
+        it: Registers the snapshot repository on the bucket after every sync
+        set:
+            search.elasticsearch.snapshots.enabled: true
+    -   asserts:
+            -   matchRegex:
+                    path: spec.template.spec.containers[0].env[2].value
+                    pattern: "\"config\":\\{\"include_global_state\":true,\"indices\":\"liferay-0-\\*\"\\}"
+            -   matchRegex:
+                    path: spec.template.spec.containers[0].env[2].value
+                    pattern: "\"retention\":\\{\"expire_after\":\"14d\",\"max_count\":60,\"min_count\":10\\}"
+            -   matchRegex:
+                    path: spec.template.spec.containers[0].env[2].value
+                    pattern: "\"repository\":\"snapshots\""
+            -   matchRegex:
+                    path: spec.template.spec.containers[0].env[2].value
+                    pattern: "\"schedule\":\"0 0 3 \\* \\* \\?\""
+        it: Schedules the snapshot policy with the configured indices and retention
+        set:
+            search.elasticsearch.snapshots.enabled: true
+            search.elasticsearch.snapshots.indices: liferay-0-*
+            search.elasticsearch.snapshots.retention.expireAfter: 14d
+            search.elasticsearch.snapshots.retention.maxCount: 60
+            search.elasticsearch.snapshots.retention.minCount: 10
+            search.elasticsearch.snapshots.schedule: 0 0 3 * * ?
+    -   asserts:
+            -   equal:
+                    path: metadata.annotations["argocd.argoproj.io/hook"]
+                    value: PostSync
+            -   equal:
+                    path: spec.template.spec.containers[0].env
+                    value:
+                        -   name: SNAPSHOT_ENABLED
+                            value: "false"
+            -   matchRegex:
+                    path: spec.template.spec.containers[0].command[2]
+                    pattern: delete_search_api "_slm/policy/daily-snapshots"
+        it: Unregisters the snapshots after every sync when they are disabled

@@ -18,6 +18,29 @@ tests:
                     port: 9999
     -   asserts:
             -   equal:
+                    path: spec.endpoints[0].metricRelabeling[0].regex
+                    value: ^custom_(a|b)$
+        documentSelector:
+            path: metadata.name
+            value: custom
+        it: Collapses a multiline regex into a single line
+        set:
+            podMonitoring.instances:
+                custom:
+                    matchLabels:
+                        app: custom-app
+                    metricRelabeling:
+                        -   action: keep
+                            regex: |-
+                                ^custom_(
+                                    a
+                                    |b
+                                )$
+                            sourceLabels:
+                                -   __name__
+                    port: 9999
+    -   asserts:
+            -   equal:
                     path: spec.endpoints[0].interval
                     value: 1m
             -   equal:
@@ -55,6 +78,27 @@ tests:
             value: liferay
         it: Keeps the Tomcat connector connection metrics on the liferay instance
     -   asserts:
+            -   equal:
+                    path: metadata.namespace
+                    value: my-namespace-elasticsearch
+            -   equal:
+                    path: spec.selector.matchLabels
+                    value:
+                        app.kubernetes.io/name: elasticsearch-exporter
+        documentSelector:
+            path: metadata.name
+            value: elasticsearch-exporter
+        it: Monitors the Elasticsearch exporter in the Elasticsearch namespace when it is enabled
+        set:
+            search.elasticsearch.exporter.enabled: true
+    -   asserts:
+            -   hasDocuments:
+                    count: 2
+        it: Omits the Elasticsearch exporter instance when search is disabled
+        set:
+            search.elasticsearch.enabled: false
+            search.elasticsearch.exporter.enabled: true
+    -   asserts:
             -   hasDocuments:
                     count: 0
         it: Omits the PodMonitoring resources when the chart is disabled
@@ -86,3 +130,9 @@ tests:
                     path: /metrics
                     port: 9999
             podMonitoring.interval: 30s
+    -   asserts:
+            -   hasDocuments:
+                    count: 1
+        it: Skips an instance whose enabled flag is false
+        set:
+            podMonitoring.instances.envoy.enabled: false

@@ -1,0 +1,30 @@
+{{- $search := .Values.search.elasticsearch -}}
+{{- if and .Values.enabled $search.enabled $search.exporter.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+    labels:
+        app.kubernetes.io/component: metrics
+        app.kubernetes.io/name: elasticsearch-exporter
+        {{- include "search.labels" . | nindent 8 }}
+    name: {{ include "search.name" . }}-exporter
+    namespace: {{ include "search.namespace" . }}
+spec:
+    ingress:
+        -   from:
+                -   namespaceSelector:
+                        matchLabels:
+                            kubernetes.io/metadata.name: gmp-system
+                    podSelector:
+                        matchLabels:
+                            app: managed-prometheus-collector
+                            app.kubernetes.io/name: collector
+            ports:
+                -   port: metrics
+                    protocol: TCP
+    podSelector:
+        matchLabels:
+            app.kubernetes.io/name: elasticsearch-exporter
+    policyTypes:
+        -   Ingress
+{{- end -}}

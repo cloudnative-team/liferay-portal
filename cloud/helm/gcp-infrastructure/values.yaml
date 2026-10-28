@@ -27,6 +27,7 @@ deletionProtection: true
 enabled: true
 endpoints: {}
 environmentId: ""
+extensionSecrets: []
 externalSecretCreationPolicy: Owner
 forceDestroy: false
 gateway:
@@ -54,12 +55,50 @@ persistence:
     storageClassName: standard-rwo
 podMonitoring:
     instances:
+        elasticsearch-exporter:
+            enabled: "{{ and .Values.search.elasticsearch.enabled .Values.search.elasticsearch.exporter.enabled }}"
+            matchLabels:
+                app.kubernetes.io/name: elasticsearch-exporter
+            metricRelabeling:
+                -   action: keep
+                    regex: |-
+                        elasticsearch_(
+                            cluster_health_(status|unassigned_shards|active_shards|active_primary_shards|initializing_shards|relocating_shards|number_of_pending_tasks)
+                            |clusterinfo_up
+                            |jvm_(memory_(pool_used_bytes|pool_max_bytes|pool_peak_used_bytes|used_bytes|max_bytes)|gc_collection_seconds_(sum|count)|uptime_seconds)
+                            |process_(cpu_percent|open_files_count|max_files_descriptors|mem_resident_size_bytes)
+                            |os_(cpu_percent|load1)
+                            |filesystem_(data_(available_bytes|size_bytes)|io_stats_device_(read|write)_size_kilobytes_sum)
+                            |clustersettings_(allocation_watermark_(low|high|flood_stage)_ratio|stats_max_shards_per_node)
+                            |indices_search_(query_total|query_time_seconds|fetch_total|fetch_time_seconds|scroll_total)
+                            |indices_(indexing_(index_total|index_time_seconds_total|is_throttled|throttle_time_seconds_total)|merges_(total_time_seconds_total|total_throttled_time_seconds_total|current))
+                            |thread_pool_(rejected_count|queue_count|active_count)
+                            |breakers_(tripped|estimated_size_bytes|limit_size_bytes)
+                            |node_shards_total
+                            |indices_settings_stats_read_only_indices
+                            |indices_shards_store_size_in_bytes
+                            |index_stats_(indexing_index_total|search_query_total|search_query_time_seconds_total|query_cache_hits_total|query_cache_misses_total)
+                            |snapshot_stats_(latest_snapshot_timestamp|oldest_snapshot_timestamp|number_of_snapshots|snapshot_number_of_failures|snapshot_failed_shards)
+                            |slm_stats_(total_snapshots_taken|total_snapshots_failed|operation_mode)
+                        )
+                    sourceLabels:
+                        -   __name__
+            namespace: "{{ include \"search.namespace\" . }}"
+            path: /metrics
+            port: metrics
         envoy:
             matchLabels:
                 app.kubernetes.io/name: envoy
             metricRelabeling:
                 -   action: keep
-                    regex: ^envoy_(http_downstream_(rq_(total|xx|time_(bucket|sum|count))|cx_[rt]x_bytes_total)|cluster_upstream_rq_(total|time_(bucket|sum|count)))$
+                    regex: |-
+                        ^envoy_(
+                            http_downstream_(
+                                rq_(total|xx|time_(bucket|sum|count))
+                                |cx_[rt]x_bytes_total
+                            )
+                            |cluster_upstream_rq_(total|time_(bucket|sum|count))
+                        )$
                     sourceLabels:
                         -   __name__
             path: /stats/prometheus
@@ -70,7 +109,17 @@ podMonitoring:
                 app.kubernetes.io/name: liferay-default
             metricRelabeling:
                 -   action: keep
-                    regex: ^(?:Catalina_(?:GlobalRequestProcessor_(?:.*_)?(?:errorCount|processingTime|requestCount)|ThreadPool_(?:.*_)?(?:connectionCount|currentThreadCount|currentThreadsBusy|maxConnections))|hikaricp_(?:ActiveConnections|IdleConnections|ThreadsAwaitingConnection|TotalConnections)|java_lang_Threading_ThreadCount|jvm_(?:(?:buffer_pool|memory(?:_pool)?)_(?:used|max)_bytes|classes_currently_loaded|gc_collection_seconds_(?:count|sum)|threads_(?:current|peak|state))|process_(?:cpu_seconds_total|open_fds|resident_memory_bytes))$
+                    regex: |-
+                        ^(?:
+                            Catalina_(?:
+                                GlobalRequestProcessor_(?:.*_)?(?:errorCount|processingTime|requestCount)
+                                |ThreadPool_(?:.*_)?(?:connectionCount|currentThreadCount|currentThreadsBusy|maxConnections)
+                            )
+                            |hikaricp_(?:ActiveConnections|IdleConnections|ThreadsAwaitingConnection|TotalConnections)
+                            |java_lang_Threading_ThreadCount
+                            |jvm_(?:(?:buffer_pool|memory(?:_pool)?)_(?:used|max)_bytes|classes_currently_loaded|gc_collection_seconds_(?:count|sum)|threads_(?:current|peak|state))
+                            |process_(?:cpu_seconds_total|open_fds|resident_memory_bytes)
+                        )$
                     sourceLabels:
                         -   __name__
             path: /metrics
@@ -80,13 +129,51 @@ projectId: ""
 region: ""
 search:
     elasticsearch:
+        allowedIngress: []
         annotations:
             instrumentation.opentelemetry.io/inject-dotnet: "false"
             instrumentation.opentelemetry.io/inject-java: "false"
             instrumentation.opentelemetry.io/inject-nodejs: "false"
             instrumentation.opentelemetry.io/inject-python: "false"
             sidecar.opentelemetry.io/inject: "false"
+        config: {}
         enabled: true
+        exporter:
+            enabled: false
+            image:
+                pullPolicy: IfNotPresent
+                repository: quay.io/prometheuscommunity/elasticsearch-exporter
+                tag: v1.10.0
+            livenessProbe:
+                failureThreshold: 3
+                initialDelaySeconds: 10
+                periodSeconds: 30
+                tcpSocket:
+                    port: metrics
+                timeoutSeconds: 5
+            ports:
+                -   containerPort: 9114
+                    name: metrics
+                    protocol: TCP
+            readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                    path: /healthz
+                    port: metrics
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                timeoutSeconds: 5
+            replicaCount: 1
+            resources:
+                limits:
+                    cpu: 300m
+                    memory: 384Mi
+                requests:
+                    cpu: 50m
+                    memory: 128Mi
+        extraInitContainers: []
+        extraVolumeMounts: []
+        extraVolumes: []
         nodeCount: 1
         podSecurityContext:
             fsGroup: 1000
@@ -102,6 +189,15 @@ search:
                     -   ALL
             privileged: false
             readOnlyRootFilesystem: false
+        snapshots:
+            enabled: false
+            indices: liferay-*
+            registration: job
+            retention:
+                expireAfter: 7d
+                maxCount: 30
+                minCount: 5
+            schedule: 0 30 1 * * ?
         version: 8.19.11
         volumeSize: 10Gi
 secretNames: []
