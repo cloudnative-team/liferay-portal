@@ -1,6 +1,6 @@
 {{- $search := .Values.search.elasticsearch -}}
-{{- if and .Values.enabled $search.enabled $search.snapshots.enabled (eq $search.snapshots.registration "job") -}}
 {{- $snapshots := $search.snapshots -}}
+{{- if and .Values.enabled $search.enabled (or (not $snapshots.enabled) (eq $snapshots.registration "job")) -}}
 {{- $policy := dict "config" (dict "include_global_state" true "indices" $snapshots.indices) "name" "<daily-snapshot-{now/d}>" "repository" "snapshots" "retention" (dict "expire_after" $snapshots.retention.expireAfter "max_count" (int $snapshots.retention.maxCount) "min_count" (int $snapshots.retention.minCount)) "schedule" $snapshots.schedule -}}
 apiVersion: batch/v1
 kind: Job
@@ -27,13 +27,19 @@ spec:
                         -   |-
                             {{- .Files.Get "scripts/search-snapshots.sh" | nindent 28 }}
                     env:
+                        {{- if $snapshots.enabled }}
                         -   name: SNAPSHOT_BUCKET
                             valueFrom:
                                 configMapKeyRef:
                                     key: bucket
                                     name: search-snapshots
+                        {{- end }}
+                        -   name: SNAPSHOT_ENABLED
+                            value: {{ $snapshots.enabled | quote }}
+                        {{- if $snapshots.enabled }}
                         -   name: SNAPSHOT_POLICY
                             value: {{ $policy | toJson | quote }}
+                        {{- end }}
                     envFrom:
                         -   secretRef:
                                 name: search-connection-details
