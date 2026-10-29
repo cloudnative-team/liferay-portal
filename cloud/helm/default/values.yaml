@@ -18,8 +18,7 @@ autoscaling:
         maxReplicaCount: 100
         minReplicaCount: 1
         pollingInterval: 30
-        prometheusTriggerMetadata:
-            serverAddress: ""
+        prometheusServerAddress: ""
         triggerAuthentication:
             annotations: {}
             spec: {}
