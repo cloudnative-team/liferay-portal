@@ -315,7 +315,7 @@
 			"description": "RBAC resources.",
 			"properties": {
 				"create": {
-					"description": "Creates the operator ClusterRole and ClusterRoleBinding.",
+					"description": "Creates the operator ClusterRole and ClusterRoleBinding, and the Role and RoleBinding in each watched namespace.",
 					"type": "boolean"
 				}
 			},
@@ -384,6 +384,16 @@
 		"tolerations": {
 			"description": "Tolerations for the operator pod.",
 			"type": "array"
+		},
+		"watchNamespaces": {
+			"description": "Namespaces the operator watches, in place of every namespace. The operator then holds its permissions through a Role in each of them, and its cluster wide permissions narrow to these Namespace objects and reading CustomResourceDefinitions. List every namespace that runs DXP and every namespace that holds a ClientExtension. Each namespace must exist before the chart is installed.",
+			"items": {
+				"maxLength": 63,
+				"pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+				"type": "string"
+			},
+			"type": "array",
+			"uniqueItems": true
 		}
 	},
 	"type": "object"

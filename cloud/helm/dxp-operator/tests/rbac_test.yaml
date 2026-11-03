@@ -9,6 +9,26 @@ tests:
             -   exists:
                     path: rules[?(@.resources[0]=="clientextensions")]
             -   exists:
+                    path: rules[?(@.resources[0]=="configmaps")]
+            -   contains:
+                    content: patch
+                    path: rules[?(@.resources[0]=="deployments")].verbs
+            -   exists:
+                    path: rules[?(@.resources[0]=="jobs")]
+        documentSelector:
+            matchMany: true
+            path: kind
+            value: Role
+        it: Adds the ClientExtension rules to each watched namespace role when the ClientExtension controller is enabled
+        set:
+            clientExtensions.enabled: true
+            watchNamespaces:
+                -   able
+                -   baker
+    -   asserts:
+            -   exists:
+                    path: rules[?(@.resources[0]=="clientextensions")]
+            -   exists:
                     path: rules[?(@.resources[0]=="clientextensions/finalizers")]
             -   exists:
                     path: rules[?(@.resources[0]=="clientextensions/status")]
@@ -39,6 +59,28 @@ tests:
         set:
             serviceAccount.annotations:
                 eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/operator
+    -   asserts:
+            -   equal:
+                    path: roleRef
+                    value:
+                        apiGroup: rbac.authorization.k8s.io
+                        kind: Role
+                        name: my-release-liferay-dxp-operator
+            -   equal:
+                    path: subjects
+                    value:
+                        -   kind: ServiceAccount
+                            name: my-release-liferay-dxp-operator
+                            namespace: my-namespace
+        documentSelector:
+            matchMany: true
+            path: kind
+            value: RoleBinding
+        it: Binds each watched namespace role to the operator service account
+        set:
+            watchNamespaces:
+                -   able
+                -   baker
     -   asserts:
             -   equal:
                     path: roleRef
@@ -76,6 +118,28 @@ tests:
         it: Grants only reading ConfigMaps cluster wide
         set:
             clientExtensions.enabled: true
+    -   asserts:
+            -   exists:
+                    path: rules[?(@.resources[0]=="liferayenvironments")]
+            -   exists:
+                    path: rules[?(@.resources[0]=="secrets")]
+            -   exists:
+                    path: rules[?(@.resources[0]=="statefulsets")]
+            -   notExists:
+                    path: rules[?(@.resources[0]=="configmaps")]
+            -   notExists:
+                    path: rules[?(@.resources[0]=="customresourcedefinitions")]
+            -   notExists:
+                    path: rules[?(@.resources[0]=="namespaces")]
+        documentSelector:
+            matchMany: true
+            path: kind
+            value: Role
+        it: Grants the namespaced rules through a role in each watched namespace
+        set:
+            watchNamespaces:
+                -   able
+                -   baker
     -   asserts:
             -   equal:
                     path: rules[?(@.resources[0]=="clientextensions/finalizers")].verbs
@@ -132,6 +196,20 @@ tests:
         it: Leaves the cluster role unnamespaced and unannotated
     -   asserts:
             -   equal:
+                    path: rules[?(@.resources[0]=="namespaces")].verbs
+                    value:
+                        -   get
+                        -   list
+                        -   patch
+                        -   watch
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Lets the ClientExtension controller watch every namespace when it is enabled
+        set:
+            clientExtensions.enabled: true
+    -   asserts:
+            -   equal:
                     path: metadata.name
                     value: my-release-liferay-dxp-operator
             -   equal:
@@ -141,6 +219,37 @@ tests:
             path: kind
             value: ServiceAccount
         it: Names the service account after the release in the release namespace
+    -   asserts:
+            -   equal:
+                    path: rules
+                    value:
+                        -   apiGroups:
+                                -   ""
+                            resourceNames:
+                                -   able
+                                -   baker
+                            resources:
+                                -   namespaces
+                            verbs:
+                                -   get
+                                -   patch
+                        -   apiGroups:
+                                -   apiextensions.k8s.io
+                            resources:
+                                -   customresourcedefinitions
+                            verbs:
+                                -   get
+                                -   list
+                                -   watch
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Narrows the cluster role to the watched namespaces and reading custom resource definitions
+        set:
+            clientExtensions.enabled: true
+            watchNamespaces:
+                -   able
+                -   baker
     -   asserts:
             -   hasDocuments:
                     count: 0
@@ -176,6 +285,21 @@ tests:
             value: ServiceAccount
         it: Omits the service account annotations by default
     -   asserts:
+            -   hasDocuments:
+                    count: 7
+            -   matchRegex:
+                    path: kind
+                    pattern: ^Role(Binding)?$
+        documentSelector:
+            matchMany: true
+            path: metadata.namespace
+            value: baker
+        it: Renders a role and a role binding in each watched namespace
+        set:
+            watchNamespaces:
+                -   able
+                -   baker
+    -   asserts:
             -   contains:
                     content:
                         apiGroups:
@@ -194,9 +318,7 @@ tests:
                             -   namespaces
                         verbs:
                             -   get
-                            -   list
-                            -   update
-                            -   watch
+                            -   patch
                     path: rules
             -   contains:
                     content:

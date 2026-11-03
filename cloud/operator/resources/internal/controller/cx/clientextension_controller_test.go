@@ -59,13 +59,29 @@ func TestReconcileAcceptsClientExtensionOnceAllowed(t *testing.T) {
 
 func TestReconcileAllowedNamespaces(t *testing.T) {
 	testCases := map[string]struct {
-		dxpNamespace string
-		messages     []string
-		objects      []client.Object
-		wantPhase    string
-		wantReason   string
-		wantStatus   metav1.ConditionStatus
+		dxpNamespace    string
+		messages        []string
+		objects         []client.Object
+		wantPhase       string
+		wantReason      string
+		wantStatus      metav1.ConditionStatus
+		watchNamespaces []string
 	}{
+		"a DXP namespace the operator does not watch is refused": {
+			dxpNamespace: "liferay-dev",
+			messages: []string{
+				`The DXP operator does not watch namespace "liferay-dev"`,
+				`adds "liferay-dev" to its watched namespaces`,
+			},
+			objects: []client.Object{
+				newDxpMetadataConfigMap("liferay-dev", "liferay.com"),
+				newDxpNamespace(), newPolicyConfigMap("able"),
+			},
+			wantPhase:       cxv1alpha1.PhaseDegraded,
+			wantReason:      ReasonDxpNamespaceNotWatched,
+			wantStatus:      metav1.ConditionFalse,
+			watchNamespaces: []string{"able"},
+		},
 		"a listed namespace is permitted": {
 			dxpNamespace: "liferay-dev",
 			messages:     []string{`in namespace "liferay-dev"`},
@@ -91,6 +107,18 @@ func TestReconcileAllowedNamespaces(t *testing.T) {
 			wantPhase:    cxv1alpha1.PhaseDegraded,
 			wantReason:   ReasonNamespaceNotPermitted,
 			wantStatus:   metav1.ConditionFalse,
+		},
+		"a watched DXP namespace is permitted": {
+			dxpNamespace: "liferay-dev",
+			messages:     []string{`in namespace "liferay-dev"`},
+			objects: []client.Object{
+				newDxpMetadataConfigMap("liferay-dev", "liferay.com"),
+				newDxpNamespace(), newPolicyConfigMap("able"),
+			},
+			wantPhase:       cxv1alpha1.PhaseReady,
+			wantReason:      ReasonDelivered,
+			wantStatus:      metav1.ConditionTrue,
+			watchNamespaces: []string{"able", "liferay-dev"},
 		},
 		"an unlisted namespace is refused": {
 			dxpNamespace: "liferay-dev",
@@ -125,6 +153,8 @@ func TestReconcileAllowedNamespaces(t *testing.T) {
 			clientExtension := newClientExtension(testCase.dxpNamespace, "sample", "able")
 
 			clientExtensionReconciler := newClientExtensionReconciler(nil, t, append(testCase.objects, clientExtension)...)
+
+			clientExtensionReconciler.WatchNamespaces = testCase.watchNamespaces
 
 			reconcileClientExtension(clientExtension, clientExtensionReconciler, t)
 
@@ -863,6 +893,42 @@ func TestReconcileReportsStaleExtProvisionConfigMapItMayNotDelete(t *testing.T) 
 		clientExtension, clientExtensionReconciler, t,
 	).Message; !strings.Contains(message, want) {
 		t.Errorf("Expected the Delivered message to contain %q, got %q", want, message)
+	}
+}
+
+func TestReconcileRequeuesMissingDxpNamespace(t *testing.T) {
+	testCases := map[string]struct {
+		wantRequeueAfter time.Duration
+		watchNamespaces  []string
+	}{
+		"the namespace watch reports it": {},
+		"watched namespaces poll for it": {
+			wantRequeueAfter: refusalRequeueInterval,
+			watchNamespaces:  []string{"able", "liferay-dev"},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clientExtension := newClientExtension("liferay-dev", "sample", "able")
+
+			clientExtensionReconciler := newClientExtensionReconciler(nil, t, clientExtension)
+
+			clientExtensionReconciler.WatchNamespaces = testCase.watchNamespaces
+
+			result, error := clientExtensionReconciler.Reconcile(
+				context.Background(),
+				controllerruntime.Request{NamespacedName: client.ObjectKeyFromObject(clientExtension)},
+			)
+
+			if error != nil {
+				t.Fatalf("Reconcile() error = %v, want nil", error)
+			}
+
+			if result.RequeueAfter != testCase.wantRequeueAfter {
+				t.Errorf("Reconcile() RequeueAfter = %v, want %v", result.RequeueAfter, testCase.wantRequeueAfter)
+			}
+		})
 	}
 }
 

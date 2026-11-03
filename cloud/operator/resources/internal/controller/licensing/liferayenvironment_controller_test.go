@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -70,6 +71,93 @@ func (stubProvisioning *stubProvisioning) Manifest(
 
 func (inlineRunner inlineRunner) Run(task func()) {
 	task()
+}
+
+func TestLabelNamespaceAndGetEnvironmentIDPatchesTheNamespace(t *testing.T) {
+	testCases := map[string]struct {
+		labels      map[string]string
+		wantLabels  map[string]string
+		wantPatches int
+	}{
+		"a labeled namespace is left alone": {
+			labels:     map[string]string{environmentLabel: "true"},
+			wantLabels: map[string]string{environmentLabel: "true"},
+		},
+		"an unlabeled namespace is patched": {
+			labels:      map[string]string{"team": "able"},
+			wantLabels:  map[string]string{environmentLabel: "true", "team": "able"},
+			wantPatches: 1,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			patches := 0
+
+			fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(
+				interceptor.Funcs{
+					Patch: func(
+						context context.Context,
+						writer client.WithWatch,
+						object client.Object,
+						patch client.Patch,
+						options ...client.PatchOption,
+					) error {
+						patches++
+
+						return writer.Patch(context, object, patch, options...)
+					},
+					Update: func(
+						context context.Context,
+						writer client.WithWatch,
+						object client.Object,
+						options ...client.UpdateOption,
+					) error {
+						return errors.NewForbidden(
+							corev1.Resource("namespaces"), object.GetName(),
+							fmt.Errorf("the operator may only patch namespaces"),
+						)
+					},
+				},
+			).WithObjects(
+				&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Labels: testCase.labels, Name: "liferay-dev", UID: "able-uid"},
+				},
+			).WithScheme(
+				newScheme(t),
+			).Build()
+
+			liferayEnvironmentReconciler := &LiferayEnvironmentReconciler{Client: fakeClient}
+
+			environmentID, error := liferayEnvironmentReconciler.labelNamespaceAndGetEnvironmentID(
+				context.Background(), "liferay-dev",
+			)
+
+			if error != nil {
+				t.Fatalf("labelNamespaceAndGetEnvironmentID() error = %v, want nil", error)
+			}
+
+			if environmentID != "able-uid" {
+				t.Errorf("labelNamespaceAndGetEnvironmentID() = %q, want %q", environmentID, "able-uid")
+			}
+
+			if patches != testCase.wantPatches {
+				t.Errorf("patches = %d, want %d", patches, testCase.wantPatches)
+			}
+
+			var namespace corev1.Namespace
+
+			if error := fakeClient.Get(
+				context.Background(), types.NamespacedName{Name: "liferay-dev"}, &namespace,
+			); error != nil {
+				t.Fatal(error)
+			}
+
+			if !maps.Equal(namespace.Labels, testCase.wantLabels) {
+				t.Errorf("labels = %v, want %v", namespace.Labels, testCase.wantLabels)
+			}
+		})
+	}
 }
 
 func TestReconcileBacksOffFailedAddOn(t *testing.T) {

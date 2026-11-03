@@ -1,7 +1,7 @@
 apiVersion: v2
 appVersion: latest
 description:
-    Liferay is an all-in-one DXP, LCAP, and Commerce platform. This chart installs the Liferay cloud operator, a cluster-wide controller that manages LiferayEnvironment resources for Liferay cloud native environments.
+    Liferay is an all-in-one DXP, LCAP, and Commerce platform. This chart installs the Liferay cloud operator, a controller that manages LiferayEnvironment resources for Liferay cloud native environments in every namespace or in a configured list of namespaces.
 icon: https://www-cdn.liferay.com/documents/d/guest/liferay-logo
 kubeVersion: ^1.30.0-0
 name: liferay-dxp-operator

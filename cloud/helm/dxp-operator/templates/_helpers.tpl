@@ -40,6 +40,176 @@ helm.sh/chart: {{ include "dxp-operator.chart" . }}
 {{- default .Release.Namespace .Values.namespaceOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "dxp-operator.rules" -}}
+{{- $clientExtensions := .context.Values.clientExtensions.enabled }}
+{{- $watchNamespaces := .context.Values.watchNamespaces }}
+{{- if and $clientExtensions .namespaced }}
+-   apiGroups:
+        -   ""
+    resources:
+        -   configmaps
+    verbs:
+        -   get
+        -   list
+        -   watch
+{{- end }}
+{{- if .namespaced }}
+-   apiGroups:
+        -   ""
+    resources:
+        -   events
+    verbs:
+        -   create
+        -   patch
+{{- end }}
+{{- if .clusterScoped }}
+-   apiGroups:
+        -   ""
+    {{- with $watchNamespaces }}
+    resourceNames:
+        {{- range . }}
+        -   {{ . }}
+        {{- end }}
+    {{- end }}
+    resources:
+        -   namespaces
+    verbs:
+        -   get
+        {{- if and $clientExtensions (empty $watchNamespaces) }}
+        -   list
+        {{- end }}
+        -   patch
+        {{- if and $clientExtensions (empty $watchNamespaces) }}
+        -   watch
+        {{- end }}
+{{- end }}
+{{- if .namespaced }}
+-   apiGroups:
+        -   ""
+    resources:
+        -   secrets
+    verbs:
+        -   create
+        -   get
+        -   list
+        -   update
+        -   watch
+{{- end }}
+{{- if .clusterScoped }}
+-   apiGroups:
+        -   apiextensions.k8s.io
+    resources:
+        -   customresourcedefinitions
+    verbs:
+        -   get
+        -   list
+        -   watch
+{{- end }}
+{{- if .namespaced }}
+-   apiGroups:
+        -   apps
+    resources:
+        -   deployments
+    verbs:
+        -   get
+        -   list
+        {{- if $clientExtensions }}
+        -   patch
+        {{- end }}
+        -   update
+        -   watch
+-   apiGroups:
+        -   apps
+    resources:
+        -   statefulsets
+    verbs:
+        -   get
+        -   list
+        -   update
+        -   watch
+-   apiGroups:
+        -   autoscaling
+    resources:
+        -   horizontalpodautoscalers
+    verbs:
+        -   get
+        -   list
+        -   patch
+        -   watch
+{{- if $clientExtensions }}
+-   apiGroups:
+        -   batch
+    resources:
+        -   cronjobs
+    verbs:
+        -   get
+        -   list
+        -   watch
+-   apiGroups:
+        -   batch
+    resources:
+        -   jobs
+    verbs:
+        -   get
+        -   list
+        -   watch
+-   apiGroups:
+        -   cx.liferay.com
+    resources:
+        -   clientextensions
+    verbs:
+        -   get
+        -   list
+        -   patch
+        -   watch
+-   apiGroups:
+        -   cx.liferay.com
+    resources:
+        -   clientextensions/finalizers
+    verbs:
+        -   update
+-   apiGroups:
+        -   cx.liferay.com
+    resources:
+        -   clientextensions/status
+    verbs:
+        -   get
+        -   patch
+        -   update
+{{- end }}
+-   apiGroups:
+        -   keda.sh
+    resources:
+        -   scaledobjects
+    verbs:
+        -   get
+        -   list
+        -   patch
+        -   watch
+-   apiGroups:
+        -   licensing.liferay.com
+    resources:
+        -   liferayenvironments
+    verbs:
+        -   get
+        -   list
+        -   watch
+-   apiGroups:
+        -   licensing.liferay.com
+    resources:
+        -   liferayenvironments/finalizers
+    verbs:
+        -   update
+-   apiGroups:
+        -   licensing.liferay.com
+    resources:
+        -   liferayenvironments/status
+    verbs:
+        -   get
+        -   update
+{{- end }}
+{{- end }}
+
 {{- define "dxp-operator.selectorLabels" -}}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/name: {{ include "dxp-operator.name" . }}

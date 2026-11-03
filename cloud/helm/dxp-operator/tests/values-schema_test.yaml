@@ -39,10 +39,25 @@ tests:
             heartbeatInterval: 10 minutes
     -   asserts:
             -   failedTemplate:
+                    errorPattern: watchNamespaces
+        it: Rejects a namespace watched twice
+        set:
+            watchNamespaces:
+                -   able
+                -   able
+    -   asserts:
+            -   failedTemplate:
                     errorPattern: clientExtensions
         it: Rejects a non-boolean ClientExtension controller switch
         set:
             clientExtensions.enabled: "yes"
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: watchNamespaces
+        it: Rejects a watched namespace that is not a DNS label
+        set:
+            watchNamespaces:
+                -   Able_Baker
     -   asserts:
             -   failedTemplate:
                     errorPattern: maxDelayy

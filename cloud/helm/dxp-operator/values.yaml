@@ -80,3 +80,4 @@ serviceAccount:
     create: true
     name: ""
 tolerations: []
+watchNamespaces: []
