@@ -125,6 +125,8 @@ liferay-default:
                     defaultMode: 0755
                     name: liferay-init-scripts-gcp
                 name: liferay-init-scripts-gcp
+    database:
+        host: localhost
     marketplace:
         csi:
             driver: filestore.csi.storage.gke.io
