@@ -39,11 +39,11 @@
 {{- $targetActiveDataPlane := $xr.spec.targetActiveDataPlane -}}
 
 {{- $activeDataPlane := $targetActiveDataPlane -}}
-{{- $databaseBootstrapIamUser := get (dict "postgresql" (trimSuffix ".gserviceaccount.com" $databaseBootstrapEmail)) $env.databaseEngine -}}
-{{- $databaseClientEnv := get (dict "postgresql" (list (dict "name" "PGPASSWORD" "value" "iam"))) $env.databaseEngine -}}
-{{- $databaseClientImage := get (dict "postgresql" "postgres:18-alpine") $env.databaseEngine -}}
-{{- $databaseIamUser := get (dict "postgresql" (trimSuffix ".gserviceaccount.com" $gsaEmail)) $env.databaseEngine -}}
-{{- $databasePort := get (dict "postgresql" "5432") $env.databaseEngine -}}
+{{- $databaseBootstrapIamUser := get (dict "mysql" (splitList "@" $databaseBootstrapEmail | first) "postgresql" (trimSuffix ".gserviceaccount.com" $databaseBootstrapEmail)) $env.databaseEngine -}}
+{{- $databaseClientEnv := get (dict "mysql" (list) "postgresql" (list (dict "name" "PGPASSWORD" "value" "iam"))) $env.databaseEngine -}}
+{{- $databaseClientImage := get (dict "mysql" "mysql:8.4" "postgresql" "postgres:18-alpine") $env.databaseEngine -}}
+{{- $databaseIamUser := get (dict "mysql" (splitList "@" $gsaEmail | first) "postgresql" (trimSuffix ".gserviceaccount.com" $gsaEmail)) $env.databaseEngine -}}
+{{- $databasePort := get (dict "mysql" "3306" "postgresql" "5432") $env.databaseEngine -}}
 {{- $dataPlanes := list $targetActiveDataPlane -}}
 {{- $isCMKKeyReady := or (not $cmkEnabled) $cmkKeyId -}}
 {{- $labels := merge (dict "app" "liferay" "deployment-name" $env.deploymentName "environment-id" $environmentId "project-id" $projectId) $xr.spec.commonTags -}}
