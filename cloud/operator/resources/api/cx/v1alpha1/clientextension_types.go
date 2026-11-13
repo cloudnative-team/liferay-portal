@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	ConditionConfigurationAccepted = "ConfigurationAccepted"
-	ConditionDelivered             = "Delivered"
-	ConditionMirrored              = "Mirrored"
-	ConditionProvisioned           = "Provisioned"
-	ConditionReady                 = "Ready"
-	ConditionWorkloadAccepted      = "WorkloadAccepted"
+	ConditionDelivered         = "Delivered"
+	ConditionMirrored          = "Mirrored"
+	ConditionProvisioned       = "Provisioned"
+	ConditionReady             = "Ready"
+	ConditionWorkloadAccepted  = "WorkloadAccepted"
+	ConditionWorkloadAvailable = "WorkloadAvailable"
 )
 
 const (
@@ -58,11 +58,13 @@ func init() {
 // +kubebuilder:printcolumn:JSONPath=`.spec.virtualInstanceId`,name="Virtual-Instance",type=string
 // +kubebuilder:printcolumn:JSONPath=`.spec.workloadRef.kind`,name="Workload",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="Delivered")].status`,name="Delivered",type=string
-// +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="ConfigurationAccepted")].status`,name="Config-Accepted",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="Provisioned")].status`,name="Provisioned",type=string
+// +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="WorkloadAvailable")].status`,name="Available",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.phase`,name="Phase",type=string
 // +kubebuilder:printcolumn:JSONPath=`.metadata.creationTimestamp`,name="Age",type=date
 // +kubebuilder:printcolumn:JSONPath=`.spec.serviceId`,name="Service-ID",priority=1,type=string
+// +kubebuilder:printcolumn:JSONPath=`.spec.domain`,name="Domain",priority=1,type=string
+// +kubebuilder:printcolumn:JSONPath=`.status.image`,name="Image",priority=1,type=string
 // +kubebuilder:resource:shortName=cx
 // +kubebuilder:subresource:status
 type ClientExtension struct {
@@ -132,6 +134,9 @@ type ClientExtensionStatus struct {
 
 	// +optional
 	ExtProvisionResourceVersion string `json:"extProvisionResourceVersion,omitempty"`
+
+	// +optional
+	Image string `json:"image,omitempty"`
 
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`

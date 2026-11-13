@@ -1,0 +1,93 @@
+{{- $dxpOperator := .Values.operatorApplications.dxpOperator -}}
+{{- if and .Values.liferay.enabled $dxpOperator.enabled (dig "clientExtensions" "enabled" false ($dxpOperator.values | default dict)) -}}
+{{- $gitops := .Values.gitops -}}
+{{- $layout := $gitops.layout -}}
+{{- $segmentPattern := "^\\{\\{path\\[(\\d+)\\]\\}\\}$" -}}
+{{- range $layoutKey := list "environmentId" "projectId" -}}
+{{- if not (regexMatch $segmentPattern (get $layout $layoutKey)) -}}
+{{- fail (printf "The value \"gitops.layout.%s\" must have the form {{path[n]}} for the client extension ApplicationSet" $layoutKey) -}}
+{{- end -}}
+{{- end -}}
+{{- $environmentId := regexReplaceAll $segmentPattern $layout.environmentId "index .path.segments $1" -}}
+{{- $projectId := regexReplaceAll $segmentPattern $layout.projectId "index .path.segments $1" -}}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+    annotations:
+        argocd.argoproj.io/sync-wave: "-60"
+    finalizers:
+        -   resources-finalizer.argocd.argoproj.io
+    labels:
+        {{- include "liferay-platform.labels" . | nindent 8 }}
+        app.kubernetes.io/name: client-extension-applicationset
+    name: client-extension-applicationset
+    namespace: {{ .Release.Namespace }}
+spec:
+    generators:
+        -   matrix:
+                generators:
+                    -   matrix:
+                            generators:
+                                -   git:
+                                        files:
+                                            -   path: {{ $layout.environments }}/{{ $layout.liferayValuesFilename }}
+                                        repoURL: {{ $gitops.repository.url }}
+                                        revision: {{ $gitops.repository.revision }}
+                                {{- /*
+                                Emits one element per entry of liferay.yaml's
+                                clientExtensions list that has a descriptor and
+                                a version, and skips anything else instead of
+                                failing. The entry's values are passed as a
+                                JSON string: the matrix merges the descriptor
+                                file's top-level keys into the same parameters
+                                and keeps this side only for keys it has, so a
+                                map could be extended by the descriptor while a
+                                string that is never empty cannot.
+                                */}}
+                                -   list:
+                                        elementsYaml: {{ `{{ $elements := list }}{{ $clientExtensions := get . "clientExtensions" }}{{ if kindIs "slice" $clientExtensions }}{{ range $clientExtensions }}{{ if and (kindIs "map" .) (kindIs "string" (get . "descriptor")) (get . "descriptor") (get . "version") }}{{ $values := get . "values" }}{{ if not (kindIs "map" $values) }}{{ $values = dict }}{{ end }}{{ $elements = append $elements (dict "descriptor" (get . "descriptor") "valuesJson" (toJson $values) "version" (toString (get . "version"))) }}{{ end }}{{ end }}{{ end }}{{ toJson $elements }}` | quote }}
+                    -   oci:
+                            files:
+                                -   path: client-extension-descriptor.json
+                            pathParamPrefix: descriptorFile
+                            repoURL: {{ `{{ .descriptor }}` | quote }}
+                            requeueAfterSeconds: {{ .Values.clientExtensions.requeueAfterSeconds }}
+                            revision: {{ `{{ .version }}` | quote }}
+    goTemplate: true
+    goTemplateOptions:
+        -   missingkey=error
+    template:
+        metadata:
+            labels:
+                {{- include "liferay-platform.labels" . | nindent 16 }}
+                app.kubernetes.io/name: client-extension
+            name: {{ printf "{{ %s }}-{{ %s }}-{{ base .descriptor }}" $projectId $environmentId | quote }}
+        spec:
+            destination:
+                namespace: {{ printf "liferay-{{ %s }}-{{ %s }}" $projectId $environmentId | quote }}
+                server: https://kubernetes.default.svc
+            project: liferay-client-extension
+            source:
+                {{- include "liferay-platform.chartSource" .Values.clientExtensions.chart | nindent 16 }}
+                helm:
+                    releaseName: {{ `{{ base .descriptor }}` | quote }}
+                    {{- /*
+                    Passes the descriptor that Workspace publishes to the
+                    liferay-client-extension chart as it is, which maps it and
+                    fails only this Application when it cannot. Nothing here
+                    may fail: a failing template stops the ApplicationSet from
+                    updating any of its Applications. The values from
+                    liferay.yaml take precedence.
+                    */}}
+                    values: {{ printf "{{ $values := fromJson .valuesJson }}{{ mergeOverwrite (dict \"clientExtension\" (dict \"serviceId\" (base .descriptor)) \"descriptor\" (get . \"clientExtension\") \"fullnameOverride\" (base .descriptor) \"network\" (dict \"gatewayName\" (printf \"%%s-%%s-gateway\" (%s) (%s)))) $values | toJson }}" $projectId $environmentId | quote }}
+            syncPolicy:
+                automated:
+                    prune: true
+                    selfHeal: true
+                retry:
+                    backoff:
+                        duration: 30s
+                        factor: 2
+                        maxDuration: 10m
+                    limit: 10
+{{- end -}}
