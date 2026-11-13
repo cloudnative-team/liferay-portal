@@ -57,6 +57,10 @@ spec:
                             value: {{ .Values.retry.initialDelay | quote }}
                         -   name: RETRY_MAX_DELAY
                             value: {{ .Values.retry.maxDelay | quote }}
+                        {{- with .Values.watchNamespaces }}
+                        -   name: WATCH_NAMESPACES
+                            value: {{ join "," . | quote }}
+                        {{- end }}
                         {{- range $k, $v := .Values.customEnv }}
                         {{- if and $v (gt (len $v) 0) }}
                         {{- toYaml $v | nindent 24 }}

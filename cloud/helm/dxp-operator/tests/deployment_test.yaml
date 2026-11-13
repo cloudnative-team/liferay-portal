@@ -218,6 +218,10 @@ tests:
                     path: spec.template.spec.volumes
         it: Omits the volumes and volume mounts by default
     -   asserts:
+            -   notExists:
+                    path: spec.template.spec.containers[0].env[?(@.name=="WATCH_NAMESPACES")]
+        it: Omits the watched namespaces by default
+    -   asserts:
             -   equal:
                     path: spec.template.spec.containers[0].env[?(@.name=="CLIENT_EXTENSIONS_ENABLED")].value
                     value: "true"
@@ -232,6 +236,15 @@ tests:
                     path: spec.template.spec.containers[0].env[?(@.name=="OPERATOR_SERVICE_ACCOUNT")].valueFrom.fieldRef.fieldPath
                     value: spec.serviceAccountName
         it: Passes the operator its own namespace and service account, which delivery refusals name
+    -   asserts:
+            -   equal:
+                    path: spec.template.spec.containers[0].env[?(@.name=="WATCH_NAMESPACES")].value
+                    value: able,baker
+        it: Passes the watched namespaces as a comma separated environment variable
+        set:
+            watchNamespaces:
+                -   able
+                -   baker
     -   asserts:
             -   equal:
                     path: spec.template.spec.containers[0].env[?(@.name=="METRICS_ADDRESS")].value

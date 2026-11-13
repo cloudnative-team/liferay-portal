@@ -36,6 +36,7 @@ const (
 	ReasonDelivered              = "Delivered"
 	ReasonDeliveryNotPermitted   = "DeliveryNotPermitted"
 	ReasonDxpNamespaceNotFound   = "DxpNamespaceNotFound"
+	ReasonDxpNamespaceNotWatched = "DxpNamespaceNotWatched"
 	ReasonExtInitMissing         = "ExtInitMissing"
 	ReasonMirrorFailed           = "MirrorFailed"
 	ReasonMirrored               = "Mirrored"
@@ -115,6 +116,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 			)
 		} else if error != nil {
 			return controllerruntime.Result{}, error
+		}
+
+		if (refusedReason == ReasonDxpNamespaceNotFound) && (len(clientExtensionReconciler.WatchNamespaces) > 0) {
+			return controllerruntime.Result{RequeueAfter: refusalRequeueInterval}, nil
 		}
 
 		return controllerruntime.Result{}, nil
@@ -282,7 +287,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 func (clientExtensionReconciler *ClientExtensionReconciler) SetupWithManager(
 	manager controllerruntime.Manager,
 ) error {
-	return controllerruntime.NewControllerManagedBy(
+	controllerBuilder := controllerruntime.NewControllerManagedBy(
 		manager,
 	).For(
 		&cxv1alpha1.ClientExtension{},
@@ -307,13 +312,17 @@ func (clientExtensionReconciler *ClientExtensionReconciler) SetupWithManager(
 	).Watches(
 		&corev1.ConfigMap{},
 		handler.EnqueueRequestsFromMapFunc(clientExtensionReconciler.requestsForConfigMap),
-	).Watches(
-		&corev1.Namespace{},
-		handler.EnqueueRequestsFromMapFunc(clientExtensionReconciler.requestsForNamespace),
-		builder.WithPredicates(namespaceExistencePredicate),
-	).Complete(
-		clientExtensionReconciler,
 	)
+
+	if len(clientExtensionReconciler.WatchNamespaces) == 0 {
+		controllerBuilder = controllerBuilder.Watches(
+			&corev1.Namespace{},
+			handler.EnqueueRequestsFromMapFunc(clientExtensionReconciler.requestsForNamespace),
+			builder.WithPredicates(namespaceExistencePredicate),
+		)
+	}
+
+	return controllerBuilder.Complete(clientExtensionReconciler)
 }
 
 func appendOptionalCondition(
@@ -621,6 +630,13 @@ func refusalMessage(
 		)
 	}
 
+	if reason == ReasonDxpNamespaceNotWatched {
+		return fmt.Sprintf(
+			"The DXP operator does not watch namespace %q, so this client extension is not delivered there. Whoever installs the operator adds %q to its watched namespaces.",
+			dxpNamespace, dxpNamespace,
+		)
+	}
+
 	return fmt.Sprintf(
 		"Namespace %q does not list %q in its %q ConfigMap, so this client extension is not delivered there. Whoever manages DXP grants access by adding %q to the ConfigMap's %q key.",
 		dxpNamespace, clientExtension.Namespace, cxv1alpha1.ConfigMapNameClientExtensionPolicy,
@@ -733,6 +749,12 @@ func (clientExtensionReconciler *ClientExtensionReconciler) resolveDxpNamespace(
 
 	if clientExtension.Namespace == dxpNamespace {
 		return dxpNamespace, "", nil
+	}
+
+	if (len(clientExtensionReconciler.WatchNamespaces) > 0) &&
+		!slices.Contains(clientExtensionReconciler.WatchNamespaces, dxpNamespace) {
+
+		return dxpNamespace, ReasonDxpNamespaceNotWatched, nil
 	}
 
 	var namespace corev1.Namespace
@@ -897,9 +919,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) updateStatus(
 type ClientExtensionReconciler struct {
 	client.Client
 
-	APIReader      client.Reader
-	Recorder       record.EventRecorder
-	ServiceAccount string
+	APIReader       client.Reader
+	Recorder        record.EventRecorder
+	ServiceAccount  string
+	WatchNamespaces []string
 }
 
 var errExtProvisionOwnedElsewhere = errors.New("ext-provision: owned by another client extension")

@@ -40,29 +40,15 @@ func main() {
 		controller.SetupLog.Error(configError, "Unable to read configuration, falling back to defaults")
 	}
 
-	cxConfigMapSelector, error := labels.Parse(cx.LabelMetadataType)
+	managerOptions, error := newManagerOptions(config)
 
 	if error != nil {
-		controller.SetupLog.Error(error, "Unable to build the ConfigMap cache selector")
+		controller.SetupLog.Error(error, "Unable to build the manager options")
 
 		os.Exit(1)
 	}
 
-	manager, error := controllerruntime.NewManager(
-		controllerruntime.GetConfigOrDie(),
-		controllerruntime.Options{
-			Cache: cache.Options{
-				ByObject: map[client.Object]cache.ByObject{
-					&corev1.ConfigMap{}: {Label: cxConfigMapSelector},
-				},
-			},
-			HealthProbeBindAddress: config.ProbeAddress,
-			Metrics: metricsserver.Options{
-				BindAddress: config.MetricsAddress,
-			},
-			Scheme: scheme,
-		},
-	)
+	manager, error := controllerruntime.NewManager(controllerruntime.GetConfigOrDie(), managerOptions)
 
 	if error != nil {
 		controller.SetupLog.Error(error, "Unable to start manager")
@@ -88,10 +74,11 @@ func main() {
 		reconcilers = append(
 			reconcilers,
 			&cx.ClientExtensionReconciler{
-				APIReader:      manager.GetAPIReader(),
-				Client:         manager.GetClient(),
-				Recorder:       manager.GetEventRecorderFor("clientextension-controller"),
-				ServiceAccount: config.OperatorNamespace + "/" + config.OperatorServiceAccount,
+				APIReader:       manager.GetAPIReader(),
+				Client:          manager.GetClient(),
+				Recorder:        manager.GetEventRecorderFor("clientextension-controller"),
+				ServiceAccount:  config.OperatorNamespace + "/" + config.OperatorServiceAccount,
+				WatchNamespaces: config.WatchNamespaces,
 			},
 		)
 	}
@@ -130,6 +117,7 @@ func main() {
 		"metricsAddress", config.MetricsAddress,
 		"probeAddress", config.ProbeAddress,
 		"provisioningBaseURL", config.ProvisioningBaseURL,
+		"watchNamespaces", config.WatchNamespaces,
 	)
 
 	if error := manager.Start(controllerruntime.SetupSignalHandler()); error != nil {
@@ -137,6 +125,42 @@ func main() {
 
 		os.Exit(1)
 	}
+}
+
+func newManagerOptions(config config) (controllerruntime.Options, error) {
+	cxConfigMapSelector, error := labels.Parse(cx.LabelMetadataType)
+
+	if error != nil {
+		return controllerruntime.Options{}, error
+	}
+
+	cacheOptions := cache.Options{
+		ByObject: map[client.Object]cache.ByObject{
+			&corev1.ConfigMap{}: {Label: cxConfigMapSelector},
+		},
+	}
+
+	if len(config.WatchNamespaces) > 0 {
+		cacheOptions.DefaultNamespaces = map[string]cache.Config{}
+
+		for _, watchNamespace := range config.WatchNamespaces {
+			cacheOptions.DefaultNamespaces[watchNamespace] = cache.Config{}
+		}
+	}
+
+	return controllerruntime.Options{
+		Cache: cacheOptions,
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{&corev1.Namespace{}},
+			},
+		},
+		HealthProbeBindAddress: config.ProbeAddress,
+		Metrics: metricsserver.Options{
+			BindAddress: config.MetricsAddress,
+		},
+		Scheme: scheme,
+	}, nil
 }
 
 type config struct {
@@ -154,6 +178,7 @@ type config struct {
 	ProvisioningGracePeriod time.Duration `env:"PROVISIONING_GRACE_PERIOD" envDefault:"168h"`
 	RetryInitialDelay       time.Duration `env:"RETRY_INITIAL_DELAY" envDefault:"30s"`
 	RetryMaxDelay           time.Duration `env:"RETRY_MAX_DELAY" envDefault:"30m"`
+	WatchNamespaces         []string      `env:"WATCH_NAMESPACES" envSeparator:","`
 }
 
 var scheme = runtime.NewScheme()

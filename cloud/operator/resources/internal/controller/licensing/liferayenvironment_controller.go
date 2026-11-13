@@ -45,7 +45,7 @@ const (
 )
 
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;update;watch
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;list;update;watch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;update;watch
@@ -366,6 +366,8 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) labelNamespace
 		return environmentID, nil
 	}
 
+	patch := client.MergeFrom(namespace.DeepCopy())
+
 	if namespace.Labels == nil {
 		namespace.Labels = map[string]string{}
 	}
@@ -376,7 +378,7 @@ func (liferayEnvironmentReconciler *LiferayEnvironmentReconciler) labelNamespace
 		"Namespace was labeled as a licensed environment", "namespace", namespaceName,
 	)
 
-	if error := liferayEnvironmentReconciler.Update(context, namespace); error != nil {
+	if error := liferayEnvironmentReconciler.Patch(context, namespace, patch); error != nil {
 		return "", error
 	}
 

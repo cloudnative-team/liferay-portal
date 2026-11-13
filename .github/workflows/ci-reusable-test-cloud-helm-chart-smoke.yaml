@@ -184,6 +184,203 @@ jobs:
             -   if: ${{failure()}}
                 name: Print LiferayEnvironment
                 run: kubectl get liferayenvironment liferay --namespace liferay --output yaml
+    test-dxp-operator-watched-namespaces:
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+            -   name: Create kind cluster
+                uses: helm/kind-action@v1
+                with:
+                    cluster_name: dxp-operator
+            -   name: Install Helm
+                uses: azure/setup-helm@v4
+                with:
+                    version: 4.2.4
+            -   name: Build image
+                run: docker build --pull --tag liferay-dxp-operator:smoke .
+                working-directory: ./cloud/operator
+            -   name: Load image
+                run: kind load docker-image liferay-dxp-operator:smoke --name dxp-operator
+            -   name: Create namespaces
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        kubectl create namespace liferay
+
+                        kubectl create namespace other
+                    }
+
+                    main "${@}"
+            -   name: Install Helm chart
+                run: helm install liferay-dxp-operator . --create-namespace --namespace dxp-operator-system --set clientExtensions.enabled=true --set image.pullPolicy=Never --set image.repository=liferay-dxp-operator --set image.tag=smoke --set "watchNamespaces={liferay}" --timeout 5m --wait
+                working-directory: ./cloud/helm/dxp-operator
+            -   name: Check the operator holds permissions in the watched namespace only
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function check_permission {
+                        local expected="${1}"
+
+                        shift
+
+                        local actual=no
+
+                        if kubectl auth can-i "${@}" --as system:serviceaccount:dxp-operator-system:liferay-dxp-operator > /dev/null
+                        then
+                            actual=yes
+                        fi
+
+                        if [[ ${actual} != "${expected}" ]]
+                        then
+                            echo "The answer to \"can the operator ${*}\" is ${actual} instead of ${expected}." >&2
+
+                            exit 1
+                        fi
+                    }
+
+                    function main {
+                        local resource
+
+                        for resource in clientextensions.cx.liferay.com configmaps liferayenvironments.licensing.liferay.com secrets statefulsets.apps
+                        do
+                            check_permission yes list "${resource}" --namespace liferay
+
+                            check_permission no list "${resource}" --namespace other
+
+                            check_permission no list "${resource}" --all-namespaces
+                        done
+
+                        check_permission yes update statefulsets.apps --namespace liferay
+
+                        check_permission no update statefulsets.apps --namespace other
+
+                        check_permission yes patch namespace/liferay
+
+                        check_permission no patch namespace/other
+
+                        check_permission no list namespaces
+                    }
+
+                    main "${@}"
+            -   name: Create LiferayEnvironments
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local namespace
+
+                        for namespace in liferay other
+                        do
+                            kubectl apply --filename - <<EOF
+                    apiVersion: licensing.liferay.com/v1alpha1
+                    kind: LiferayEnvironment
+                    metadata:
+                        name: liferay
+                        namespace: ${namespace}
+                    spec:
+                        activationCodeSecretRef:
+                            key: activationCode
+                            name: liferay-activation-code
+                        workloadRef:
+                            name: liferay
+                    EOF
+                        done
+                    }
+
+                    main "${@}"
+            -   name: Check only the watched LiferayEnvironment is reconciled
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        kubectl wait --for=jsonpath='{.status.phase}'=Pending --namespace liferay --timeout 2m liferayenvironment/liferay
+
+                        kubectl get secret liferay-identity --namespace liferay
+
+                        local labeled_namespaces
+
+                        labeled_namespaces=$(kubectl get namespaces --output name --selector licensing.liferay.com/environment=true)
+
+                        if [[ ${labeled_namespaces} != namespace/liferay ]]
+                        then
+                            echo "The licensed environment label is on \"${labeled_namespaces}\" instead of only \"namespace/liferay\"." >&2
+
+                            exit 1
+                        fi
+
+                        local phase
+
+                        phase=$(kubectl get liferayenvironment liferay --namespace other --output jsonpath='{.status.phase}')
+
+                        if [[ -n ${phase} ]]
+                        then
+                            echo "The operator reconciled the LiferayEnvironment in the unwatched namespace to phase \"${phase}\"." >&2
+
+                            exit 1
+                        fi
+
+                        if kubectl get secret liferay-identity --namespace other > /dev/null 2>&1
+                        then
+                            echo "The operator created an identity secret in the unwatched namespace." >&2
+
+                            exit 1
+                        fi
+                    }
+
+                    main "${@}"
+            -   name: Check the operator is not denied access
+                run: |
+                    set -o errexit
+                    set -o nounset
+                    set -o pipefail
+
+                    function main {
+                        local logs
+
+                        logs=$(kubectl logs deployment/liferay-dxp-operator --namespace dxp-operator-system)
+
+                        if [[ ${logs} != *cx.ClientExtensionReconciler* ]]
+                        then
+                            echo "The operator did not start the ClientExtension controller." >&2
+
+                            exit 1
+                        fi
+
+                        if [[ ${logs} != *licensing.LiferayEnvironmentReconciler* ]]
+                        then
+                            echo "The operator did not start the LiferayEnvironment controller." >&2
+
+                            exit 1
+                        fi
+
+                        if [[ ${logs,,} == *forbidden* ]]
+                        then
+                            echo "The operator was denied access by the API server." >&2
+
+                            exit 1
+                        fi
+                    }
+
+                    main "${@}"
+            -   if: ${{failure()}}
+                name: Print operator events
+                run: kubectl get events --namespace dxp-operator-system
+            -   if: ${{failure()}}
+                name: Print operator logs
+                run: kubectl logs deployment/liferay-dxp-operator --namespace dxp-operator-system
+            -   if: ${{failure()}}
+                name: Print LiferayEnvironments
+                run: kubectl get liferayenvironments --all-namespaces --output yaml
 on:
     workflow_call:
 permissions:
