@@ -11,13 +11,12 @@ import (
 )
 
 const (
-	ConditionConfigurationAccepted = "ConfigurationAccepted"
-	ConditionDelivered             = "Delivered"
-	ConditionMirrored              = "Mirrored"
-	ConditionProvisioned           = "Provisioned"
-	ConditionReady                 = "Ready"
-	ConditionWorkloadAccepted      = "WorkloadAccepted"
-	ConditionWorkloadAvailable     = "WorkloadAvailable"
+	ConditionDelivered         = "Delivered"
+	ConditionMirrored          = "Mirrored"
+	ConditionProvisioned       = "Provisioned"
+	ConditionReady             = "Ready"
+	ConditionWorkloadAccepted  = "WorkloadAccepted"
+	ConditionWorkloadAvailable = "WorkloadAvailable"
 )
 
 const (
@@ -59,7 +58,6 @@ func init() {
 // +kubebuilder:printcolumn:JSONPath=`.spec.virtualInstanceId`,name="Virtual-Instance",type=string
 // +kubebuilder:printcolumn:JSONPath=`.spec.workloadRef.kind`,name="Workload",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="Delivered")].status`,name="Delivered",type=string
-// +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="ConfigurationAccepted")].status`,name="Config-Accepted",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="Provisioned")].status`,name="Provisioned",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.conditions[?(@.type=="WorkloadAvailable")].status`,name="Available",type=string
 // +kubebuilder:printcolumn:JSONPath=`.status.phase`,name="Phase",type=string

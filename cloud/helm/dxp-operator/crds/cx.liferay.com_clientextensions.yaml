@@ -28,9 +28,6 @@ spec:
         -   jsonPath: .status.conditions[?(@.type=="Delivered")].status
             name: Delivered
             type: string
-        -   jsonPath: .status.conditions[?(@.type=="ConfigurationAccepted")].status
-            name: Config-Accepted
-            type: string
         -   jsonPath: .status.conditions[?(@.type=="Provisioned")].status
             name: Provisioned
             type: string
