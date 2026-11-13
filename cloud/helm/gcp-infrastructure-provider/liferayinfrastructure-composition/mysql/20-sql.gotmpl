@@ -1,0 +1,126 @@
+{{- $database := $xr.spec.database }}
+{{- $instanceType := $database.instanceType | default "db-custom-1-3840" }}
+
+{{- range $dataPlane := $dataPlanes }}
+---
+apiVersion: sql.gcp.m.upbound.io/v1beta1
+kind: Database
+metadata:
+    annotations:
+        crossplane.io/external-name: {{ $databaseName }}
+        gotemplating.fn.crossplane.io/composition-resource-name: liferay-db-{{ $dataPlane }}
+    labels:
+        app: liferay
+        component: database
+        dataPlane: {{ $dataPlane }}
+    name: {{ $xr.metadata.name }}-db-{{ $dataPlane }}
+spec:
+    forProvider:
+        charset: utf8mb4
+        collation: utf8mb4_unicode_ci
+        instanceSelector:
+            matchLabels:
+                app: liferay
+                component: database-instance
+                dataPlane: {{ $dataPlane }}
+    managementPolicies: ["Create", "Observe", "Update"]
+{{- if $isCMKKeyReady }}
+---
+apiVersion: sql.gcp.m.upbound.io/v1beta1
+kind: DatabaseInstance
+metadata:
+    annotations:
+        gotemplating.fn.crossplane.io/composition-resource-name: database-primary-{{ $dataPlane }}
+    labels:
+        app: liferay
+        component: database-instance
+        dataPlane: {{ $dataPlane }}
+        databaseEngine: {{ $env.databaseEngine }}
+    name: {{ $databaseInstanceNamePrefix }}{{ $dataPlane }}
+spec:
+    forProvider:
+        databaseVersion: {{ printf "MYSQL_%s" ($database.version | default "8.4" | replace "." "_") }}
+        deletionProtection: {{ and (not $forceDestroy) (eq $dataPlane $activeDataPlane) }}
+        {{- if $cmkEnabled }}
+        encryptionKeyName: {{ $cmkKeyId }}
+        {{- end }}
+        region: {{ $region }}
+        settings:
+            availabilityType: {{ $database.highAvailability | ternary "REGIONAL" "ZONAL" }}
+            {{- if $database.highAvailability }}
+            backupConfiguration:
+                backupRetentionSettings:
+                    retainedBackups: 7
+                binaryLogEnabled: true
+                enabled: true
+                transactionLogRetentionDays: 7
+            {{- end }}
+            databaseFlags:
+                -   name: cloudsql_iam_authentication
+                    value: "on"
+            diskSize: {{ $database.storageGB }}
+            diskType: PD_SSD
+            edition: {{ hasPrefix "db-perf-optimized-" $instanceType | ternary "ENTERPRISE_PLUS" "ENTERPRISE" }}
+            insightsConfig:
+                queryInsightsEnabled: true
+            ipConfiguration:
+                ipv4Enabled: false
+                privateNetwork: projects/{{ $env.projectId }}/global/networks/{{ $env.vpcName }}
+                sslMode: TRUSTED_CLIENT_CERTIFICATE_REQUIRED
+            retainBackupsOnDelete: true
+            tier: {{ $instanceType }}
+            userLabels:
+                {{- merge (dict "active" (eq $dataPlane $activeDataPlane | toString)) $backupTargetLabels | toYaml | nindent 16 }}
+    managementPolicies: {{ $xr.spec.backup.enabled | ternary ((list "*") | toJson) $managementPolicies }}
+{{- end }}
+{{- if not (and (eq $dataPlane $targetActiveDataPlane) (eq $restorePhase "provisioning")) }}
+{{- if $databaseBootstrapEmail }}
+---
+apiVersion: sql.gcp.m.upbound.io/v1beta1
+kind: User
+metadata:
+    annotations:
+        crossplane.io/external-name: {{ $databaseBootstrapEmail }}
+        gotemplating.fn.crossplane.io/composition-resource-name: database-bootstrap-iam-user-{{ $dataPlane }}
+    labels:
+        app: liferay
+        component: database-bootstrap-user
+        dataPlane: {{ $dataPlane }}
+    name: {{ $xr.metadata.name }}-db-bootstrap-user-{{ $dataPlane }}
+spec:
+    forProvider:
+        databaseRoles:
+            -   cloudsqlsuperuser
+        instanceSelector:
+            matchLabels:
+                app: liferay
+                component: database-instance
+                dataPlane: {{ $dataPlane }}
+        type: CLOUD_IAM_SERVICE_ACCOUNT
+    managementPolicies: ["Create", "Observe", "Update"]
+{{- end }}
+{{- if $gsaEmail }}
+---
+apiVersion: sql.gcp.m.upbound.io/v1beta1
+kind: User
+metadata:
+    annotations:
+        crossplane.io/external-name: {{ $gsaEmail }}
+        gotemplating.fn.crossplane.io/composition-resource-name: liferay-iam-user-{{ $dataPlane }}
+    labels:
+        app: liferay
+        component: database-user
+        dataPlane: {{ $dataPlane }}
+    name: {{ $xr.metadata.name }}-db-user-{{ $dataPlane }}
+spec:
+    forProvider:
+        instanceSelector:
+            matchLabels:
+                app: liferay
+                component: database-instance
+                dataPlane: {{ $dataPlane }}
+        type: CLOUD_IAM_SERVICE_ACCOUNT
+    managementPolicies: ["Create", "Observe", "Update"]
+{{- end }}
+{{- end }}
+{{- end }}

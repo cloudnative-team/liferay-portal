@@ -11,6 +11,16 @@
 {{- fail "GCP restores through the backup-restore workflow, so \"database.restore\" must be unset" -}}
 {{- end -}}
 
+{{- if not $env.databaseEngine -}}
+{{- fail "Property \"database.engine\" must be set" -}}
+{{- end -}}
+
+{{- $observedDatabaseEngine := coalesce (dig "database-primary-blue" "resource" "metadata" "labels" "databaseEngine" "" $observedResources) (dig "database-primary-green" "resource" "metadata" "labels" "databaseEngine" "" $observedResources) -}}
+
+{{- if and $observedDatabaseEngine (ne $observedDatabaseEngine $env.databaseEngine) -}}
+{{- fail (printf "Unable to change the database engine of the environment from %q to %q. Create a new deployment to use another database engine." $observedDatabaseEngine $env.databaseEngine) -}}
+{{- end -}}
+
 {{- $cmkEnabled := $xr.spec.cmk.enabled -}}
 {{- $cmkKeyId := dig "liferay-cryptokey" "resource" "status" "atProvider" "id" "" $observedResources -}}
 {{- $databaseBootstrapEmail := dig "database-bootstrap-gsa" "resource" "status" "atProvider" "email" "" $observedResources -}}
@@ -29,8 +39,11 @@
 {{- $targetActiveDataPlane := $xr.spec.targetActiveDataPlane -}}
 
 {{- $activeDataPlane := $targetActiveDataPlane -}}
-{{- $databaseBootstrapIamUser := trimSuffix ".gserviceaccount.com" $databaseBootstrapEmail -}}
-{{- $databaseIamUser := trimSuffix ".gserviceaccount.com" $gsaEmail -}}
+{{- $databaseBootstrapIamUser := get (dict "mysql" (splitList "@" $databaseBootstrapEmail | first) "postgresql" (trimSuffix ".gserviceaccount.com" $databaseBootstrapEmail)) $env.databaseEngine -}}
+{{- $databaseClientEnv := get (dict "mysql" (list) "postgresql" (list (dict "name" "PGPASSWORD" "value" "iam"))) $env.databaseEngine -}}
+{{- $databaseClientImage := get (dict "mysql" "mysql:8.4" "postgresql" "postgres:18-alpine") $env.databaseEngine -}}
+{{- $databaseIamUser := get (dict "mysql" (splitList "@" $gsaEmail | first) "postgresql" (trimSuffix ".gserviceaccount.com" $gsaEmail)) $env.databaseEngine -}}
+{{- $databasePort := get (dict "mysql" "3306" "postgresql" "5432") $env.databaseEngine -}}
 {{- $dataPlanes := list $targetActiveDataPlane -}}
 {{- $isCMKKeyReady := or (not $cmkEnabled) $cmkKeyId -}}
 {{- $labels := merge (dict "app" "liferay" "deployment-name" $env.deploymentName "environment-id" $environmentId "project-id" $projectId) $xr.spec.commonTags -}}
