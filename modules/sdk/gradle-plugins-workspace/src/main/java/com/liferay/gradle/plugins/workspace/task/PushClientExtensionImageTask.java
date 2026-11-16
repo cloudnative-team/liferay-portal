@@ -107,9 +107,11 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 		// image is also pushed under a tag that ends in its digest, which a
 		// liferay.yaml entry can name to keep exactly this build.
 
-		String digestTag =
-			image.substring(repository.length() + 1) + "." +
-				digest.substring(digest.indexOf(':') + 1).substring(0, 12);
+		String tag = image.substring(repository.length() + 1);
+
+		String digestHex = digest.substring(digest.indexOf(':') + 1);
+
+		String digestTag = tag + "." + digestHex.substring(0, 12);
 
 		DockerClient dockerClient = getDockerClient();
 
