@@ -120,9 +120,11 @@ func isFailedWaitingReason(reason string) bool {
 
 func jobAvailableCondition(job *batchv1.Job, podProblem string) metav1.Condition {
 	if complete := jobCondition(batchv1.JobComplete, job); complete != nil {
+		lastTransitionTime := complete.LastTransitionTime.UTC()
+
 		return newCondition(
 			metav1.ConditionTrue,
-			fmt.Sprintf("Job %q completed at %s.", job.Name, complete.LastTransitionTime.UTC().Format(time.RFC3339)),
+			fmt.Sprintf("Job %q completed at %s.", job.Name, lastTransitionTime.Format(time.RFC3339)),
 			ReasonJobComplete,
 		)
 	}
@@ -234,7 +236,9 @@ func (clientExtensionReconciler *ClientExtensionReconciler) workloadAvailableCon
 		}
 
 		return deploymentAvailableCondition(deployment, podProblem(pods)), nil
-	} else if cronJob, ok := workload.(*batchv1.CronJob); ok {
+	}
+
+	if cronJob, ok := workload.(*batchv1.CronJob); ok {
 		var jobList batchv1.JobList
 
 		if error := clientExtensionReconciler.APIReader.List(
@@ -244,7 +248,9 @@ func (clientExtensionReconciler *ClientExtensionReconciler) workloadAvailableCon
 		}
 
 		return cronJobAvailableCondition(cronJob, jobList.Items), nil
-	} else if job, ok := workload.(*batchv1.Job); ok {
+	}
+
+	if job, ok := workload.(*batchv1.Job); ok {
 		selector := job.Spec.Selector
 
 		if selector == nil {
@@ -272,7 +278,9 @@ func workloadSummary(workload client.Object, workloadAvailable metav1.Condition)
 		}
 
 		return fmt.Sprintf("%d/%d", deployment.Status.AvailableReplicas, replicas)
-	} else if cronJob, ok := workload.(*batchv1.CronJob); ok {
+	}
+
+	if cronJob, ok := workload.(*batchv1.CronJob); ok {
 		if workloadAvailable.Reason == ReasonJobFailed {
 			return "Failed"
 		}
@@ -286,10 +294,14 @@ func workloadSummary(workload client.Object, workloadAvailable metav1.Condition)
 		}
 
 		return "Scheduled"
-	} else if _, ok := workload.(*batchv1.Job); ok {
+	}
+
+	if _, ok := workload.(*batchv1.Job); ok {
 		if workloadAvailable.Reason == ReasonJobComplete {
 			return "Completed"
-		} else if workloadAvailable.Reason == ReasonJobFailed {
+		}
+
+		if workloadAvailable.Reason == ReasonJobFailed {
 			return "Failed"
 		}
 
