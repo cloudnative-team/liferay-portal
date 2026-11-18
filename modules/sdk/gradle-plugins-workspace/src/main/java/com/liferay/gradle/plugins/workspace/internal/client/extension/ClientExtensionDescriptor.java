@@ -29,9 +29,9 @@ public class ClientExtensionDescriptor {
 	public static final int VERSION = 1;
 
 	public static Map<String, Object> derive(
-		String type, Map<String, Object> configsMap,
-		String oAuthApplicationHeadlessServerERC, String imageDigest,
-		String imageRepository, String imageTag) {
+		Map<String, Object> configsMap, String imageDigest,
+		String imageRepository, String imageTag,
+		String oAuthApplicationHeadlessServerERC, String type) {
 
 		Map<String, Object> clientExtensionMap = new LinkedHashMap<>();
 

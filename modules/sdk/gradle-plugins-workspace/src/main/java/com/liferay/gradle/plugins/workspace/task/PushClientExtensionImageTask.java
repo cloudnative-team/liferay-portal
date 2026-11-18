@@ -5,6 +5,7 @@
 
 package com.liferay.gradle.plugins.workspace.task;
 
+import com.bmuschko.gradle.docker.internal.RegistryAuthLocator;
 import com.bmuschko.gradle.docker.tasks.image.DockerPushImage;
 
 import com.github.dockerjava.api.DockerClient;
@@ -18,6 +19,7 @@ import com.github.dockerjava.api.model.PushResponseItem;
 import com.github.dockerjava.api.model.ResponseItem;
 
 import com.liferay.gradle.plugins.workspace.internal.client.extension.ClientExtensionDescriptor;
+import com.liferay.gradle.plugins.workspace.internal.util.StringUtil;
 
 import java.io.File;
 
@@ -77,10 +79,13 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 		Set<String> images = imagesSetProperty.get();
 
 		if (images.isEmpty()) {
+			Project project = getProject();
+
 			throw new GradleException(
-				"Set the liferay.workspace.client.extension.registry " +
-					"property and a version to publish \"" +
-						getProject().getName() + "\"");
+				StringUtil.concat(
+					"Set the \"liferay.workspace.client.extension.registry\" ",
+					"property and a version to publish \"", project.getName(),
+					"\""));
 		}
 
 		super.runRemoteCommand();
@@ -89,9 +94,9 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 
 		String image = iterator.next();
 
-		String repository = ClientExtensionDescriptor.getRepository(image);
+		String imageRepository = ClientExtensionDescriptor.getRepository(image);
 
-		String digest = _getDigest(image, repository);
+		String digest = _getDigest(image, imageRepository);
 
 		RegularFile regularFile = _imageDigestFile.get();
 
@@ -107,7 +112,7 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 		// image is also pushed under a tag that ends in its digest, which a
 		// liferay.yaml entry can name to keep exactly this build.
 
-		String tag = image.substring(repository.length() + 1);
+		String tag = image.substring(imageRepository.length() + 1);
 
 		String digestHex = digest.substring(digest.indexOf(':') + 1);
 
@@ -116,11 +121,11 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 		DockerClient dockerClient = getDockerClient();
 
 		TagImageCmd tagImageCmd = dockerClient.tagImageCmd(
-			image, repository, digestTag);
+			image, imageRepository, digestTag);
 
 		tagImageCmd.exec();
 
-		String digestImage = repository + ":" + digestTag;
+		String digestImage = imageRepository + ":" + digestTag;
 
 		_pushImage(digestImage);
 
@@ -152,7 +157,9 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 	}
 
 	private void _pushImage(String image) throws Exception {
-		AuthConfig authConfig = getRegistryAuthLocator().lookupAuthConfig(
+		RegistryAuthLocator registryAuthLocator = getRegistryAuthLocator();
+
+		AuthConfig authConfig = registryAuthLocator.lookupAuthConfig(
 			image, getRegistryCredentials());
 
 		DockerClient dockerClient = getDockerClient();
@@ -161,7 +168,7 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 
 		pushImageCmd.withAuthConfig(authConfig);
 
-		pushImageCmd.exec(
+		ResultCallback.Adapter<PushResponseItem> resultCallback =
 			new ResultCallback.Adapter<PushResponseItem>() {
 
 				@Override
@@ -177,12 +184,16 @@ public class PushClientExtensionImageTask extends DockerPushImage {
 						}
 
 						throw new GradleException(
-							"Unable to push \"" + image + "\": " + message);
+							StringUtil.concat(
+								"Unable to push \"", image, "\": ", message));
 					}
 				}
 
-			}
-		).awaitCompletion();
+			};
+
+		pushImageCmd.exec(resultCallback);
+
+		resultCallback.awaitCompletion();
 	}
 
 	private final RegularFileProperty _imageDigestFile;

@@ -16,6 +16,7 @@ import java.io.File;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -95,7 +96,9 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 
 		File outputDir = _getFile(_outputDir);
 
-		getProject().delete(outputDir);
+		Project project = getProject();
+
+		project.delete(outputDir);
 
 		outputDir.mkdirs();
 
@@ -105,22 +108,22 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 		objectWriter.writeValue(
 			new File(outputDir, ClientExtensionDescriptor.FILE_NAME),
 			ClientExtensionDescriptor.derive(
-				type, _readJSON(_clientExtensionConfigFile),
-				_oAuthApplicationHeadlessServerERC.getOrNull(), imageDigest,
-				imageRepository, imageTag));
+				_readJSON(_clientExtensionConfigFile), imageDigest,
+				imageRepository, imageTag,
+				_oAuthApplicationHeadlessServerERC.getOrNull(), type));
+
+		String dockerfileContent = String.format(
+			"FROM scratch\n\nLABEL %s=\"%d\"\n\nCOPY %s /\n",
+			ClientExtensionDescriptor.LABEL_VERSION,
+			ClientExtensionDescriptor.VERSION,
+			ClientExtensionDescriptor.FILE_NAME);
+
+		File dockerfile = new File(outputDir, "Dockerfile");
+
+		Path dockerfilePath = dockerfile.toPath();
 
 		Files.write(
-			new File(
-				outputDir, "Dockerfile"
-			).toPath(),
-			String.format(
-				"FROM scratch\n\nLABEL %s=\"%d\"\n\nCOPY %s /\n",
-				ClientExtensionDescriptor.LABEL_VERSION,
-				ClientExtensionDescriptor.VERSION,
-				ClientExtensionDescriptor.FILE_NAME
-			).getBytes(
-				StandardCharsets.UTF_8
-			));
+			dockerfilePath, dockerfileContent.getBytes(StandardCharsets.UTF_8));
 	}
 
 	@InputFile

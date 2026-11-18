@@ -12,16 +12,14 @@ runGradleTest {
 
 		assert catalog.repositories.contains("able")
 		assert catalog.repositories.contains("able-descriptor")
-		assert catalog.repositories.contains("baker-descriptor")
 		assert !catalog.repositories.contains("baker")
+		assert catalog.repositories.contains("baker-descriptor")
 
 		HttpURLConnection httpURLConnection = _openManifest(registry, "able", "1.0.0")
 
 		httpURLConnection.requestMethod = "HEAD"
 
 		assert httpURLConnection.responseCode == 200
-
-		String digest = httpURLConnection.getHeaderField("Docker-Content-Digest")
 
 		HttpURLConnection descriptorHttpURLConnection = _openManifest(registry, "able-descriptor", "1.0.0")
 
@@ -38,6 +36,8 @@ runGradleTest {
 		digestTagHttpURLConnection.requestMethod = "HEAD"
 
 		assert digestTagHttpURLConnection.getHeaderField("Docker-Content-Digest") == descriptorDigest
+
+		String digest = httpURLConnection.getHeaderField("Docker-Content-Digest")
 
 		Map<String, Object> able = _pullDescriptor(registry, "able").descriptor
 

@@ -6,6 +6,7 @@
 package com.liferay.gradle.plugins.workspace.internal.client.extension;
 
 import java.util.Map;
+import java.util.UUID;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -18,7 +19,7 @@ public class ClientExtensionDescriptorTest {
 	@Test
 	public void testDerive() {
 		Map<String, Object> clientExtensionMap = _derive(
-			ClientExtensionDescriptor.TYPE_SERVICE, "able-oauth");
+			ClientExtensionDescriptor.TYPE_SERVICE, _randomString());
 
 		Assert.assertEquals(
 			Map.of("key~able", Map.of()), clientExtensionMap.get("configs"));
@@ -41,12 +42,15 @@ public class ClientExtensionDescriptorTest {
 
 	@Test
 	public void testDeriveWhenIsBatch() {
+		String oAuthApplicationHeadlessServerERC = _randomString();
+
 		Map<String, Object> clientExtensionMap = _derive(
-			ClientExtensionDescriptor.TYPE_BATCH, "able-oauth");
+			ClientExtensionDescriptor.TYPE_BATCH,
+			oAuthApplicationHeadlessServerERC);
 
 		Assert.assertNotNull(clientExtensionMap.get("image"));
 		Assert.assertEquals(
-			"able-oauth",
+			oAuthApplicationHeadlessServerERC,
 			clientExtensionMap.get("oauthApplicationHeadlessServerERC"));
 		Assert.assertEquals(
 			ClientExtensionDescriptor.TYPE_BATCH,
@@ -56,7 +60,7 @@ public class ClientExtensionDescriptorTest {
 	@Test
 	public void testDeriveWhenIsConfigurationOnly() {
 		Map<String, Object> clientExtensionMap = _derive(
-			ClientExtensionDescriptor.TYPE_CONFIGURATION, "able-oauth");
+			ClientExtensionDescriptor.TYPE_CONFIGURATION, _randomString());
 
 		Assert.assertNull(clientExtensionMap.get("image"));
 		Assert.assertNull(
@@ -71,11 +75,11 @@ public class ClientExtensionDescriptorTest {
 	public void testGetRepository() {
 		Assert.assertEquals(
 			"localhost:5001/able",
-			ClientExtensionDescriptor.getRepository(
-				"localhost:5001/able:1.0.0@sha256:1"));
+			ClientExtensionDescriptor.getRepository("localhost:5001/able"));
 		Assert.assertEquals(
 			"localhost:5001/able",
-			ClientExtensionDescriptor.getRepository("localhost:5001/able"));
+			ClientExtensionDescriptor.getRepository(
+				"localhost:5001/able:1.0.0@sha256:1"));
 	}
 
 	@Test
@@ -92,13 +96,16 @@ public class ClientExtensionDescriptorTest {
 		String type, String oAuthApplicationHeadlessServerERC) {
 
 		Map<String, Object> descriptorMap = ClientExtensionDescriptor.derive(
-			type, Map.of("key~able", Map.of()),
-			oAuthApplicationHeadlessServerERC, "sha256:1", "registry/able",
-			"1.0.0");
+			Map.of("key~able", Map.of()), "sha256:1", "registry/able", "1.0.0",
+			oAuthApplicationHeadlessServerERC, type);
 
 		Assert.assertEquals(descriptorMap.toString(), 1, descriptorMap.size());
 
 		return (Map<String, Object>)descriptorMap.get("descriptor");
+	}
+
+	private String _randomString() {
+		return String.valueOf(UUID.randomUUID());
 	}
 
 }

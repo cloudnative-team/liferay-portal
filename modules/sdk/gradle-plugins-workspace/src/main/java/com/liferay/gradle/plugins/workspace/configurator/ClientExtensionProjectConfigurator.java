@@ -536,6 +536,8 @@ public class ClientExtensionProjectConfigurator
 
 		createClientExtensionDescriptorTaskProvider.configure(
 			createClientExtensionDescriptorTask -> {
+				createClientExtensionDescriptorTask.dependsOn(
+					createClientExtensionConfigTaskProvider);
 				createClientExtensionDescriptorTask.mustRunAfter(
 					pushClientExtensionImageTaskProvider);
 				createClientExtensionDescriptorTask.setDescription(
@@ -576,9 +578,6 @@ public class ClientExtensionProjectConfigurator
 							ClientExtensionDescriptor.getType(
 								createClientExtensionConfigTask.
 									getClassificationGrouping())));
-
-				createClientExtensionDescriptorTask.dependsOn(
-					createClientExtensionConfigTaskProvider);
 			});
 
 		Gradle gradle = project.getGradle();
@@ -1387,7 +1386,10 @@ public class ClientExtensionProjectConfigurator
 	private Provider<String> _getImageProvider(
 		Project project, String repositorySuffix) {
 
-		Provider<String> registryProvider = _getRegistryProvider(project);
+		ProviderFactory providerFactory = project.getProviders();
+
+		Provider<String> registryProvider = providerFactory.gradleProperty(
+			_PROPERTY_PREFIX + "registry");
 
 		return registryProvider.zip(
 			_getVersionProvider(project),
@@ -1438,12 +1440,6 @@ public class ClientExtensionProjectConfigurator
 			Collections::singletonList);
 
 		return imagesProvider.orElse(Collections.emptyList());
-	}
-
-	private Provider<String> _getRegistryProvider(Project project) {
-		ProviderFactory providerFactory = project.getProviders();
-
-		return providerFactory.gradleProperty(_PROPERTY_PREFIX + "registry");
 	}
 
 	private Provider<String> _getVersionProvider(Project project) {
