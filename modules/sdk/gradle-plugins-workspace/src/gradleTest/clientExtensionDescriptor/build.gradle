@@ -3,7 +3,7 @@ import groovy.json.JsonSlurper
 task runGradleTest
 
 runGradleTest {
-	dependsOn ":client-extensions:able:createClientExtensionDescriptor", ":client-extensions:baker:createClientExtensionDescriptor"
+	dependsOn ":client-extensions:able:createClientExtensionDescriptor", ":client-extensions:baker:createClientExtensionDescriptor", ":client-extensions:charlie:createClientExtensionDescriptor"
 
 	doLast {
 		Map<String, Object> able = _readDescriptor("able").descriptor
@@ -13,6 +13,7 @@ runGradleTest {
 		assert able.image.digest == null
 		assert able.image.repository == "localhost:5999/able"
 		assert able.image.tag == "1.0.0"
+		assert able.oauthApplicationHeadlessServerERC == null
 		assert able.type == "service"
 		assert able.workload == null
 
@@ -20,8 +21,14 @@ runGradleTest {
 
 		assert baker.configs.size() > 0
 		assert baker.image == null
-		assert baker.oauthApplicationHeadlessServerERC == "baker-oauth-application-headless-server"
+		assert baker.oauthApplicationHeadlessServerERC == null
 		assert baker.type == "configuration"
+
+		Map<String, Object> charlie = _readDescriptor("charlie").descriptor
+
+		assert charlie.image.repository == "localhost:5999/charlie"
+		assert charlie.oauthApplicationHeadlessServerERC == "charlie-oauth-application-headless-server"
+		assert charlie.type == "batch"
 
 		String dockerfileText = project(":client-extensions:able").file("build/client-extension-descriptor/Dockerfile").text
 

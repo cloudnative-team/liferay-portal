@@ -5,11 +5,7 @@
 
 package com.liferay.gradle.plugins.workspace.internal.client.extension;
 
-import com.liferay.gradle.plugins.workspace.internal.util.StringUtil;
-
 import java.util.Map;
-
-import org.gradle.api.GradleException;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -22,7 +18,7 @@ public class ClientExtensionDescriptorTest {
 	@Test
 	public void testDerive() {
 		Map<String, Object> clientExtensionMap = _derive(
-			Map.of("key~able", Map.of()), "liferay/jar-runner:latest");
+			ClientExtensionDescriptor.TYPE_SERVICE, "able-oauth");
 
 		Assert.assertEquals(
 			Map.of("key~able", Map.of()), clientExtensionMap.get("configs"));
@@ -46,99 +42,29 @@ public class ClientExtensionDescriptorTest {
 	@Test
 	public void testDeriveWhenIsBatch() {
 		Map<String, Object> clientExtensionMap = _derive(
-			Map.of(
-				"com.liferay.oauth2.provider.configuration." +
-					"OAuth2ProviderApplicationHeadlessServerConfiguration~" +
-						"able-batch/liferay.com",
-				Map.of()),
-			"liferay/batch:latest");
+			ClientExtensionDescriptor.TYPE_BATCH, "able-oauth");
 
+		Assert.assertNotNull(clientExtensionMap.get("image"));
 		Assert.assertEquals(
-			"able-batch",
+			"able-oauth",
 			clientExtensionMap.get("oauthApplicationHeadlessServerERC"));
 		Assert.assertEquals(
 			ClientExtensionDescriptor.TYPE_BATCH,
 			clientExtensionMap.get("type"));
-
-		clientExtensionMap = _derive(
-			Map.of(
-				_CONFIGURATION_KEY_HEADLESS_SERVER + "able-batch/able.com",
-				Map.of(),
-				_CONFIGURATION_KEY_HEADLESS_SERVER + "able-batch/liferay.com",
-				Map.of()),
-			"liferay/batch:latest");
-
-		Assert.assertEquals(
-			"able-batch",
-			clientExtensionMap.get("oauthApplicationHeadlessServerERC"));
-
-		try {
-			_derive(
-				Map.of(
-					_CONFIGURATION_KEY_HEADLESS_SERVER +
-						"able-batch/liferay.com",
-					Map.of(),
-					_CONFIGURATION_KEY_HEADLESS_SERVER +
-						"baker-batch/liferay.com",
-					Map.of()),
-				"liferay/batch:latest");
-
-			Assert.fail();
-		}
-		catch (GradleException gradleException) {
-			String message = gradleException.getMessage();
-
-			Assert.assertTrue(message, message.contains("able-batch"));
-			Assert.assertTrue(message, message.contains("baker-batch"));
-		}
 	}
 
 	@Test
 	public void testDeriveWhenIsConfigurationOnly() {
 		Map<String, Object> clientExtensionMap = _derive(
-			Map.of(), "liferay/noop");
+			ClientExtensionDescriptor.TYPE_CONFIGURATION, "able-oauth");
 
 		Assert.assertNull(clientExtensionMap.get("image"));
+		Assert.assertNull(
+			clientExtensionMap.get("oauthApplicationHeadlessServerERC"));
 		Assert.assertEquals(
 			ClientExtensionDescriptor.TYPE_CONFIGURATION,
 			clientExtensionMap.get("type"));
 		Assert.assertNull(clientExtensionMap.get("workload"));
-	}
-
-	@Test
-	public void testGetBaseImage() {
-		Assert.assertEquals(
-			"liferay/caddy:latest",
-			ClientExtensionDescriptor.getBaseImage(
-				"# A comment\nFROM --platform=linux/amd64 " +
-					"liferay/caddy:latest\nCOPY . /public_html"));
-		Assert.assertEquals(
-			"", ClientExtensionDescriptor.getBaseImage("COPY . /public_html"));
-	}
-
-	@Test
-	public void testGetBaseImageWhenIsMultiStage() {
-		String dockerfileText = StringUtil.concat(
-			"FROM gradle:8-jdk21 AS build\n", "RUN gradle bootJar\n",
-			"FROM liferay/caddy:latest\n",
-			"COPY --from=build /out /public_html");
-
-		Assert.assertEquals(
-			"liferay/caddy:latest",
-			ClientExtensionDescriptor.getBaseImage(dockerfileText));
-		Assert.assertEquals(
-			ClientExtensionDescriptor.TYPE_FRONTEND,
-			ClientExtensionDescriptor.getType(
-				ClientExtensionDescriptor.getBaseImage(dockerfileText)));
-
-		Assert.assertEquals(
-			"liferay/jar-runner:latest",
-			ClientExtensionDescriptor.getBaseImage(
-				StringUtil.concat(
-					"FROM liferay/jar-runner:latest AS runtime\n",
-					"from --platform=linux/amd64 gradle:8-jdk21 as Build\n",
-					"RUN gradle bootJar\n", "FROM RUNTIME\n",
-					"COPY --from=build /out /opt/liferay")));
 	}
 
 	@Test
@@ -155,30 +81,24 @@ public class ClientExtensionDescriptorTest {
 	@Test
 	public void testGetType() {
 		Assert.assertEquals(
-			ClientExtensionDescriptor.TYPE_FRONTEND,
-			ClientExtensionDescriptor.getType("liferay/caddy:latest"));
-		Assert.assertEquals(
-			ClientExtensionDescriptor.TYPE_FRONTEND,
-			ClientExtensionDescriptor.getType(
-				"registry.example.com/liferay/caddy:latest"));
+			ClientExtensionDescriptor.TYPE_BATCH,
+			ClientExtensionDescriptor.getType("batch"));
 		Assert.assertEquals(
 			ClientExtensionDescriptor.TYPE_SERVICE,
-			ClientExtensionDescriptor.getType("myliferay/caddy:latest"));
+			ClientExtensionDescriptor.getType("microservice"));
 	}
 
 	private Map<String, Object> _derive(
-		Map<String, Object> configsMap, String baseImage) {
+		String type, String oAuthApplicationHeadlessServerERC) {
 
 		Map<String, Object> descriptorMap = ClientExtensionDescriptor.derive(
-			baseImage, configsMap, "sha256:1", "registry/able", "1.0.0");
+			type, Map.of("key~able", Map.of()),
+			oAuthApplicationHeadlessServerERC, "sha256:1", "registry/able",
+			"1.0.0");
 
 		Assert.assertEquals(descriptorMap.toString(), 1, descriptorMap.size());
 
 		return (Map<String, Object>)descriptorMap.get("descriptor");
 	}
-
-	private static final String _CONFIGURATION_KEY_HEADLESS_SERVER =
-		"com.liferay.oauth2.provider.configuration." +
-			"OAuth2ProviderApplicationHeadlessServerConfiguration~";
 
 }

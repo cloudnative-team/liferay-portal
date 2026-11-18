@@ -48,10 +48,12 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 		ObjectFactory objectFactory = project.getObjects();
 
 		_clientExtensionConfigFile = objectFactory.fileProperty();
-		_dockerfile = objectFactory.fileProperty();
 		_image = objectFactory.property(String.class);
 		_imageDigestFile = objectFactory.fileProperty();
+		_oAuthApplicationHeadlessServerERC = objectFactory.property(
+			String.class);
 		_outputDir = objectFactory.directoryProperty();
+		_type = objectFactory.property(String.class);
 
 		ProjectLayout projectLayout = project.getLayout();
 
@@ -68,14 +70,13 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 
 	@TaskAction
 	public void createClientExtensionDescriptor() throws Exception {
-		String baseImage = ClientExtensionDescriptor.getBaseImage(
-			FileUtil.read(_getFile(_dockerfile)));
+		String type = _type.get();
 
 		String imageDigest = null;
 		String imageRepository = null;
 		String imageTag = null;
 
-		if (!ClientExtensionDescriptor.isConfigurationOnly(baseImage) &&
+		if (!type.equals(ClientExtensionDescriptor.TYPE_CONFIGURATION) &&
 			_image.isPresent()) {
 
 			String image = _image.get();
@@ -104,7 +105,8 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 		objectWriter.writeValue(
 			new File(outputDir, ClientExtensionDescriptor.FILE_NAME),
 			ClientExtensionDescriptor.derive(
-				baseImage, _readJSON(_clientExtensionConfigFile), imageDigest,
+				type, _readJSON(_clientExtensionConfigFile),
+				_oAuthApplicationHeadlessServerERC.getOrNull(), imageDigest,
 				imageRepository, imageTag));
 
 		Files.write(
@@ -126,11 +128,6 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 		return _clientExtensionConfigFile;
 	}
 
-	@InputFile
-	public RegularFileProperty getDockerfile() {
-		return _dockerfile;
-	}
-
 	@Input
 	@Optional
 	public Property<String> getImage() {
@@ -142,9 +139,20 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 		return _imageDigestFile;
 	}
 
+	@Input
+	@Optional
+	public Property<String> getOAuthApplicationHeadlessServerERC() {
+		return _oAuthApplicationHeadlessServerERC;
+	}
+
 	@OutputDirectory
 	public DirectoryProperty getOutputDir() {
 		return _outputDir;
+	}
+
+	@Input
+	public Property<String> getType() {
+		return _type;
 	}
 
 	private File _getFile(DirectoryProperty directoryProperty) {
@@ -178,9 +186,10 @@ public class CreateClientExtensionDescriptorTask extends DefaultTask {
 	private static final ObjectMapper _objectMapper = new ObjectMapper();
 
 	private final RegularFileProperty _clientExtensionConfigFile;
-	private final RegularFileProperty _dockerfile;
 	private final Property<String> _image;
 	private final RegularFileProperty _imageDigestFile;
+	private final Property<String> _oAuthApplicationHeadlessServerERC;
 	private final DirectoryProperty _outputDir;
+	private final Property<String> _type;
 
 }

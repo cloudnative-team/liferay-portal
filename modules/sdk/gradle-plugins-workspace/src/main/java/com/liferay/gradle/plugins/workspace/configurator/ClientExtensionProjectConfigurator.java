@@ -28,7 +28,6 @@ import com.liferay.gradle.plugins.workspace.internal.client.extension.ClientExte
 import com.liferay.gradle.plugins.workspace.internal.client.extension.ClientExtensionDescriptor;
 import com.liferay.gradle.plugins.workspace.internal.client.extension.NodeBuildConfigurer;
 import com.liferay.gradle.plugins.workspace.internal.client.extension.ThemeCSSTypeConfigurer;
-import com.liferay.gradle.plugins.workspace.internal.util.FileUtil;
 import com.liferay.gradle.plugins.workspace.internal.util.GradleUtil;
 import com.liferay.gradle.plugins.workspace.internal.util.JsonNodeUtil;
 import com.liferay.gradle.plugins.workspace.internal.util.StringUtil;
@@ -554,17 +553,29 @@ public class ClientExtensionProjectConfigurator
 						CreateClientExtensionConfigTask::
 							getClientExtensionConfigFile));
 
-				RegularFileProperty dockerfileProperty =
-					createClientExtensionDescriptorTask.getDockerfile();
-
-				dockerfileProperty.fileProvider(
-					createClientExtensionConfigTaskProvider.map(
-						CreateClientExtensionConfigTask::getDockerFile));
-
 				Property<String> imageProperty =
 					createClientExtensionDescriptorTask.getImage();
 
 				imageProperty.set(_getImageProvider(project, ""));
+
+				Property<String> oAuthApplicationHeadlessServerERCProperty =
+					createClientExtensionDescriptorTask.
+						getOAuthApplicationHeadlessServerERC();
+
+				oAuthApplicationHeadlessServerERCProperty.set(
+					createClientExtensionConfigTaskProvider.map(
+						CreateClientExtensionConfigTask::
+							getBatchOAuthApplicationHeadlessServerERC));
+
+				Property<String> typeProperty =
+					createClientExtensionDescriptorTask.getType();
+
+				typeProperty.set(
+					createClientExtensionConfigTaskProvider.map(
+						createClientExtensionConfigTask ->
+							ClientExtensionDescriptor.getType(
+								createClientExtensionConfigTask.
+									getClassificationGrouping())));
 
 				createClientExtensionDescriptorTask.dependsOn(
 					createClientExtensionConfigTaskProvider);
@@ -1466,10 +1477,9 @@ public class ClientExtensionProjectConfigurator
 		CreateClientExtensionConfigTask createClientExtensionConfigTask =
 			createClientExtensionConfigTaskProvider.get();
 
-		return ClientExtensionDescriptor.isConfigurationOnly(
-			ClientExtensionDescriptor.getBaseImage(
-				FileUtil.read(
-					createClientExtensionConfigTask.getDockerFile())));
+		return Objects.equals(
+			createClientExtensionConfigTask.getClassificationGrouping(),
+			"configuration");
 	}
 
 	private boolean _isLanguageProject(File rootDir, File projectDir) {

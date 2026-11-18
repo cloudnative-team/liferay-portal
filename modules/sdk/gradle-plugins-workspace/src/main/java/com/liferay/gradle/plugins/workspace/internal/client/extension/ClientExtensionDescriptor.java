@@ -5,15 +5,10 @@
 
 package com.liferay.gradle.plugins.workspace.internal.client.extension;
 
-import com.liferay.gradle.plugins.workspace.internal.util.StringUtil;
-
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
-
-import org.gradle.api.GradleException;
 
 /**
  * @author Gregory Amerson
@@ -29,17 +24,14 @@ public class ClientExtensionDescriptor {
 
 	public static final String TYPE_CONFIGURATION = "configuration";
 
-	public static final String TYPE_FRONTEND = "frontend";
-
 	public static final String TYPE_SERVICE = "service";
 
 	public static final int VERSION = 1;
 
 	public static Map<String, Object> derive(
-		String baseImage, Map<String, Object> configsMap, String imageDigest,
+		String type, Map<String, Object> configsMap,
+		String oAuthApplicationHeadlessServerERC, String imageDigest,
 		String imageRepository, String imageTag) {
-
-		String type = getType(baseImage);
 
 		Map<String, Object> clientExtensionMap = new LinkedHashMap<>();
 
@@ -56,10 +48,9 @@ public class ClientExtensionDescriptor {
 			clientExtensionMap.put("image", imageMap);
 		}
 
-		String oAuthApplicationHeadlessServerERC =
-			_getOAuthApplicationHeadlessServerERC(configsMap);
+		if (type.equals(TYPE_BATCH) &&
+			(oAuthApplicationHeadlessServerERC != null)) {
 
-		if (oAuthApplicationHeadlessServerERC != null) {
 			clientExtensionMap.put(
 				"oauthApplicationHeadlessServerERC",
 				oAuthApplicationHeadlessServerERC);
@@ -68,51 +59,6 @@ public class ClientExtensionDescriptor {
 		clientExtensionMap.put("type", type);
 
 		return Collections.singletonMap("descriptor", clientExtensionMap);
-	}
-
-	/**
-	 * Returns the image that the last stage of a Dockerfile builds on, which
-	 * is the image the client extension runs. When that stage builds on an
-	 * earlier stage, as in FROM build, it returns the earlier stage's image.
-	 */
-	public static String getBaseImage(String dockerfileText) {
-		String baseImage = "";
-
-		Map<String, String> stageBaseImageMap = new HashMap<>();
-
-		for (String line : dockerfileText.split("\n")) {
-			String trimmedLine = line.trim();
-
-			String[] tokens = trimmedLine.split("\\s+");
-
-			if (!tokens[0].equalsIgnoreCase("FROM")) {
-				continue;
-			}
-
-			int i = 1;
-
-			while ((i < tokens.length) && tokens[i].startsWith("--")) {
-				i++;
-			}
-
-			if (i == tokens.length) {
-				continue;
-			}
-
-			baseImage = stageBaseImageMap.getOrDefault(
-				StringUtil.toLowerCase(tokens[i]), tokens[i]);
-
-			if (((i + 2) >= tokens.length) ||
-				!tokens[i + 1].equalsIgnoreCase("AS")) {
-
-				continue;
-			}
-
-			stageBaseImageMap.put(
-				StringUtil.toLowerCase(tokens[i + 2]), baseImage);
-		}
-
-		return baseImage;
 	}
 
 	public static String getRepository(String image) {
@@ -131,81 +77,16 @@ public class ClientExtensionDescriptor {
 		return image;
 	}
 
-	public static String getType(String baseImage) {
-		String baseRepository = getRepository(baseImage);
-
-		if (_isLiferayRepository(baseRepository, "batch")) {
-			return TYPE_BATCH;
+	/**
+	 * Returns the descriptor type for a client extension project's
+	 * classification grouping. The descriptor calls a microservice a service.
+	 */
+	public static String getType(String classificationGrouping) {
+		if (classificationGrouping.equals("microservice")) {
+			return TYPE_SERVICE;
 		}
 
-		if (_isLiferayRepository(baseRepository, "caddy")) {
-			return TYPE_FRONTEND;
-		}
-
-		if (_isLiferayRepository(baseRepository, "noop")) {
-			return TYPE_CONFIGURATION;
-		}
-
-		return TYPE_SERVICE;
+		return classificationGrouping;
 	}
-
-	public static boolean isConfigurationOnly(String baseImage) {
-		return TYPE_CONFIGURATION.equals(getType(baseImage));
-	}
-
-	private static String _getOAuthApplicationHeadlessServerERC(
-		Map<String, Object> configsMap) {
-
-		String oAuthApplicationHeadlessServerERC = null;
-
-		for (String configurationKey : configsMap.keySet()) {
-			int index = configurationKey.indexOf(
-				_CONFIGURATION_KEY_HEADLESS_SERVER);
-
-			if (index < 0) {
-				continue;
-			}
-
-			String identifier = configurationKey.substring(
-				index + _CONFIGURATION_KEY_HEADLESS_SERVER.length());
-
-			index = identifier.indexOf('/');
-
-			if (index >= 0) {
-				identifier = identifier.substring(0, index);
-			}
-
-			if ((oAuthApplicationHeadlessServerERC != null) &&
-				!oAuthApplicationHeadlessServerERC.equals(identifier)) {
-
-				throw new GradleException(
-					"Unable to choose between OAuth 2 headless server " +
-						"applications \"" + oAuthApplicationHeadlessServerERC +
-							"\" and \"" + identifier + "\"");
-			}
-
-			oAuthApplicationHeadlessServerERC = identifier;
-		}
-
-		return oAuthApplicationHeadlessServerERC;
-	}
-
-	private static boolean _isLiferayRepository(
-		String repository, String name) {
-
-		String liferayRepository = "liferay/" + name;
-
-		if (repository.equals(liferayRepository) ||
-			repository.endsWith("/" + liferayRepository)) {
-
-			return true;
-		}
-
-		return false;
-	}
-
-	private static final String _CONFIGURATION_KEY_HEADLESS_SERVER =
-		"com.liferay.oauth2.provider.configuration." +
-			"OAuth2ProviderApplicationHeadlessServerConfiguration~";
 
 }

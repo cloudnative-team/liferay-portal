@@ -54,7 +54,7 @@ runGradleTest {
 
 		assert baker.configs.size() > 0
 		assert baker.image == null
-		assert baker.oauthApplicationHeadlessServerERC == "baker-oauth-application-headless-server"
+		assert baker.oauthApplicationHeadlessServerERC == null
 		assert baker.type == "configuration"
 		assert baker.workload == null
 	}

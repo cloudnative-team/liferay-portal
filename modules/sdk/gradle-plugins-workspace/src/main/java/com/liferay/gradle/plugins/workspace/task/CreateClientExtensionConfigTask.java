@@ -62,6 +62,7 @@ import org.gradle.api.provider.Provider;
 import org.gradle.api.provider.ProviderFactory;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
@@ -224,6 +225,35 @@ public class CreateClientExtensionConfigTask extends DefaultTask {
 		_storePluginPackageProperties(pluginPackageProperties);
 
 		_createClientExtensionConfigFile(jsonMap);
+	}
+
+	/**
+	 * Returns the OAuth 2 headless server application that the project's batch
+	 * or site initializer client extension uses, or null when the project has
+	 * none.
+	 */
+	@Internal
+	public String getBatchOAuthApplicationHeadlessServerERC() {
+		for (ClientExtension clientExtension : _clientExtensions) {
+			if (!Objects.equals(clientExtension.getClassification(), "batch")) {
+				continue;
+			}
+
+			Object oAuthApplicationHeadlessServer =
+				clientExtension.typeSettings.get(
+					"oAuthApplicationHeadlessServer");
+
+			if (oAuthApplicationHeadlessServer != null) {
+				return String.valueOf(oAuthApplicationHeadlessServer);
+			}
+		}
+
+		return null;
+	}
+
+	@Internal
+	public String getClassificationGrouping() {
+		return _validateAndGetClassificationGrouping(_clientExtensions);
 	}
 
 	@OutputFile
