@@ -71,6 +71,7 @@ const unknownVirtualInstanceGracePeriod = 30 * time.Minute
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
