@@ -5,7 +5,27 @@
 
 package com.liferay.client.extension.util.spring.boot3.client;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.RSAKey;
+
+import java.io.IOException;
+
+import java.math.BigInteger;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPrivateCrtKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPublicKeySpec;
+
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 
@@ -25,6 +45,11 @@ import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClient
 import org.springframework.security.oauth2.client.InMemoryReactiveOAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.ReactiveOAuth2AuthorizedClientProviderBuilder;
+import org.springframework.security.oauth2.client.endpoint.NimbusJwtClientAuthenticationParametersConverter;
+import org.springframework.security.oauth2.client.endpoint.OAuth2ClientCredentialsGrantRequest;
+import org.springframework.security.oauth2.client.endpoint.RestClientClientCredentialsTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.WebClientReactiveClientCredentialsTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
@@ -55,10 +80,21 @@ public class LiferayOAuth2ClientConfiguration {
 					clientRegistrationRepository,
 					oAuth2AuthorizedClientService);
 
+		RestClientClientCredentialsTokenResponseClient
+			restClientClientCredentialsTokenResponseClient =
+				new RestClientClientCredentialsTokenResponseClient();
+
+		restClientClientCredentialsTokenResponseClient.addParametersConverter(
+			new NimbusJwtClientAuthenticationParametersConverter<>(
+				this::_getJWK));
+
 		authorizedClientServiceOAuth2AuthorizedClientManager.
 			setAuthorizedClientProvider(
 				OAuth2AuthorizedClientProviderBuilder.builder(
 				).clientCredentials(
+					clientCredentialsGrantBuilder ->
+						clientCredentialsGrantBuilder.accessTokenResponseClient(
+							restClientClientCredentialsTokenResponseClient)
 				).build());
 
 		return authorizedClientServiceOAuth2AuthorizedClientManager;
@@ -124,13 +160,35 @@ public class LiferayOAuth2ClientConfiguration {
 		ReactiveClientRegistrationRepository
 			reactiveClientRegistrationRepository) {
 
-		return WebClient.builder(
-		).filter(
-			new ServerOAuth2AuthorizedClientExchangeFilterFunction(
+		AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager
+			authorizedClientServiceReactiveOAuth2AuthorizedClientManager =
 				new AuthorizedClientServiceReactiveOAuth2AuthorizedClientManager(
 					reactiveClientRegistrationRepository,
 					new InMemoryReactiveOAuth2AuthorizedClientService(
-						reactiveClientRegistrationRepository)))
+						reactiveClientRegistrationRepository));
+
+		WebClientReactiveClientCredentialsTokenResponseClient
+			webClientReactiveClientCredentialsTokenResponseClient =
+				new WebClientReactiveClientCredentialsTokenResponseClient();
+
+		webClientReactiveClientCredentialsTokenResponseClient.
+			addParametersConverter(
+				new NimbusJwtClientAuthenticationParametersConverter
+					<OAuth2ClientCredentialsGrantRequest>(this::_getJWK));
+
+		authorizedClientServiceReactiveOAuth2AuthorizedClientManager.
+			setAuthorizedClientProvider(
+				ReactiveOAuth2AuthorizedClientProviderBuilder.builder(
+				).clientCredentials(
+					clientCredentialsGrantBuilder ->
+						clientCredentialsGrantBuilder.accessTokenResponseClient(
+							webClientReactiveClientCredentialsTokenResponseClient)
+				).build());
+
+		return WebClient.builder(
+		).filter(
+			new ServerOAuth2AuthorizedClientExchangeFilterFunction(
+				authorizedClientServiceReactiveOAuth2AuthorizedClientManager)
 		).build();
 	}
 
@@ -194,7 +252,9 @@ public class LiferayOAuth2ClientConfiguration {
 				externalReferenceCode +
 					".oauth2.headless.server.client.secret");
 
-			if (clientSecret == null) {
+			RSAKey rsaKey = _getRSAKey();
+
+			if ((clientSecret == null) && (rsaKey == null)) {
 				if (_log.isDebugEnabled()) {
 					_log.debug(
 						"Unable to get client secret for external reference " +
@@ -205,9 +265,17 @@ public class LiferayOAuth2ClientConfiguration {
 			}
 
 			if (_log.isDebugEnabled()) {
-				_log.debug(
-					"Obtained client_secret for external reference code " +
-						externalReferenceCode);
+				if (rsaKey != null) {
+					_log.debug(
+						"Using private key " + rsaKey.getKeyID() +
+							" for external reference code " +
+								externalReferenceCode);
+				}
+				else {
+					_log.debug(
+						"Obtained client_secret for external reference code " +
+							externalReferenceCode);
+				}
 			}
 
 			String tokenURI = _environment.getProperty(
@@ -226,20 +294,30 @@ public class LiferayOAuth2ClientConfiguration {
 				).toString();
 			}
 
-			ClientRegistration clientRegistration =
+			ClientRegistration.Builder builder =
 				ClientRegistration.withRegistrationId(
 					externalReferenceCode
 				).tokenUri(
 					tokenURI
 				).clientId(
 					clientId
-				).clientSecret(
-					clientSecret
 				).authorizationGrantType(
 					AuthorizationGrantType.CLIENT_CREDENTIALS
-				).clientAuthenticationMethod(
+				);
+
+			if (rsaKey != null) {
+				builder.clientAuthenticationMethod(
+					ClientAuthenticationMethod.PRIVATE_KEY_JWT);
+			}
+			else {
+				builder.clientAuthenticationMethod(
 					ClientAuthenticationMethod.CLIENT_SECRET_POST
-				).build();
+				).clientSecret(
+					clientSecret
+				);
+			}
+
+			ClientRegistration clientRegistration = builder.build();
 
 			if (_log.isDebugEnabled()) {
 				_log.debug("Adding client registration " + clientRegistration);
@@ -249,6 +327,71 @@ public class LiferayOAuth2ClientConfiguration {
 		}
 
 		return clientRegistrations;
+	}
+
+	private JWK _getJWK(ClientRegistration clientRegistration) {
+		if (!ClientAuthenticationMethod.PRIVATE_KEY_JWT.equals(
+				clientRegistration.getClientAuthenticationMethod())) {
+
+			return null;
+		}
+
+		return _getRSAKey();
+	}
+
+	private synchronized RSAKey _getRSAKey() {
+		if (_rsaKey != null) {
+			return _rsaKey;
+		}
+
+		Path path = Paths.get(_privateKeyPath);
+
+		if (!Files.isReadable(path)) {
+			return null;
+		}
+
+		try {
+			String pem = Files.readString(path);
+
+			byte[] bytes = Base64.getMimeDecoder(
+			).decode(
+				pem.replaceAll("-----[A-Z ]+-----", "")
+			);
+
+			KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+
+			RSAPrivateCrtKey rsaPrivateCrtKey =
+				(RSAPrivateCrtKey)keyFactory.generatePrivate(
+					new PKCS8EncodedKeySpec(bytes));
+
+			BigInteger modulus = rsaPrivateCrtKey.getModulus();
+
+			RSAPublicKey rsaPublicKey =
+				(RSAPublicKey)keyFactory.generatePublic(
+					new RSAPublicKeySpec(
+						modulus, rsaPrivateCrtKey.getPublicExponent()));
+
+			_rsaKey = new RSAKey.Builder(
+				rsaPublicKey
+			).privateKey(
+				rsaPrivateCrtKey
+			).keyIDFromThumbprint(
+			).build();
+
+			if (_log.isInfoEnabled()) {
+				_log.info(
+					"Loaded private key " + _rsaKey.getKeyID() + " from " +
+						path);
+			}
+
+			return _rsaKey;
+		}
+		catch (GeneralSecurityException | IOException | JOSEException
+					exception) {
+
+			throw new IllegalStateException(
+				"Unable to load private key from " + path, exception);
+		}
 	}
 
 	private static final Log _log = LogFactory.getLog(
@@ -275,5 +418,12 @@ public class LiferayOAuth2ClientConfiguration {
 
 	@Value("${com.liferay.lxc.dxp.server.protocol}")
 	private String _lxcDXPServerProtocol;
+
+	@Value(
+		"${liferay.oauth.private.key.path:/etc/liferay/lxc/oauth2-private-key/private.key}"
+	)
+	private String _privateKeyPath;
+
+	private RSAKey _rsaKey;
 
 }
