@@ -65,6 +65,11 @@ containers:
                 name: lxc-ext-init-metadata
                 readOnly: true
             {{- end }}
+            {{- if include "liferay-client-extension.privateKeyJWT" . }}
+            -   mountPath: /etc/liferay/lxc/oauth2-private-key
+                name: oauth2-private-key
+                readOnly: true
+            {{- end }}
             {{- with .Values.workload.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -100,6 +105,12 @@ volumes:
     -   configMap:
             name: {{ include "liferay-client-extension.extInitName" . }}
         name: lxc-ext-init-metadata
+    {{- end }}
+    {{- if include "liferay-client-extension.privateKeyJWT" . }}
+    -   name: oauth2-private-key
+        secret:
+            defaultMode: 292
+            secretName: {{ include "liferay-client-extension.oAuth2PrivateKeySecretName" . }}
     {{- end }}
     {{- with .Values.workload.volumes }}
     {{- toYaml . | nindent 4 }}

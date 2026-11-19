@@ -20,6 +20,11 @@ const (
 )
 
 const (
+	ClientAuthenticationMethodClientSecretPost = "client_secret_post"
+	ClientAuthenticationMethodPrivateKeyJWT    = "private_key_jwt"
+)
+
+const (
 	ConfigMapKeyAllowedNamespaces      = "allowedNamespaces"
 	ConfigMapNameClientExtensionPolicy = "client-extension-policy"
 )
@@ -101,6 +106,9 @@ type ClientExtensionSpec struct {
 	// +optional
 	DxpNamespace string `json:"dxpNamespace,omitempty"`
 
+	// +optional
+	OAuth2 *OAuth2 `json:"oauth2,omitempty"`
+
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
@@ -169,6 +177,13 @@ type ClientExtensionStatus struct {
 // +kubebuilder:validation:Type=object
 type Configuration struct {
 	apiextensionsv1.JSON
+}
+
+type OAuth2 struct {
+	// +kubebuilder:default=client_secret_post
+	// +kubebuilder:validation:Enum=client_secret_post;private_key_jwt
+	// +optional
+	ClientAuthenticationMethod string `json:"clientAuthenticationMethod,omitempty"`
 }
 
 type ConfigurationError struct {

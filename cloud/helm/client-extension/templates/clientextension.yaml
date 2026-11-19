@@ -19,6 +19,10 @@ spec:
     {{- with .Values.clientExtension.dxpNamespace }}
     dxpNamespace: {{ . | quote }}
     {{- end }}
+    {{- if include "liferay-client-extension.privateKeyJWT" . }}
+    oauth2:
+        clientAuthenticationMethod: private_key_jwt
+    {{- end }}
     serviceId: {{ include "liferay-client-extension.serviceId" . | quote }}
     {{- with .Values.clientExtension.version }}
     version: {{ . | quote }}

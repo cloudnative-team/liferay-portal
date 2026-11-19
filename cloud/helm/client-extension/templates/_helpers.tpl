@@ -80,6 +80,16 @@ helm.sh/chart: {{ include "liferay-client-extension.chart" . }}
 {{- end }}
 {{- end }}
 
+{{- define "liferay-client-extension.oAuth2PrivateKeySecretName" -}}
+{{- include "liferay-client-extension.fullname" . }}-oauth2-private-key
+{{- end }}
+
+{{- define "liferay-client-extension.privateKeyJWT" -}}
+{{- if eq (dig "oauth2" "clientAuthenticationMethod" "" .Values.clientExtension) "private_key_jwt" -}}
+true
+{{- end }}
+{{- end }}
+
 {{- define "liferay-client-extension.requiresExtInit" -}}
 {{- range $configurationKey, $_ := include "liferay-client-extension.configs" . | fromJson }}
 {{- if regexMatch "^com\\.liferay\\.oauth2\\.provider\\.configuration\\.OAuth2ProviderApplication(HeadlessServer|UserAgent)Configuration(~[^/]+|_[^~/]+|-[^~_/]+)(/.*)?$" $configurationKey -}}

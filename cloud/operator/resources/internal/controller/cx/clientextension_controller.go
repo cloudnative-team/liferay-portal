@@ -163,7 +163,23 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 		}, nil
 	}
 
-	payload, error := json.MarshalIndent(clientExtension.Spec.Configs, "", "\t")
+	configs := clientExtension.Spec.Configs
+
+	if clientAuthenticationMethod(&clientExtension) == cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT {
+		privateKey, error := clientExtensionReconciler.ensureOAuth2PrivateKey(&clientExtension, context)
+
+		if error != nil {
+			return controllerruntime.Result{}, error
+		}
+
+		configs, error = injectPrivateKeyJWT(configs, &privateKey.PublicKey)
+
+		if error != nil {
+			return controllerruntime.Result{}, error
+		}
+	}
+
+	payload, error := json.MarshalIndent(configs, "", "\t")
 
 	if error != nil {
 		return controllerruntime.Result{}, error
