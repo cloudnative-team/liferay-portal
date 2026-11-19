@@ -15,6 +15,7 @@ import com.liferay.portal.kernel.security.fips.FIPSAuditUtil;
 import com.liferay.portal.kernel.security.fips.FIPSModeValidator;
 import com.liferay.portal.kernel.util.GetterUtil;
 import com.liferay.portal.kernel.util.ParamUtil;
+import com.liferay.portal.kernel.util.PortalUtil;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
 
@@ -79,6 +80,11 @@ public class LiferayJWTBearerAuthenticationHandler
 		if (assertion == null) {
 			throw new NotAuthorizedException("Missing JWT assertion");
 		}
+
+		message.put(
+			JwtConstants.EXPECTED_CLAIM_AUDIENCE,
+			PortalUtil.getPortalURL(httpServletRequest) +
+				httpServletRequest.getRequestURI());
 
 		JwtToken jwtToken = super.getJwtToken(assertion);
 
