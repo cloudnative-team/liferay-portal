@@ -14,6 +14,7 @@
 {{- end -}}
 {{- $environmentId := regexReplaceAll $segmentPattern $layout.environmentId "index .path.segments $1" -}}
 {{- $projectId := regexReplaceAll $segmentPattern $layout.projectId "index .path.segments $1" -}}
+{{- $separateNamespaceCondition := `eq (toString (ternary (get . "separateNamespace") (get . "clientExtensionsSeparateNamespace") (hasKey . "separateNamespace"))) "true"` -}}
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -56,13 +57,16 @@ spec:
             name: {{ printf "{{ %s }}-{{ %s }}-{{ .name }}" $projectId $environmentId | quote }}
         spec:
             destination:
-                namespace: {{ printf "liferay-{{ %s }}-{{ %s }}" $projectId $environmentId | quote }}
+                namespace: {{ printf "liferay-{{ %s }}-{{ %s }}{{ if %s }}-cx{{ end }}" $projectId $environmentId $separateNamespaceCondition | quote }}
                 server: https://kubernetes.default.svc
             project: liferay-client-extension
             source:
                 {{- include "liferay-platform.chartSource" .Values.clientExtensions | nindent 16 }}
                 helm:
                     parameters:
+                        -   forceString: true
+                            name: clientExtension.dxpNamespace
+                            value: {{ printf "liferay-{{ %s }}-{{ %s }}" $projectId $environmentId | quote }}
                         -   forceString: true
                             name: clientExtension.serviceId
                             value: {{ `{{ .name }}` | quote }}
@@ -75,6 +79,15 @@ spec:
                         -   forceString: true
                             name: network.gatewayName
                             value: {{ printf "{{ %s }}-{{ %s }}-gateway" $projectId $environmentId | quote }}
+                        -   forceString: true
+                            name: network.gatewayNamespace
+                            value: {{ printf "liferay-{{ %s }}-{{ %s }}" $projectId $environmentId | quote }}
+                        -   forceString: true
+                            name: operatorServiceAccount.name
+                            value: {{ include "liferay-platform.dxpOperatorServiceAccountName" . | quote }}
+                        -   forceString: true
+                            name: operatorServiceAccount.namespace
+                            value: {{ $dxpOperator.namespace | quote }}
                     releaseName: {{ `{{ .name }}` | quote }}
                     valueFiles:
                         -   {{ `cxdescriptor://{{ trimPrefix "oci://" .descriptor }}:{{ .version }}` | quote }}

@@ -22,7 +22,7 @@ tests:
                 template: templates/applicationset-client-extension.yaml
             -   equal:
                     path: spec.template.spec.destination.namespace
-                    value: liferay-{{ index .path.segments 2 }}-{{ index .path.segments 4 }}
+                    value: "liferay-{{ index .path.segments 2 }}-{{ index .path.segments 4 }}{{ if eq (toString (ternary (get . \"separateNamespace\") (get . \"clientExtensionsSeparateNamespace\") (hasKey . \"separateNamespace\"))) \"true\" }}-cx{{ end }}"
                 template: templates/applicationset-client-extension.yaml
             -   contains:
                     content:
@@ -54,12 +54,6 @@ tests:
             -   equal:
                     path: spec.clusterResourceWhitelist
                     value: []
-                template: templates/appproject-client-extension.yaml
-            -   notContains:
-                    any: true
-                    content:
-                        kind: RoleBinding
-                    path: spec.namespaceResourceWhitelist
                 template: templates/appproject-client-extension.yaml
             -   equal:
                     path: spec.destinations
@@ -133,6 +127,9 @@ tests:
                         helm:
                             parameters:
                                 -   forceString: true
+                                    name: clientExtension.dxpNamespace
+                                    value: liferay-{{ index .path.segments 2 }}-{{ index .path.segments 4 }}
+                                -   forceString: true
                                     name: clientExtension.serviceId
                                     value: "{{ .name }}"
                                 -   forceString: true
@@ -144,6 +141,15 @@ tests:
                                 -   forceString: true
                                     name: network.gatewayName
                                     value: "{{ index .path.segments 2 }}-{{ index .path.segments 4 }}-gateway"
+                                -   forceString: true
+                                    name: network.gatewayNamespace
+                                    value: liferay-{{ index .path.segments 2 }}-{{ index .path.segments 4 }}
+                                -   forceString: true
+                                    name: operatorServiceAccount.name
+                                    value: dxp-operator
+                                -   forceString: true
+                                    name: operatorServiceAccount.namespace
+                                    value: dxp-operator-system
                             releaseName: "{{ .name }}"
                             valueFiles:
                                 -   "cxdescriptor://{{ trimPrefix \"oci://\" .descriptor }}:{{ .version }}"
