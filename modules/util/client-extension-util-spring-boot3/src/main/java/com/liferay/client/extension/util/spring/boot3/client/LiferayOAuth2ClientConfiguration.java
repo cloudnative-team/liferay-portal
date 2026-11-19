@@ -215,8 +215,18 @@ public class LiferayOAuth2ClientConfiguration {
 						externalReferenceCode);
 			}
 
-			String clientId = _environment.getProperty(
+			String clientId = _getPrivateKeyDirectoryProperty(
 				externalReferenceCode + ".oauth2.headless.server.client.id");
+
+			boolean privateKeyClient = clientId != null;
+
+			if (clientId == null) {
+				clientId = _environment.getProperty(
+					externalReferenceCode +
+						".oauth2.headless.server.client.id");
+
+				privateKeyClient = clientId != null;
+			}
 
 			if (clientId == null) {
 				clientId = LiferayOAuth2Util.getClientId(
@@ -254,10 +264,7 @@ public class LiferayOAuth2ClientConfiguration {
 
 			RSAKey rsaKey = null;
 
-			if (_environment.containsProperty(
-					externalReferenceCode +
-						".oauth2.headless.server.client.id")) {
-
+			if (privateKeyClient) {
 				rsaKey = _getRSAKey();
 			}
 
@@ -344,6 +351,32 @@ public class LiferayOAuth2ClientConfiguration {
 		}
 
 		return _getRSAKey();
+	}
+
+	private String _getPrivateKeyDirectoryProperty(String name) {
+		Path path = Paths.get(_privateKeyPath);
+
+		path = path.resolveSibling(name);
+
+		if (!Files.isReadable(path)) {
+			return null;
+		}
+
+		try {
+			String value = Files.readString(path);
+
+			value = value.trim();
+
+			if (value.isEmpty()) {
+				return null;
+			}
+
+			return value;
+		}
+		catch (IOException ioException) {
+			throw new IllegalStateException(
+				"Unable to read " + path, ioException);
+		}
 	}
 
 	private synchronized RSAKey _getRSAKey() {
