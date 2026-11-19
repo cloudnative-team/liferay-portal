@@ -2,6 +2,9 @@ backup:
     restore:
         sanitizationScripts: {}
 clusterSecretStoreName: ""
+clientExtensions:
+    separateNamespace:
+        enabled: false
 cmk: {}
 commonTags: {}
 database: {}
