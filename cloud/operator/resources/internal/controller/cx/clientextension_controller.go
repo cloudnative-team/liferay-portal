@@ -266,8 +266,18 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	var result controllerruntime.Result
 
+	workloadExtInitConfigMap := extInitConfigMap
+
+	if privateKey != nil {
+
+		// The workload of a private_key_jwt client extension reads its
+		// credentials from the private key Secret, not from ext-init
+
+		workloadExtInitConfigMap = nil
+	}
+
 	mirroredCondition, error := clientExtensionReconciler.mirroredCondition(
-		&clientExtension, context, &dxpMetadata, extInitConfigMap,
+		&clientExtension, context, &dxpMetadata, workloadExtInitConfigMap,
 	)
 
 	if error != nil {
@@ -287,8 +297,8 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 	if (mirroredCondition.Status == metav1.ConditionTrue) && (provisionedCondition.Status == metav1.ConditionTrue) {
 		configMapsWithDigest = []*corev1.ConfigMap{&dxpMetadata}
 
-		if extInitConfigMap != nil {
-			configMapsWithDigest = append(configMapsWithDigest, extInitConfigMap)
+		if workloadExtInitConfigMap != nil {
+			configMapsWithDigest = append(configMapsWithDigest, workloadExtInitConfigMap)
 		}
 	}
 

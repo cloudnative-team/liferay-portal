@@ -121,7 +121,7 @@ func TestExtInitRequiredIdentifiers(test *testing.T) {
 		ClientAuthenticationMethod: cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT,
 	}
 
-	if identifiers := extInitRequiredIdentifiers(&clientExtension); !slices.Equal(identifiers, []string{"cx-oaua"}) {
+	if identifiers := extInitRequiredIdentifiers(&clientExtension); len(identifiers) != 0 {
 		test.Errorf("private_key_jwt: %v", identifiers)
 	}
 }

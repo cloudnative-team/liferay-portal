@@ -165,21 +165,15 @@ func (clientExtensionReconciler *ClientExtensionReconciler) createOAuth2Credenti
 }
 
 // extInitRequiredIdentifiers returns the OAuth 2 applications whose
-// credentials the workload reads from the ext-init ConfigMap. The headless
-// server applications of a private_key_jwt client extension are not among
-// them: their client IDs and key are in the private key Secret.
+// credentials the workload reads from the ext-init ConfigMap. A private_key_jwt
+// client extension reads none: its headless server client IDs and key are in
+// the private key Secret, and the SDK looks up user agent client IDs at DXP.
 func extInitRequiredIdentifiers(clientExtension *cxv1alpha1.ClientExtension) []string {
-	identifiers := extInitIdentifiers(clientExtension)
-
-	if clientAuthenticationMethod(clientExtension) != cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT {
-		return identifiers
+	if clientAuthenticationMethod(clientExtension) == cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT {
+		return nil
 	}
 
-	externalReferenceCodes := headlessServerExternalReferenceCodes(clientExtension.Spec.Configs)
-
-	return slices.DeleteFunc(identifiers, func(identifier string) bool {
-		return slices.Contains(externalReferenceCodes, identifier)
-	})
+	return extInitIdentifiers(clientExtension)
 }
 
 func headlessServerExternalReferenceCodes(configs map[string]cxv1alpha1.Configuration) []string {

@@ -92,8 +92,7 @@ true
 
 {{- define "liferay-client-extension.requiresExtInit" -}}
 {{- range $configurationKey, $_ := include "liferay-client-extension.configs" . | fromJson }}
-{{- $types := ternary "UserAgent" "HeadlessServer|UserAgent" (eq (include "liferay-client-extension.privateKeyJWT" $) "true") }}
-{{- if regexMatch (printf "^com\\.liferay\\.oauth2\\.provider\\.configuration\\.OAuth2ProviderApplication(%s)Configuration(~[^/]+|_[^~/]+|-[^~_/]+)(/.*)?$" $types) $configurationKey -}}
+{{- if and (not (include "liferay-client-extension.privateKeyJWT" $)) (regexMatch "^com\\.liferay\\.oauth2\\.provider\\.configuration\\.OAuth2ProviderApplication(HeadlessServer|UserAgent)Configuration(~[^/]+|_[^~/]+|-[^~_/]+)(/.*)?$" $configurationKey) -}}
 true
 {{- end }}
 {{- end }}
