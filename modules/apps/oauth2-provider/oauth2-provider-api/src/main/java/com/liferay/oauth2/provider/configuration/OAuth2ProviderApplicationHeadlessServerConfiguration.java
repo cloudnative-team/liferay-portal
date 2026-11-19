@@ -25,6 +25,16 @@ public interface OAuth2ProviderApplicationHeadlessServerConfiguration {
 	@Meta.AD(type = Meta.Type.String)
 	public String baseURL();
 
+	@Meta.AD(
+		deflt = "client_secret_post",
+		optionValues = {"client_secret_post", "private_key_jwt"},
+		required = false, type = Meta.Type.String
+	)
+	public String clientAuthenticationMethod();
+
+	@Meta.AD(deflt = "", required = false, type = Meta.Type.String)
+	public String clientId();
+
 	@Meta.AD(deflt = "", required = false, type = Meta.Type.String)
 	public String description();
 
@@ -37,6 +47,9 @@ public interface OAuth2ProviderApplicationHeadlessServerConfiguration {
 	@Deprecated
 	@Meta.AD(required = false, type = Meta.Type.String)
 	public String homePageURL();
+
+	@Meta.AD(deflt = "", required = false, type = Meta.Type.String)
+	public String jwks();
 
 	@Meta.AD(deflt = "", required = false, type = Meta.Type.String)
 	public String name();

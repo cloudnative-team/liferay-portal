@@ -86,24 +86,31 @@ public class OAuth2ProviderApplicationHeadlessServerConfigurationFactory
 			_log.debug("OAuth 2 application " + oAuth2Application);
 		}
 
-		modifyConfigMap(
-			companyLocalService.getCompanyById(companyId),
-			getExtensionProperties(
-				externalReferenceCode, oAuth2Application
-			).put(
-				externalReferenceCode + ".oauth2.headless.server.audience",
-				oAuth2Application.getHomePageURL()
-			).put(
-				externalReferenceCode + ".oauth2.headless.server.client.id",
-				oAuth2Application.getClientId()
-			).put(
+		Map<String, String> extensionProperties = getExtensionProperties(
+			externalReferenceCode, oAuth2Application
+		).put(
+			externalReferenceCode + ".oauth2.headless.server.audience",
+			oAuth2Application.getHomePageURL()
+		).put(
+			externalReferenceCode + ".oauth2.headless.server.client.id",
+			oAuth2Application.getClientId()
+		).put(
+			externalReferenceCode + ".oauth2.headless.server.scopes",
+			StringUtil.merge(scopeAliasesList, StringPool.NEW_LINE)
+		).build();
+
+		if (!Objects.equals(
+				oAuth2Application.getClientAuthenticationMethod(),
+				"private_key_jwt")) {
+
+			extensionProperties.put(
 				externalReferenceCode + ".oauth2.headless.server.client.secret",
 				oAuth2ApplicationLocalService.getPlaintextClientSecret(
-					oAuth2Application)
-			).put(
-				externalReferenceCode + ".oauth2.headless.server.scopes",
-				StringUtil.merge(scopeAliasesList, StringPool.NEW_LINE)
-			).build(),
+					oAuth2Application));
+		}
+
+		modifyConfigMap(
+			companyLocalService.getCompanyById(companyId), extensionProperties,
 			properties);
 	}
 
@@ -122,23 +129,46 @@ public class OAuth2ProviderApplicationHeadlessServerConfigurationFactory
 
 		User user = userLocalService.getGuestUser(companyId);
 
+		String clientAuthenticationMethod =
+			oAuth2ProviderApplicationHeadlessServerConfiguration.
+				clientAuthenticationMethod();
+		String jwks = null;
+
+		if (Objects.equals(clientAuthenticationMethod, "private_key_jwt")) {
+			jwks = oAuth2ProviderApplicationHeadlessServerConfiguration.jwks();
+		}
+
 		User serviceUser = null;
-		String clientId = OAuth2SecureRandomGenerator.generateClientId();
-		String clientSecret =
-			OAuth2SecureRandomGenerator.generateClientSecret();
+		String clientId =
+			oAuth2ProviderApplicationHeadlessServerConfiguration.clientId();
+		String clientSecret = null;
 
 		if (oAuth2Application != null) {
 			serviceUser = userLocalService.getUserById(
 				companyId, oAuth2Application.getClientCredentialUserId());
-			clientId = oAuth2Application.getClientId();
-			clientSecret =
-				oAuth2ApplicationLocalService.getPlaintextClientSecret(
-					oAuth2Application);
+
+			if (Validator.isNull(clientId)) {
+				clientId = oAuth2Application.getClientId();
+			}
+
+			if (jwks == null) {
+				clientSecret =
+					oAuth2ApplicationLocalService.getPlaintextClientSecret(
+						oAuth2Application);
+			}
 		}
 		else {
 			serviceUser = _getServiceUser(
 				companyId,
 				oAuth2ProviderApplicationHeadlessServerConfiguration);
+		}
+
+		if (Validator.isNull(clientId)) {
+			clientId = OAuth2SecureRandomGenerator.generateClientId();
+		}
+
+		if ((jwks == null) && Validator.isNull(clientSecret)) {
+			clientSecret = OAuth2SecureRandomGenerator.generateClientSecret();
 		}
 
 		String homePageURL = getHomePageURL(
@@ -158,11 +188,11 @@ public class OAuth2ProviderApplicationHeadlessServerConfigurationFactory
 				externalReferenceCode, user.getUserId(), user.getScreenName(),
 				ListUtil.fromArray(
 					GrantType.CLIENT_CREDENTIALS, GrantType.JWT_BEARER),
-				"client_secret_post", serviceUser.getUserId(), clientId,
+				clientAuthenticationMethod, serviceUser.getUserId(), clientId,
 				ClientProfile.HEADLESS_SERVER.id(), clientSecret,
 				oAuth2ProviderApplicationHeadlessServerConfiguration.
 					description(),
-				featuresList, homePageURL, 0, null,
+				featuresList, homePageURL, 0, jwks,
 				getName(
 					oAuth2ProviderApplicationHeadlessServerConfiguration.name(),
 					externalReferenceCode),
