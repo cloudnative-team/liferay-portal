@@ -3,6 +3,7 @@ package cx
 import (
 	"cmp"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,7 +72,7 @@ const unknownVirtualInstanceGracePeriod = 30 * time.Minute
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=create;get;update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;patch;watch
 // +kubebuilder:rbac:groups=batch,resources=cronjobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
@@ -166,14 +167,19 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	configs := clientExtension.Spec.Configs
 
+	var clientIDs map[string]string
+	var privateKey *rsa.PrivateKey
+
 	if clientAuthenticationMethod(&clientExtension) == cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT {
-		privateKey, error := clientExtensionReconciler.ensureOAuth2PrivateKey(&clientExtension, context)
+		privateKey, clientIDs, error = clientExtensionReconciler.ensureOAuth2Credentials(
+			&clientExtension, context, headlessServerExternalReferenceCodes(configs),
+		)
 
 		if error != nil {
 			return controllerruntime.Result{}, error
 		}
 
-		configs, error = injectPrivateKeyJWT(configs, &privateKey.PublicKey)
+		configs, error = injectPrivateKeyJWT(configs, &privateKey.PublicKey, clientIDs)
 
 		if error != nil {
 			return controllerruntime.Result{}, error
@@ -251,7 +257,7 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 	}
 
 	provisionedCondition, extInitConfigMap, error := clientExtensionReconciler.provisionedCondition(
-		&clientExtension, context, dxpNamespace,
+		&clientExtension, context, dxpNamespace, &dxpMetadata, privateKey, clientIDs,
 	)
 
 	if error != nil {
@@ -270,6 +276,10 @@ func (clientExtensionReconciler *ClientExtensionReconciler) Reconcile(
 
 	if mirroredCondition.Status != metav1.ConditionTrue {
 		result.RequeueAfter = refusalRequeueInterval
+	}
+
+	if provisionedCondition.Reason == ReasonTokenRequestFailed {
+		result.RequeueAfter = extInitGracePeriod
 	}
 
 	var configMapsWithDigest []*corev1.ConfigMap
@@ -580,8 +590,51 @@ func (clientExtensionReconciler *ClientExtensionReconciler) provisionedCondition
 	clientExtension *cxv1alpha1.ClientExtension,
 	context context.Context,
 	dxpNamespace string,
+	dxpMetadata *corev1.ConfigMap,
+	privateKey *rsa.PrivateKey,
+	clientIDs map[string]string,
 ) (metav1.Condition, *corev1.ConfigMap, error) {
 	identifiers := extInitIdentifiers(clientExtension)
+
+	if privateKey != nil {
+		tokenURL := fmt.Sprintf(
+			"%s://%s/o/oauth2/token", dxpMetadata.Data[MetadataKeyServerProtocol],
+			dxpMetadata.Data[MetadataKeyMainDomain],
+		)
+
+		var failures []string
+
+		for externalReferenceCode, clientID := range clientIDs {
+			if error := requestToken(context, tokenURL, clientID, privateKey); error != nil {
+				failures = append(failures, fmt.Sprintf("%q: %v", externalReferenceCode, error))
+			}
+
+			identifiers = slices.DeleteFunc(identifiers, func(identifier string) bool {
+				return identifier == externalReferenceCode
+			})
+		}
+
+		if len(failures) > 0 {
+			slices.Sort(failures)
+
+			return newCondition(
+				metav1.ConditionFalse,
+				fmt.Sprintf(
+					"DXP did not issue a token for the private_key_jwt OAuth2 applications at %s: %s",
+					tokenURL, strings.Join(failures, "; "),
+				),
+				ReasonTokenRequestFailed,
+			), nil, nil
+		}
+
+		if len(identifiers) == 0 {
+			return newCondition(
+				metav1.ConditionTrue,
+				fmt.Sprintf("DXP issued tokens for the private_key_jwt OAuth2 applications at %s.", tokenURL),
+				ReasonProvisioned,
+			), nil, nil
+		}
+	}
 
 	if len(identifiers) == 0 {
 		return newCondition(

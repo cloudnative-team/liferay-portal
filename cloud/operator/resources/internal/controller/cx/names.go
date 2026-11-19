@@ -27,7 +27,10 @@ const (
 	LabelVirtualInstance = "dxp.lxc.liferay.com/virtualInstanceId"
 )
 
-const MetadataKeyServerProtocol = "com.liferay.lxc.dxp.server.protocol"
+const (
+	MetadataKeyMainDomain     = "com.liferay.lxc.dxp.mainDomain"
+	MetadataKeyServerProtocol = "com.liferay.lxc.dxp.server.protocol"
+)
 
 const (
 	MetadataTypeDxp          = "dxp"

@@ -2,6 +2,7 @@ package cx
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -11,9 +12,15 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
+	"net/url"
+	"slices"
 	"strings"
+	"time"
 
+	uuid "github.com/google/uuid"
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,37 +54,77 @@ func clientAuthenticationMethod(clientExtension *cxv1alpha1.ClientExtension) str
 	return clientExtension.Spec.OAuth2.ClientAuthenticationMethod
 }
 
-func (clientExtensionReconciler *ClientExtensionReconciler) ensureOAuth2PrivateKey(
+func (clientExtensionReconciler *ClientExtensionReconciler) ensureOAuth2Credentials(
 	clientExtension *cxv1alpha1.ClientExtension,
 	context context.Context,
-) (*rsa.PrivateKey, error) {
+	externalReferenceCodes []string,
+) (*rsa.PrivateKey, map[string]string, error) {
 	name := types.NamespacedName{Name: oAuth2PrivateKeySecretName(clientExtension), Namespace: clientExtension.Namespace}
 
 	var secret corev1.Secret
 
 	error := clientExtensionReconciler.APIReader.Get(context, name, &secret)
 
-	if error == nil {
-		return parseOAuth2PrivateKey(secret.Data[OAuth2PrivateKeySecretKey])
+	if apierrors.IsNotFound(error) {
+		return clientExtensionReconciler.createOAuth2Credentials(clientExtension, context, externalReferenceCodes, name)
 	}
 
-	if !apierrors.IsNotFound(error) {
-		return nil, error
+	if error != nil {
+		return nil, nil, error
 	}
 
+	privateKey, error := parseOAuth2PrivateKey(secret.Data[OAuth2PrivateKeySecretKey])
+
+	if error != nil {
+		return nil, nil, error
+	}
+
+	clientIDs := map[string]string{}
+	missing := false
+
+	for _, externalReferenceCode := range externalReferenceCodes {
+		clientID := string(secret.Data[clientIDSecretKey(externalReferenceCode)])
+
+		if clientID == "" {
+			clientID = newClientID()
+			missing = true
+
+			secret.Data[clientIDSecretKey(externalReferenceCode)] = []byte(clientID)
+		}
+
+		clientIDs[externalReferenceCode] = clientID
+	}
+
+	if missing {
+		if error := clientExtensionReconciler.Update(context, &secret); error != nil {
+			return nil, nil, error
+		}
+	}
+
+	return privateKey, clientIDs, nil
+}
+
+func (clientExtensionReconciler *ClientExtensionReconciler) createOAuth2Credentials(
+	clientExtension *cxv1alpha1.ClientExtension,
+	context context.Context,
+	externalReferenceCodes []string,
+	name types.NamespacedName,
+) (*rsa.PrivateKey, map[string]string, error) {
 	privateKey, error := rsa.GenerateKey(rand.Reader, 2048)
 
 	if error != nil {
-		return nil, error
+		return nil, nil, error
 	}
 
 	pkcs8, error := x509.MarshalPKCS8PrivateKey(privateKey)
 
 	if error != nil {
-		return nil, error
+		return nil, nil, error
 	}
 
-	secret = corev1.Secret{
+	clientIDs := map[string]string{}
+
+	secret := corev1.Secret{
 		Data: map[string][]byte{
 			OAuth2PrivateKeySecretKey: pem.EncodeToMemory(&pem.Block{Bytes: pkcs8, Type: "PRIVATE KEY"}),
 		},
@@ -89,31 +136,74 @@ func (clientExtensionReconciler *ClientExtensionReconciler) ensureOAuth2PrivateK
 		Type: corev1.SecretTypeOpaque,
 	}
 
+	for _, externalReferenceCode := range externalReferenceCodes {
+		clientIDs[externalReferenceCode] = newClientID()
+
+		secret.Data[clientIDSecretKey(externalReferenceCode)] = []byte(clientIDs[externalReferenceCode])
+	}
+
 	if error := controllerutil.SetControllerReference(
 		clientExtension, &secret, clientExtensionReconciler.Scheme(),
 	); error != nil {
-		return nil, error
+		return nil, nil, error
 	}
 
 	if error := clientExtensionReconciler.Create(context, &secret); error != nil {
 		if apierrors.IsAlreadyExists(error) {
-			return clientExtensionReconciler.ensureOAuth2PrivateKey(clientExtension, context)
+			return clientExtensionReconciler.ensureOAuth2Credentials(clientExtension, context, externalReferenceCodes)
 		}
 
-		return nil, error
+		return nil, nil, error
 	}
 
 	clientExtensionReconciler.Recorder.Eventf(
-		clientExtension, corev1.EventTypeNormal, "OAuth2PrivateKeyCreated",
-		"Created OAuth 2 private key %s in Secret %s", jwkThumbprint(&privateKey.PublicKey), name.Name,
+		clientExtension, corev1.EventTypeNormal, "OAuth2CredentialsCreated",
+		"Created OAuth 2 private key %s and client IDs in Secret %s", jwkThumbprint(&privateKey.PublicKey), name.Name,
 	)
 
-	return privateKey, nil
+	return privateKey, clientIDs, nil
+}
+
+// extInitRequiredIdentifiers returns the OAuth 2 applications whose
+// credentials the workload reads from the ext-init ConfigMap. The headless
+// server applications of a private_key_jwt client extension are not among
+// them: their client IDs and key are in the private key Secret.
+func extInitRequiredIdentifiers(clientExtension *cxv1alpha1.ClientExtension) []string {
+	identifiers := extInitIdentifiers(clientExtension)
+
+	if clientAuthenticationMethod(clientExtension) != cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT {
+		return identifiers
+	}
+
+	externalReferenceCodes := headlessServerExternalReferenceCodes(clientExtension.Spec.Configs)
+
+	return slices.DeleteFunc(identifiers, func(identifier string) bool {
+		return slices.Contains(externalReferenceCodes, identifier)
+	})
+}
+
+func headlessServerExternalReferenceCodes(configs map[string]cxv1alpha1.Configuration) []string {
+	var externalReferenceCodes []string
+
+	for pid := range configs {
+		if !strings.HasPrefix(pid, pidPrefixOAuth2HeadlessServer) {
+			continue
+		}
+
+		externalReferenceCode, _, _ := strings.Cut(strings.TrimPrefix(pid, pidPrefixOAuth2HeadlessServer), "/")
+
+		externalReferenceCodes = append(externalReferenceCodes, externalReferenceCode)
+	}
+
+	slices.Sort(externalReferenceCodes)
+
+	return slices.Compact(externalReferenceCodes)
 }
 
 func injectPrivateKeyJWT(
 	configs map[string]cxv1alpha1.Configuration,
 	publicKey *rsa.PublicKey,
+	clientIDs map[string]string,
 ) (map[string]cxv1alpha1.Configuration, error) {
 	jwks, error := json.Marshal(map[string][]jsonWebKey{"keys": {newJSONWebKey(publicKey)}})
 
@@ -136,7 +226,14 @@ func injectPrivateKeyJWT(
 			return nil, fmt.Errorf("unable to parse configuration %s: %w", pid, error)
 		}
 
+		externalReferenceCode, _, _ := strings.Cut(strings.TrimPrefix(pid, pidPrefixOAuth2HeadlessServer), "/")
+
 		properties["clientAuthenticationMethod"] = cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT
+
+		if clientID := clientIDs[externalReferenceCode]; clientID != "" {
+			properties["clientId"] = clientID
+		}
+
 		properties["jwks"] = string(jwks)
 
 		raw, error := json.Marshal(properties)
@@ -151,6 +248,10 @@ func injectPrivateKeyJWT(
 	}
 
 	return injectedConfigs, nil
+}
+
+func clientIDSecretKey(externalReferenceCode string) string {
+	return externalReferenceCode + ".oauth2.headless.server.client.id"
 }
 
 func jwkThumbprint(publicKey *rsa.PublicKey) string {
@@ -178,6 +279,10 @@ func newJSONWebKey(publicKey *rsa.PublicKey) jsonWebKey {
 	}
 }
 
+func newClientID() string {
+	return "id-" + uuid.NewString()
+}
+
 func oAuth2PrivateKeySecretName(clientExtension *cxv1alpha1.ClientExtension) string {
 	return clientExtension.Name + "-oauth2-private-key"
 }
@@ -202,4 +307,77 @@ func parseOAuth2PrivateKey(bytes []byte) (*rsa.PrivateKey, error) {
 	}
 
 	return privateKey, nil
+}
+
+const ReasonTokenRequestFailed = "TokenRequestFailed"
+
+var tokenHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
+// requestToken proves that DXP has the OAuth 2 application with this client
+// ID and public key: it requests a client credentials token with a
+// private_key_jwt client assertion (RFC 7523).
+func requestToken(context context.Context, tokenURL string, clientID string, privateKey *rsa.PrivateKey) error {
+	header, error := json.Marshal(map[string]string{"alg": "RS256", "kid": jwkThumbprint(&privateKey.PublicKey), "typ": "JWT"})
+
+	if error != nil {
+		return error
+	}
+
+	now := time.Now().Unix()
+
+	claims, error := json.Marshal(map[string]any{
+		"aud": tokenURL,
+		"exp": now + 60,
+		"iat": now,
+		"iss": clientID,
+		"jti": uuid.NewString(),
+		"sub": clientID,
+	})
+
+	if error != nil {
+		return error
+	}
+
+	input := base64URL(header) + "." + base64URL(claims)
+
+	digest := sha256.Sum256([]byte(input))
+
+	signature, error := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, digest[:])
+
+	if error != nil {
+		return error
+	}
+
+	form := url.Values{
+		"client_assertion":      {input + "." + base64URL(signature)},
+		"client_assertion_type": {"urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+		"client_id":             {clientID},
+		"grant_type":            {"client_credentials"},
+	}
+
+	request, error := http.NewRequestWithContext(
+		context, http.MethodPost, tokenURL, strings.NewReader(form.Encode()),
+	)
+
+	if error != nil {
+		return error
+	}
+
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	response, error := tokenHTTPClient.Do(request)
+
+	if error != nil {
+		return error
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 512))
+
+		return fmt.Errorf("HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return nil
 }

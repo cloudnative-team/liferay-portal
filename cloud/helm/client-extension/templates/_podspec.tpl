@@ -13,7 +13,7 @@ containers:
             -   name: LIFERAY_BATCH_OAUTH_APP_ERC
                 value: {{ $batchOAuthAppERC | quote }}
             {{- end }}
-            {{- if $extInit }}
+            {{- if or $extInit (include "liferay-client-extension.privateKeyJWT" .) }}
             -   name: LIFERAY_ROUTES_CLIENT_EXTENSION
                 value: /etc/liferay/lxc/ext-init-metadata
             {{- end }}

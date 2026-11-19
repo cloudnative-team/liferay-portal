@@ -1,11 +1,17 @@
 package cx
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strings"
 	"testing"
 
 	cxv1alpha1 "github.com/liferay/liferay-portal/cloud/operator/api/cx/v1alpha1"
@@ -27,7 +33,9 @@ func TestInjectPrivateKeyJWT(test *testing.T) {
 		userAgentPID:      {JSON: apiextensionsv1.JSON{Raw: []byte(`{"scopes":["b"]}`)}},
 	}
 
-	injectedConfigs, error := injectPrivateKeyJWT(configs, &privateKey.PublicKey)
+	injectedConfigs, error := injectPrivateKeyJWT(
+		configs, &privateKey.PublicKey, map[string]string{"cx-oahs": "id-1"},
+	)
 
 	if error != nil {
 		test.Fatal(error)
@@ -41,6 +49,16 @@ func TestInjectPrivateKeyJWT(test *testing.T) {
 
 	if headlessServer["clientAuthenticationMethod"] != cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT {
 		test.Errorf("clientAuthenticationMethod = %v", headlessServer["clientAuthenticationMethod"])
+	}
+
+	if headlessServer["clientId"] != "id-1" {
+		test.Errorf("clientId = %v", headlessServer["clientId"])
+	}
+
+	if externalReferenceCodes := headlessServerExternalReferenceCodes(configs); !slices.Equal(
+		externalReferenceCodes, []string{"cx-oahs"},
+	) {
+		test.Errorf("externalReferenceCodes = %v", externalReferenceCodes)
 	}
 
 	var jwks struct {
@@ -80,5 +98,85 @@ func TestJWKThumbprint(test *testing.T) {
 
 	if thumbprint := jwkThumbprint(&publicKey); thumbprint != "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs" {
 		test.Errorf("thumbprint = %s", thumbprint)
+	}
+}
+
+func TestExtInitRequiredIdentifiers(test *testing.T) {
+	clientExtension := cxv1alpha1.ClientExtension{
+		Spec: cxv1alpha1.ClientExtensionSpec{
+			Configs: map[string]cxv1alpha1.Configuration{
+				pidPrefixOAuth2HeadlessServer + "cx-oahs": {JSON: apiextensionsv1.JSON{Raw: []byte(`{}`)}},
+				"com.liferay.oauth2.provider.configuration.OAuth2ProviderApplicationUserAgentConfiguration~cx-oaua": {
+					JSON: apiextensionsv1.JSON{Raw: []byte(`{}`)},
+				},
+			},
+		},
+	}
+
+	if identifiers := extInitRequiredIdentifiers(&clientExtension); len(identifiers) != 2 {
+		test.Errorf("client_secret_post: %v", identifiers)
+	}
+
+	clientExtension.Spec.OAuth2 = &cxv1alpha1.OAuth2{
+		ClientAuthenticationMethod: cxv1alpha1.ClientAuthenticationMethodPrivateKeyJWT,
+	}
+
+	if identifiers := extInitRequiredIdentifiers(&clientExtension); !slices.Equal(identifiers, []string{"cx-oaua"}) {
+		test.Errorf("private_key_jwt: %v", identifiers)
+	}
+}
+
+func TestRequestToken(test *testing.T) {
+	privateKey, error := rsa.GenerateKey(rand.Reader, 2048)
+
+	if error != nil {
+		test.Fatal(error)
+	}
+
+	var tokenURL string
+
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(responseWriter http.ResponseWriter, request *http.Request) {
+				if error := request.ParseForm(); error != nil {
+					test.Error(error)
+				}
+
+				parts := strings.Split(request.PostForm.Get("client_assertion"), ".")
+
+				digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+
+				signature, _ := base64.RawURLEncoding.DecodeString(parts[2])
+
+				var claims map[string]any
+
+				payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
+
+				_ = json.Unmarshal(payload, &claims)
+
+				if (rsa.VerifyPKCS1v15(&privateKey.PublicKey, crypto.SHA256, digest[:], signature) != nil) ||
+					(claims["aud"] != tokenURL) || (claims["sub"] != "id-1") ||
+					(request.PostForm.Get("client_id") != "id-1") {
+
+					responseWriter.WriteHeader(http.StatusUnauthorized)
+
+					return
+				}
+
+				_, _ = responseWriter.Write([]byte(`{"access_token":"x"}`))
+			},
+		),
+	)
+
+	defer server.Close()
+
+	tokenURL = server.URL + "/o/oauth2/token"
+
+	if error := requestToken(test.Context(), tokenURL, "id-1", privateKey); error != nil {
+		test.Errorf("valid assertion: %v", error)
+	}
+
+	if error := requestToken(test.Context(), tokenURL, "id-2", privateKey); error == nil {
+		test.Error("wrong client ID was accepted")
 	}
 }
