@@ -252,7 +252,14 @@ public class LiferayOAuth2ClientConfiguration {
 				externalReferenceCode +
 					".oauth2.headless.server.client.secret");
 
-			RSAKey rsaKey = _getRSAKey();
+			RSAKey rsaKey = null;
+
+			if (_environment.containsProperty(
+					externalReferenceCode +
+						".oauth2.headless.server.client.id")) {
+
+				rsaKey = _getRSAKey();
+			}
 
 			if ((clientSecret == null) && (rsaKey == null)) {
 				if (_log.isDebugEnabled()) {
