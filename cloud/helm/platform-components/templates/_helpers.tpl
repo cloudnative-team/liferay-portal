@@ -17,6 +17,15 @@ repoURL: {{ .repoURL }}
 targetRevision: {{ .targetRevision | quote }}
 {{- end -}}
 
+{{/*
+The separate client extension namespace of the DXP namespace passed in. The
+infrastructure and DXP charts receive this name rather than deriving it.
+*/}}
+
+{{- define "liferay-platform.clientExtensionNamespace" -}}
+{{- printf "%s-cx" . -}}
+{{- end -}}
+
 {{- define "liferay-platform.clusterSecretStoreName" -}}
 {{- $clusterSecretStoreNames := list -}}
 {{- range $name, $clusterSecretStore := .Values.clusterSecretStores -}}
