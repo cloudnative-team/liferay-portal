@@ -358,6 +358,17 @@
 			},
 			"type": "object"
 		},
+		"schemaGate": {
+			"additionalProperties": false,
+			"description": "Schema gate controller, which lets one DXP pod initialize or upgrade the database schema while the other pods wait.",
+			"properties": {
+				"enabled": {
+					"description": "Runs the schema gate controller and creates its RBAC.",
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
 		"securityContext": {
 			"description": "Container security context for the operator.",
 			"type": "object"

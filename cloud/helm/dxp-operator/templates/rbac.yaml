@@ -32,14 +32,35 @@ rules:
             -   list
             -   update
             -   watch
-    {{- if .Values.clientExtensions.enabled }}
+    {{- if or .Values.clientExtensions.enabled .Values.schemaGate.enabled }}
     -   apiGroups:
             -   ""
         resources:
             -   pods
         verbs:
+            {{- if .Values.schemaGate.enabled }}
+            -   delete
+            {{- end }}
             -   get
             -   list
+            {{- if .Values.schemaGate.enabled }}
+            -   patch
+            -   watch
+            {{- end }}
+    {{- end }}
+    {{- if .Values.schemaGate.enabled }}
+    -   apiGroups:
+            -   ""
+        resources:
+            -   pods/exec
+        verbs:
+            -   create
+    -   apiGroups:
+            -   ""
+        resources:
+            -   pods/log
+        verbs:
+            -   get
     {{- end }}
     -   apiGroups:
             -   ""
@@ -98,14 +119,23 @@ rules:
             -   get
             -   list
             -   watch
+    {{- end }}
+    {{- if or .Values.clientExtensions.enabled .Values.schemaGate.enabled }}
     -   apiGroups:
             -   batch
         resources:
             -   jobs
         verbs:
+            {{- if .Values.schemaGate.enabled }}
+            -   create
+            -   delete
+            -   deletecollection
+            {{- end }}
             -   get
             -   list
             -   watch
+    {{- end }}
+    {{- if .Values.clientExtensions.enabled }}
     -   apiGroups:
             -   cx.liferay.com
         resources:

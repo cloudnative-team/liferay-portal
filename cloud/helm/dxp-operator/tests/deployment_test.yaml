@@ -234,6 +234,13 @@ tests:
         it: Passes the operator its own namespace and service account, which delivery refusals name
     -   asserts:
             -   equal:
+                    path: spec.template.spec.containers[0].env[?(@.name=="SCHEMA_GATE_ENABLED")].value
+                    value: "true"
+        it: Passes the schema gate controller switch as a quoted environment variable
+        set:
+            schemaGate.enabled: true
+    -   asserts:
+            -   equal:
                     path: spec.template.spec.containers[0].env[?(@.name=="METRICS_ADDRESS")].value
                     value: :9090
             -   equal:

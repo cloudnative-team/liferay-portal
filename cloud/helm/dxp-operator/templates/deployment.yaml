@@ -57,6 +57,8 @@ spec:
                             value: {{ .Values.retry.initialDelay | quote }}
                         -   name: RETRY_MAX_DELAY
                             value: {{ .Values.retry.maxDelay | quote }}
+                        -   name: SCHEMA_GATE_ENABLED
+                            value: {{ .Values.schemaGate.enabled | quote }}
                         {{- range $k, $v := .Values.customEnv }}
                         {{- if and $v (gt (len $v) 0) }}
                         {{- toYaml $v | nindent 24 }}
