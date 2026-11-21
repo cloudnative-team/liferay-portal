@@ -202,7 +202,7 @@ function _connect_to_cluster {
 
 	echo "Connecting to the Kubernetes cluster."
 
-	export KUBE_CONFIG_PATH="${HOME}/.kube/config"
+	export KUBE_CONFIG_PATH="${KUBECONFIG:-${HOME}/.kube/config}"
 
 	update_kubeconfig "${cluster_name}" "${cluster_terraform_stack}"
 }
