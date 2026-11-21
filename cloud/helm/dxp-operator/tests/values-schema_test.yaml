@@ -45,6 +45,12 @@ tests:
             clientExtensions.enabled: "yes"
     -   asserts:
             -   failedTemplate:
+                    errorPattern: schemaGate
+        it: Rejects a non-boolean schema gate controller switch
+        set:
+            schemaGate.enabled: "yes"
+    -   asserts:
+            -   failedTemplate:
                     errorPattern: maxDelayy
         it: Rejects an unknown key inside a values object
         set:

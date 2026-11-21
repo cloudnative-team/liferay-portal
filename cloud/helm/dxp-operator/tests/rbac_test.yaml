@@ -31,6 +31,38 @@ tests:
             clientExtensions.enabled: true
     -   asserts:
             -   equal:
+                    path: rules[?(@.resources[0]=="pods")].verbs
+                    value:
+                        -   delete
+                        -   get
+                        -   list
+                        -   patch
+                        -   watch
+            -   equal:
+                    path: rules[?(@.resources[0]=="pods/exec")].verbs
+                    value:
+                        -   create
+            -   equal:
+                    path: rules[?(@.resources[0]=="pods/log")].verbs
+                    value:
+                        -   get
+            -   equal:
+                    path: rules[?(@.resources[0]=="jobs")].verbs
+                    value:
+                        -   create
+                        -   delete
+                        -   deletecollection
+                        -   get
+                        -   list
+                        -   watch
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Adds the schema gate rules when the schema gate controller is enabled
+        set:
+            schemaGate.enabled: true
+    -   asserts:
+            -   equal:
                     path: metadata.annotations
                     value:
                         eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/operator
@@ -134,6 +166,31 @@ tests:
         it: Leaves the cluster role unnamespaced and unannotated
     -   asserts:
             -   equal:
+                    path: rules[?(@.resources[0]=="pods")].verbs
+                    value:
+                        -   delete
+                        -   get
+                        -   list
+                        -   patch
+                        -   watch
+            -   equal:
+                    path: rules[?(@.resources[0]=="jobs")].verbs
+                    value:
+                        -   create
+                        -   delete
+                        -   deletecollection
+                        -   get
+                        -   list
+                        -   watch
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Merges the pod and Job verbs when both controllers are enabled
+        set:
+            clientExtensions.enabled: true
+            schemaGate.enabled: true
+    -   asserts:
+            -   equal:
                     path: metadata.name
                     value: my-release-liferay-dxp-operator
             -   equal:
@@ -172,6 +229,15 @@ tests:
             path: kind
             value: ClusterRole
         it: Omits the ClientExtension rules by default
+    -   asserts:
+            -   notExists:
+                    path: rules[?(@.resources[0]=="pods/exec")]
+            -   notExists:
+                    path: rules[?(@.resources[0]=="pods/log")]
+        documentSelector:
+            path: kind
+            value: ClusterRole
+        it: Omits the schema gate rules by default
     -   asserts:
             -   notExists:
                     path: metadata.annotations
