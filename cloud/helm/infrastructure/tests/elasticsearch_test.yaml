@@ -107,6 +107,7 @@ tests:
                         component: search
                         environmentId: env1
                         projectId: proj1
+                        workloadClass: standard
             -   documentSelector:
                     path: kind
                     value: Elasticsearch
@@ -116,6 +117,7 @@ tests:
                         component: search
                         environmentId: env1
                         projectId: proj1
+                        workloadClass: standard
             -   documentSelector:
                     path: kind
                     value: Namespace
@@ -124,6 +126,7 @@ tests:
                         component: search
                         environmentId: env1
                         projectId: proj1
+                        workloadClass: standard
                     path: metadata.labels
         it: Labels the Elasticsearch resources, pods and namespace with the search labels
         set:

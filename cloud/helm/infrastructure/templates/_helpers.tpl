@@ -19,6 +19,7 @@ readOnlyRootFilesystem: false
 component: search
 environmentId: {{ .Values.environmentId | quote }}
 projectId: {{ .Values.projectId | quote }}
+workloadClass: standard
 {{- end -}}
 
 {{- define "elasticsearch.name" -}}

@@ -25,6 +25,19 @@ tests:
             workload:
                 kind: CronJob
     -   asserts:
+            -   equal:
+                    path: metadata.labels.workloadClass
+                    value: custom
+                template: templates/deployment.yaml
+            -   equal:
+                    path: spec.template.metadata.labels.workloadClass
+                    value: custom
+                template: templates/deployment.yaml
+            -   notExists:
+                    path: spec.selector.matchLabels.workloadClass
+                template: templates/deployment.yaml
+        it: Labels the workload and its pods with the custom workload class
+    -   asserts:
             -   matchRegex:
                     path: metadata.name
                     pattern: ^my-release-liferay-client-extension-[0-9a-f]{8}$
