@@ -1,0 +1,192 @@
+release:
+    name: my-release
+    namespace: my-namespace
+set:
+    clusterSecretStoreName: my-secret-store
+suite: Values Schema
+templates:
+    -   templates/liferayinfrastructure.yaml
+tests:
+    -   asserts:
+            -   notFailedTemplate: {}
+        it: Accepts any key the LiferayInfrastructure schema defines in a pass through object
+        set:
+            database:
+                highAvailability: true
+                storageGB: 50
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: endpoints/mydomain.*'not' failed
+        it: Rejects a certificate on an endpoint that does not serve HTTPS
+        set:
+            endpoints:
+                mydomain:
+                    hostname: mydomain.example.com
+                    port: 80
+                    protocol: HTTP
+                    tls:
+                        externalSecretKeys:
+                            -   liferay-certificates-my-certificate
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: externalSecretKeys/0.*liferay-certificates-ProdCert
+        it: Rejects a certificate secret key that is not DNS-1123 compliant
+        set:
+            endpoints:
+                mydomain:
+                    hostname: mydomain.example.com
+                    port: 443
+                    protocol: HTTPS
+                    tls:
+                        externalSecretKeys:
+                            -   liferay-certificates-ProdCert
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: externalSecretKeys/0.*my-certificate
+        it: Rejects a certificate secret key without the liferay-certificates- prefix
+        set:
+            endpoints:
+                mydomain:
+                    hostname: mydomain.example.com
+                    port: 443
+                    protocol: HTTPS
+                    tls:
+                        externalSecretKeys:
+                            -   my-certificate
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: secretNames/0.*My_Secret
+        it: Rejects a customer secret name that is not DNS-1123 compliant
+        set:
+            secretNames:
+                -   My_Secret
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: database.*additional properties 'deletionProtection'
+        it: Rejects a key the LiferayInfrastructure schema does not define in a pass through object
+        set:
+            database:
+                deletionProtection: true
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: license/externalSecretKey
+        it: Rejects a license secret key without the liferay-licenses- prefix
+        set:
+            license.externalSecretKey: my-license
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: license/targetSecretName
+        it: Rejects a license target secret name that is not DNS-1123 compliant
+        set:
+            license.targetSecretName: Developer_Clustered
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: allowedCIDRs/0.*10.0.0.0/33
+        it: Rejects a malformed gateway CIDR
+        set:
+            gateway.accessControl.allowedCIDRs:
+                -   10.0.0.0/33
+            gateway.accessControl.enabled: true
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: endpoints/web.*hostname
+        it: Rejects a port 80 endpoint without a host name
+        set:
+            endpoints:
+                web:
+                    port: 80
+                    protocol: HTTP
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: backup.*additional properties 'schedule'
+        it: Rejects a retired backup setting
+        set:
+            backup:
+                schedule: 0 2 * * *
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: license.*additional properties 'externalSecretName'
+        it: Rejects a retired license setting
+        set:
+            license:
+                externalSecretName: liferay-licenses-example
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: search/elasticsearch/accessControl/enabled
+        it: Rejects allowed ingress while Elasticsearch access control is disabled
+        set:
+            search.elasticsearch.accessControl.allowedIngress:
+                -   namespace: client-extension
+                    port: 9200
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: endpoints/mydomain.*missing property 'tls'
+        it: Rejects an HTTPS endpoint without a certificate
+        set:
+            endpoints:
+                mydomain:
+                    hostname: mydomain.example.com
+                    port: 443
+                    protocol: HTTPS
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: allowedIngress/0.*namespace
+        it: Rejects an allowed ingress entry without a namespace
+        set:
+            search.elasticsearch.accessControl.allowedIngress:
+                -   port: 9200
+            search.elasticsearch.accessControl.enabled: true
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: allowedIngress/0.*port
+        it: Rejects an allowed ingress entry without a port
+        set:
+            search.elasticsearch.accessControl.allowedIngress:
+                -   namespace: client-extension
+            search.elasticsearch.accessControl.enabled: true
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: clusterSecretStoreName
+        it: Rejects an empty ClusterSecretStore name
+        set:
+            clusterSecretStoreName: ""
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: eckOperatorNamespace
+        it: Rejects an empty ECK operator namespace
+        set:
+            search.elasticsearch.accessControl.eckOperatorNamespace: ""
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: endpoints/admin/port
+        it: Rejects an endpoint port other than 80 or 443
+        set:
+            endpoints:
+                admin:
+                    hostname: admin.example.com
+                    port: 8443
+                    protocol: HTTPS
+                    tls:
+                        externalSecretKeys:
+                            -   liferay-certificates-admin
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: additional properties 'tls'
+        it: Rejects an unknown top level setting
+        set:
+            tls:
+                externalSecretNames:
+                    -   liferay-certificates-example
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: gateway/accessControl/allowedCIDRs
+        it: Rejects gateway access control without a CIDR
+        set:
+            gateway.accessControl.enabled: true
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: clientExtensions/separateNamespace/name
+        it: Requires a client extension namespace name when the separate namespace is enabled
+        set:
+            clientExtensions.separateNamespace.enabled: true
+            clientExtensions.separateNamespace.name: ""

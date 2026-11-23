@@ -1,3 +1,5 @@
+set:
+    clusterSecretStoreName: my-secret-store
 suite: Backup Restore Sanitization ConfigMap
 templates:
     -   templates/backup-restore-sanitization-configmap.yaml

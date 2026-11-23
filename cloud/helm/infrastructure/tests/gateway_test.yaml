@@ -2,6 +2,7 @@ release:
     name: my-release
     namespace: my-namespace
 set:
+    clusterSecretStoreName: my-secret-store
     gateway:
         className: liferay-gateway-class
         name: my-gateway
@@ -78,65 +79,6 @@ tests:
                 -   10.0.0.0/16
                 -   203.0.113.0/24
             gateway.accessControl.enabled: true
-    -   asserts:
-            -   failedTemplate:
-                    errorPattern: The mydomain endpoint does not serve HTTPS and must not set tls.externalSecretKeys
-        it: Fails when a plain endpoint sets a certificate
-        set:
-            endpoints:
-                mydomain:
-                    hostname: mydomain.example.com
-                    port: 80
-                    protocol: HTTP
-                    tls:
-                        externalSecretKeys:
-                            -   liferay-certificates-my-certificate
-    -   asserts:
-            -   failedTemplate:
-                    errorMessage: The value "gateway.accessControl.allowedCIDRs" must not be empty when "gateway.accessControl.enabled" is true
-        it: Fails when access control is enabled with no CIDR
-        set:
-            gateway.accessControl.enabled: true
-    -   asserts:
-            -   failedTemplate:
-                    errorPattern: The mydomain endpoint serves HTTPS and must set tls.externalSecretKeys
-        it: Fails when an HTTPS endpoint has no certificate
-        set:
-            endpoints:
-                mydomain:
-                    hostname: mydomain.example.com
-                    port: 443
-                    protocol: HTTPS
-    -   asserts:
-            -   failedTemplate:
-                    errorMessage: "The value \"gateway.accessControl.allowedCIDRs\" contains an invalid CIDR: 10.0.0.0/33"
-        it: Fails when an allowed CIDR is malformed
-        set:
-            gateway.accessControl.allowedCIDRs:
-                -   10.0.0.0/33
-            gateway.accessControl.enabled: true
-    -   asserts:
-            -   failedTemplate:
-                    errorPattern: The web endpoint uses port 80 without a hostname, which collides with the implicit http listener
-        it: Fails when an endpoint claims port 80 without a hostname
-        set:
-            endpoints:
-                web:
-                    port: 80
-                    protocol: HTTP
-    -   asserts:
-            -   failedTemplate:
-                    errorPattern: The admin endpoint uses port 8443, but gateways only listen on ports 80 and 443
-        it: Fails when an endpoint uses a port other than 80 or 443
-        set:
-            endpoints:
-                admin:
-                    hostname: admin.example.com
-                    port: 8443
-                    protocol: HTTPS
-                    tls:
-                        externalSecretKeys:
-                            -   liferay-certificates-admin
     -   asserts:
             -   equal:
                     path: metadata.annotations["argocd.argoproj.io/sync-wave"]

@@ -1,6 +1,8 @@
 release:
     name: my-release
     namespace: my-namespace
+set:
+    clusterSecretStoreName: my-secret-store
 suite: Elasticsearch Allowed Ingress
 templates:
     -   templates/elasticsearch-allowed-ingress.yaml
@@ -130,30 +132,6 @@ tests:
                 -   namespace: client-extension
                     port: 9200
             search.elasticsearch.accessControl.enabled: true
-    -   asserts:
-            -   failedTemplate:
-                    errorPattern: "\"search.elasticsearch.accessControl.allowedIngress\\[0\\].namespace\" is required"
-        it: Fails when an allowed ingress entry has no namespace
-        set:
-            search.elasticsearch.accessControl.allowedIngress:
-                -   port: 9200
-            search.elasticsearch.accessControl.enabled: true
-    -   asserts:
-            -   failedTemplate:
-                    errorPattern: "\"search.elasticsearch.accessControl.allowedIngress\\[0\\].port\" is required"
-        it: Fails when an allowed ingress entry has no port
-        set:
-            search.elasticsearch.accessControl.allowedIngress:
-                -   namespace: client-extension
-            search.elasticsearch.accessControl.enabled: true
-    -   asserts:
-            -   failedTemplate:
-                    errorMessage: The value "search.elasticsearch.accessControl.enabled" must be true when "search.elasticsearch.accessControl.allowedIngress" is set
-        it: Fails when an allowed ingress entry is set while access control is disabled
-        set:
-            search.elasticsearch.accessControl.allowedIngress:
-                -   namespace: client-extension
-                    port: 9200
     -   asserts:
             -   lengthEqual:
                     count: 3

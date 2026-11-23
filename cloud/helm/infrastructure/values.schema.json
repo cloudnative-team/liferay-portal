@@ -1,0 +1,920 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"additionalProperties": false,
+	"properties": {
+		"backup": {
+			"additionalProperties": false,
+			"description": "Backups of the environment's database and storage.",
+			"properties": {
+				"dayOfWeek": {
+					"description": "Day of the weekly backup.",
+					"enum": [
+						"Sunday",
+						"Monday",
+						"Tuesday",
+						"Wednesday",
+						"Thursday",
+						"Friday",
+						"Saturday"
+					]
+				},
+				"enabled": {
+					"description": "Backs up the environment.",
+					"type": "boolean"
+				},
+				"frequency": {
+					"description": "How often backups run.",
+					"enum": [
+						"Daily",
+						"Weekly"
+					]
+				},
+				"restore": {
+					"additionalProperties": false,
+					"description": "Settings applied when a backup is restored into the environment.",
+					"properties": {
+						"sanitizationScripts": {
+							"additionalProperties": {
+								"type": [
+									"null",
+									"string"
+								]
+							},
+							"description": "SQL scripts, by name, that run against the restored database. A null or empty script is skipped.",
+							"type": "object"
+						}
+					},
+					"type": "object"
+				},
+				"retentionDays": {
+					"description": "Days a backup is kept.",
+					"type": "integer"
+				},
+				"timeOfDay": {
+					"description": "Time of day the backup starts, as HH:MM.",
+					"type": "string"
+				},
+				"timeZone": {
+					"description": "Time zone of the backup schedule.",
+					"type": "string"
+				},
+				"vaultTags": {
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Tags for the backup vault.",
+					"type": "object"
+				}
+			},
+			"type": "object"
+		},
+		"clientExtensions": {
+			"additionalProperties": false,
+			"description": "Client extension placement.",
+			"properties": {
+				"separateNamespace": {
+					"additionalProperties": false,
+					"description": "Runs client extensions in their own namespace.",
+					"if": {
+						"properties": {
+							"enabled": {
+								"const": true
+							}
+						},
+						"required": [
+							"enabled"
+						]
+					},
+					"properties": {
+						"enabled": {
+							"description": "Creates the client extension namespace.",
+							"type": "boolean"
+						},
+						"name": {
+							"description": "Name of the client extension namespace. Required when enabled.",
+							"type": "string"
+						}
+					},
+					"then": {
+						"properties": {
+							"name": {
+								"minLength": 1
+							}
+						},
+						"required": [
+							"name"
+						]
+					},
+					"type": "object"
+				}
+			},
+			"type": "object"
+		},
+		"clusterSecretStoreName": {
+			"description": "ClusterSecretStore the ExternalSecrets read from.",
+			"minLength": 1,
+			"type": "string"
+		},
+		"cmk": {
+			"additionalProperties": false,
+			"description": "Customer managed encryption keys.",
+			"properties": {
+				"enabled": {
+					"description": "Encrypts the environment's resources with customer managed keys.",
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"commonTags": {
+			"additionalProperties": {
+				"type": "string"
+			},
+			"description": "Tags added to every cloud resource of the environment.",
+			"type": "object"
+		},
+		"database": {
+			"additionalProperties": false,
+			"description": "The environment's database.",
+			"properties": {
+				"highAvailability": {
+					"description": "Runs a standby database instance.",
+					"type": "boolean"
+				},
+				"instanceType": {
+					"description": "Database instance type.",
+					"type": "string"
+				},
+				"restore": {
+					"additionalProperties": false,
+					"description": "Restores the database when it is created.",
+					"properties": {
+						"pointInTime": {
+							"additionalProperties": false,
+							"description": "Restores the database to a point in time.",
+							"properties": {
+								"sourceDataPlane": {
+									"description": "Data plane to restore from.",
+									"type": "string"
+								},
+								"time": {
+									"description": "Time to restore to, in UTC.",
+									"type": "string"
+								}
+							},
+							"type": "object"
+						},
+						"snapshot": {
+							"additionalProperties": false,
+							"description": "Restores the database from a snapshot.",
+							"properties": {
+								"id": {
+									"description": "Snapshot ID.",
+									"type": "string"
+								}
+							},
+							"type": "object"
+						}
+					},
+					"type": [
+						"null",
+						"object"
+					]
+				},
+				"storageGB": {
+					"description": "Database storage size in GB.",
+					"type": "integer"
+				},
+				"version": {
+					"description": "Database engine version.",
+					"type": [
+						"number",
+						"string"
+					]
+				}
+			},
+			"type": "object"
+		},
+		"databaseAppPassword": {
+			"additionalProperties": false,
+			"description": "Password the application uses to log in to the database.",
+			"properties": {
+				"enabled": {
+					"description": "Creates the database password secret.",
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"enabled": {
+			"description": "Renders the environment's infrastructure.",
+			"type": "boolean"
+		},
+		"endpoints": {
+			"additionalProperties": {
+				"additionalProperties": false,
+				"allOf": [
+					{
+						"if": {
+							"properties": {
+								"port": {
+									"const": 80
+								}
+							},
+							"required": [
+								"port"
+							]
+						},
+						"then": {
+							"properties": {
+								"hostname": {
+									"minLength": 1
+								}
+							},
+							"required": [
+								"hostname"
+							]
+						}
+					}
+				],
+				"description": "Gateway listener for the endpoint.",
+				"else": {
+					"not": {
+						"properties": {
+							"tls": {
+								"required": [
+									"externalSecretKeys"
+								]
+							}
+						},
+						"required": [
+							"tls"
+						]
+					}
+				},
+				"if": {
+					"properties": {
+						"protocol": {
+							"const": "HTTPS"
+						}
+					},
+					"required": [
+						"protocol"
+					]
+				},
+				"properties": {
+					"hostname": {
+						"description": "Host name the listener matches.",
+						"type": "string"
+					},
+					"port": {
+						"description": "Listener port. Gateways only listen on ports 80 and 443.",
+						"enum": [
+							80,
+							443
+						]
+					},
+					"protocol": {
+						"description": "Listener protocol, such as HTTP or HTTPS.",
+						"type": "string"
+					},
+					"tls": {
+						"additionalProperties": false,
+						"description": "TLS settings for an HTTPS endpoint.",
+						"properties": {
+							"externalSecretKeys": {
+								"description": "Keys in the ClusterSecretStore holding the certificates. Required for HTTPS, and not allowed otherwise.",
+								"items": {
+									"allOf": [
+										{
+											"pattern": "^liferay-certificates-"
+										},
+										{
+											"pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+										}
+									],
+									"type": "string"
+								},
+								"type": "array"
+							}
+						},
+						"type": "object"
+					}
+				},
+				"required": [
+					"port",
+					"protocol"
+				],
+				"then": {
+					"properties": {
+						"tls": {
+							"properties": {
+								"externalSecretKeys": {
+									"minItems": 1
+								}
+							},
+							"required": [
+								"externalSecretKeys"
+							]
+						}
+					},
+					"required": [
+						"tls"
+					]
+				},
+				"type": "object"
+			},
+			"description": "Gateway endpoints by listener name. An endpoint named http replaces the implicit HTTP listener and may omit the host name.",
+			"properties": {
+				"http": {
+					"additionalProperties": false,
+					"description": "Gateway listener for the endpoint.",
+					"else": {
+						"not": {
+							"properties": {
+								"tls": {
+									"required": [
+										"externalSecretKeys"
+									]
+								}
+							},
+							"required": [
+								"tls"
+							]
+						}
+					},
+					"if": {
+						"properties": {
+							"protocol": {
+								"const": "HTTPS"
+							}
+						},
+						"required": [
+							"protocol"
+						]
+					},
+					"properties": {
+						"hostname": {
+							"description": "Host name the listener matches.",
+							"type": "string"
+						},
+						"port": {
+							"description": "Listener port. Gateways only listen on ports 80 and 443.",
+							"enum": [
+								80,
+								443
+							]
+						},
+						"protocol": {
+							"description": "Listener protocol, such as HTTP or HTTPS.",
+							"type": "string"
+						},
+						"tls": {
+							"additionalProperties": false,
+							"description": "TLS settings for an HTTPS endpoint.",
+							"properties": {
+								"externalSecretKeys": {
+									"description": "Keys in the ClusterSecretStore holding the certificates. Required for HTTPS, and not allowed otherwise.",
+									"items": {
+										"allOf": [
+											{
+												"pattern": "^liferay-certificates-"
+											},
+											{
+												"pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+											}
+										],
+										"type": "string"
+									},
+									"type": "array"
+								}
+							},
+							"type": "object"
+						}
+					},
+					"required": [
+						"port",
+						"protocol"
+					],
+					"then": {
+						"properties": {
+							"tls": {
+								"properties": {
+									"externalSecretKeys": {
+										"minItems": 1
+									}
+								},
+								"required": [
+									"externalSecretKeys"
+								]
+							}
+						},
+						"required": [
+							"tls"
+						]
+					},
+					"type": "object"
+				}
+			},
+			"type": "object"
+		},
+		"environmentId": {
+			"description": "Environment ID.",
+			"type": [
+				"integer",
+				"string"
+			]
+		},
+		"forceDestroy": {
+			"description": "Deletes cloud resources even when they hold data.",
+			"type": "boolean"
+		},
+		"gateway": {
+			"additionalProperties": false,
+			"description": "The environment's gateway.",
+			"properties": {
+				"accessControl": {
+					"additionalProperties": false,
+					"description": "Restricts the gateway to a list of client CIDRs.",
+					"if": {
+						"properties": {
+							"enabled": {
+								"const": true
+							}
+						},
+						"required": [
+							"enabled"
+						]
+					},
+					"properties": {
+						"allowedCIDRs": {
+							"description": "Client CIDRs allowed to reach the gateway. Required when access control is enabled.",
+							"items": {
+								"anyOf": [
+									{
+										"pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])/(3[0-2]|[12]?[0-9])$"
+									},
+									{
+										"pattern": "^[0-9A-Fa-f:]*:[0-9A-Fa-f:]*/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$"
+									}
+								],
+								"type": "string"
+							},
+							"type": "array"
+						},
+						"enabled": {
+							"description": "Restricts the gateway to the allowed CIDRs.",
+							"type": "boolean"
+						}
+					},
+					"then": {
+						"properties": {
+							"allowedCIDRs": {
+								"minItems": 1
+							}
+						},
+						"required": [
+							"allowedCIDRs"
+						]
+					},
+					"type": "object"
+				},
+				"annotations": {
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Annotations for the Gateway.",
+					"type": "object"
+				},
+				"className": {
+					"description": "GatewayClass of the Gateway. The Gateway renders only when this and the name are set.",
+					"type": "string"
+				},
+				"clientTrafficPolicySpec": {
+					"description": "Spec of the Envoy Gateway ClientTrafficPolicy for the Gateway.",
+					"type": "object"
+				},
+				"name": {
+					"description": "Name of the Gateway.",
+					"type": "string"
+				}
+			},
+			"type": "object"
+		},
+		"license": {
+			"additionalProperties": false,
+			"description": "The DXP license.",
+			"properties": {
+				"externalSecretKey": {
+					"description": "Key in the ClusterSecretStore holding the license. Must start with liferay-licenses-.",
+					"pattern": "^(liferay-licenses-.*)?$",
+					"type": "string"
+				},
+				"externalSecretProperty": {
+					"description": "Property of the key holding the license file.",
+					"type": "string"
+				},
+				"targetSecretName": {
+					"description": "Name of the license Secret.",
+					"pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
+					"type": "string"
+				}
+			},
+			"type": "object"
+		},
+		"orphanOnDelete": {
+			"description": "Keeps the cloud resources when the environment is deleted.",
+			"type": "boolean"
+		},
+		"overlayAccess": {
+			"additionalProperties": false,
+			"description": "Access to the deployment's overlay bucket.",
+			"properties": {
+				"enabled": {
+					"description": "Grants the environment read access to the overlay bucket.",
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"overlayBucket": {
+			"additionalProperties": false,
+			"description": "The deployment's overlay bucket.",
+			"properties": {
+				"commonTags": {
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Tags for the overlay bucket.",
+					"type": "object"
+				},
+				"enabled": {
+					"description": "Creates the overlay bucket.",
+					"type": "boolean"
+				},
+				"forceDestroy": {
+					"description": "Deletes the overlay bucket even when it holds objects.",
+					"type": "boolean"
+				},
+				"orphanOnDelete": {
+					"description": "Keeps the overlay bucket when it is deleted from the cluster.",
+					"type": "boolean"
+				}
+			},
+			"type": "object"
+		},
+		"persistence": {
+			"additionalProperties": false,
+			"description": "Persistent volumes.",
+			"properties": {
+				"storageClassName": {
+					"description": "StorageClass for persistent volumes.",
+					"type": "string"
+				}
+			},
+			"type": "object"
+		},
+		"projectId": {
+			"description": "Project ID.",
+			"type": [
+				"integer",
+				"string"
+			]
+		},
+		"search": {
+			"additionalProperties": false,
+			"description": "The environment's search engine.",
+			"properties": {
+				"elasticsearch": {
+					"additionalProperties": false,
+					"description": "Elasticsearch, run by the ECK operator in the cluster.",
+					"properties": {
+						"accessControl": {
+							"additionalProperties": false,
+							"description": "Restricts which pods can reach Elasticsearch.",
+							"if": {
+								"properties": {
+									"allowedIngress": {
+										"minItems": 1
+									}
+								},
+								"required": [
+									"allowedIngress"
+								]
+							},
+							"properties": {
+								"allowedIngress": {
+									"description": "Extra pods allowed to reach Elasticsearch. Requires access control to be enabled.",
+									"items": {
+										"additionalProperties": false,
+										"description": "Pods allowed to reach Elasticsearch.",
+										"properties": {
+											"namespace": {
+												"description": "Namespace of the pods.",
+												"minLength": 1,
+												"type": "string"
+											},
+											"podLabels": {
+												"description": "Label sets selecting the pods. Each entry allows the pods that carry all of its labels.",
+												"items": {
+													"additionalProperties": {
+														"type": "string"
+													},
+													"type": "object"
+												},
+												"type": "array"
+											},
+											"port": {
+												"description": "Elasticsearch port the pods can reach.",
+												"type": "integer"
+											}
+										},
+										"required": [
+											"namespace",
+											"port"
+										],
+										"type": "object"
+									},
+									"type": "array"
+								},
+								"eckOperatorNamespace": {
+									"description": "Namespace of the ECK operator.",
+									"minLength": 1,
+									"type": "string"
+								},
+								"enabled": {
+									"description": "Restricts access to Elasticsearch with a NetworkPolicy.",
+									"type": "boolean"
+								}
+							},
+							"then": {
+								"properties": {
+									"enabled": {
+										"const": true
+									}
+								},
+								"required": [
+									"enabled"
+								]
+							},
+							"type": "object"
+						},
+						"config": {
+							"description": "Elasticsearch node configuration.",
+							"type": "object"
+						},
+						"env": {
+							"additionalProperties": {
+								"type": [
+									"integer",
+									"number",
+									"string"
+								]
+							},
+							"description": "Environment variables for the Elasticsearch container.",
+							"type": "object"
+						},
+						"exporter": {
+							"additionalProperties": false,
+							"description": "Prometheus exporter for Elasticsearch metrics.",
+							"properties": {
+								"enabled": {
+									"description": "Runs the exporter.",
+									"type": "boolean"
+								},
+								"image": {
+									"additionalProperties": false,
+									"description": "Exporter image.",
+									"properties": {
+										"pullPolicy": {
+											"description": "Image pull policy.",
+											"enum": [
+												"Always",
+												"IfNotPresent",
+												"Never"
+											]
+										},
+										"repository": {
+											"description": "Image repository.",
+											"type": "string"
+										},
+										"tag": {
+											"description": "Image tag.",
+											"type": "string"
+										}
+									},
+									"type": "object"
+								},
+								"livenessProbe": {
+									"description": "Liveness probe of the exporter.",
+									"type": "object"
+								},
+								"readinessProbe": {
+									"description": "Readiness probe of the exporter.",
+									"type": "object"
+								},
+								"resources": {
+									"description": "Resources of the exporter.",
+									"type": "object"
+								}
+							},
+							"type": "object"
+						},
+						"extraInitContainers": {
+							"description": "Extra init containers for the Elasticsearch pods.",
+							"items": {
+								"type": "object"
+							},
+							"type": "array"
+						},
+						"extraVolumeMounts": {
+							"description": "Extra volume mounts for the Elasticsearch container.",
+							"items": {
+								"type": "object"
+							},
+							"type": "array"
+						},
+						"extraVolumes": {
+							"description": "Extra volumes for the Elasticsearch pods.",
+							"items": {
+								"type": "object"
+							},
+							"type": "array"
+						},
+						"nodeCount": {
+							"description": "Number of Elasticsearch nodes.",
+							"type": "integer"
+						},
+						"resources": {
+							"description": "Resources of the Elasticsearch container.",
+							"type": "object"
+						},
+						"snapshotsJob": {
+							"additionalProperties": false,
+							"description": "Job that registers the snapshot repository and policy.",
+							"properties": {
+								"image": {
+									"additionalProperties": false,
+									"description": "Snapshot job image.",
+									"properties": {
+										"pullPolicy": {
+											"description": "Image pull policy.",
+											"enum": [
+												"Always",
+												"IfNotPresent",
+												"Never"
+											]
+										},
+										"repository": {
+											"description": "Image repository.",
+											"type": "string"
+										},
+										"tag": {
+											"description": "Image tag.",
+											"type": "string"
+										}
+									},
+									"type": "object"
+								}
+							},
+							"type": "object"
+						},
+						"version": {
+							"description": "Elasticsearch version.",
+							"type": "string"
+						},
+						"volumeSize": {
+							"description": "Size of each Elasticsearch data volume.",
+							"type": "string"
+						}
+					},
+					"type": "object"
+				},
+				"engine": {
+					"description": "Search engine. Defaults to OpenSearch where the cloud supports it.",
+					"enum": [
+						"",
+						"elasticsearch",
+						"opensearch"
+					]
+				},
+				"opensearch": {
+					"additionalProperties": false,
+					"description": "Managed OpenSearch domain.",
+					"properties": {
+						"instanceCount": {
+							"description": "Number of OpenSearch instances.",
+							"type": "integer"
+						},
+						"instanceType": {
+							"description": "OpenSearch instance type.",
+							"type": "string"
+						},
+						"version": {
+							"description": "OpenSearch version.",
+							"type": "string"
+						},
+						"volumeSizeGB": {
+							"description": "Size of each OpenSearch volume in GB.",
+							"type": "integer"
+						}
+					},
+					"type": "object"
+				},
+				"snapshots": {
+					"additionalProperties": false,
+					"description": "Search index snapshots.",
+					"properties": {
+						"enabled": {
+							"description": "Takes search snapshots.",
+							"type": "boolean"
+						},
+						"lifecyclePolicy": {
+							"additionalProperties": false,
+							"description": "Snapshot lifecycle policy.",
+							"properties": {
+								"indices": {
+									"description": "Indices to snapshot.",
+									"type": "string"
+								},
+								"registration": {
+									"description": "How the policy is registered.",
+									"enum": [
+										"job",
+										"stackConfigPolicy"
+									]
+								},
+								"retention": {
+									"additionalProperties": false,
+									"description": "How long snapshots are kept.",
+									"properties": {
+										"expireAfter": {
+											"description": "Age after which snapshots expire.",
+											"type": "string"
+										},
+										"maxCount": {
+											"description": "Maximum number of snapshots kept.",
+											"type": "integer"
+										},
+										"minCount": {
+											"description": "Minimum number of snapshots kept.",
+											"type": "integer"
+										}
+									},
+									"type": "object"
+								},
+								"schedule": {
+									"description": "Snapshot schedule.",
+									"type": "string"
+								}
+							},
+							"type": "object"
+						},
+						"tags": {
+							"additionalProperties": {
+								"type": "string"
+							},
+							"description": "Tags for the snapshot storage.",
+							"type": "object"
+						}
+					},
+					"type": "object"
+				},
+				"supportedEngines": {
+					"description": "Search engines this cloud supports.",
+					"items": {
+						"enum": [
+							"elasticsearch",
+							"opensearch"
+						]
+					},
+					"type": "array"
+				}
+			},
+			"type": "object"
+		},
+		"secretNames": {
+			"description": "Names of customer secrets to synchronize from the ClusterSecretStore.",
+			"items": {
+				"pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+				"type": "string"
+			},
+			"type": "array"
+		},
+		"storage": {
+			"additionalProperties": false,
+			"description": "The environment's object storage.",
+			"properties": {
+				"tags": {
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Tags for the storage bucket.",
+					"type": "object"
+				}
+			},
+			"type": "object"
+		}
+	},
+	"type": "object"
+}
