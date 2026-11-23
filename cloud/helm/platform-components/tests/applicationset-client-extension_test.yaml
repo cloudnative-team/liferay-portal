@@ -2,8 +2,6 @@ release:
     name: my-release
     namespace: argocd-system
 set:
-    clusterSecretStore:
-        name: liferay-test-secret-store
     gitops:
         repository:
             url: https://git.example.com/gitops.git

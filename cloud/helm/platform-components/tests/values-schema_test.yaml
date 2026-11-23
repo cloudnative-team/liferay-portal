@@ -37,3 +37,9 @@ tests:
         it: Rejects an unknown setting in an operator section
         set:
             crossplane.nameSpace: xp
+    -   asserts:
+            -   failedTemplate:
+                    errorPattern: additional properties 'argocdd'
+        it: Rejects an unknown top level setting
+        set:
+            argocdd.enabled: true

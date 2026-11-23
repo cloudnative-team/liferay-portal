@@ -8,16 +8,6 @@ templates:
     -   templates/operator-applications.yaml
 tests:
     -   asserts:
-            -   hasDocuments:
-                    count: 6
-        it: Ignores values for an operator the chart does not install
-        set:
-            unknownOperator:
-                enabled: true
-                namespace: unknown-system
-                repoURL: https://charts.example.com
-                targetRevision: 1.0.0
-    -   asserts:
             -   equal:
                     path: spec.project
                     value: liferay-operator
