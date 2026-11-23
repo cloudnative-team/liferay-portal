@@ -1,5 +1,5 @@
 {{- define "clientExtensions.namespace" -}}
-{{- .Values.clientExtensions.separateNamespace.name | required "clientExtensions.separateNamespace.name is required when clientExtensions.separateNamespace.enabled is true" -}}
+{{- .Values.clientExtensions.separateNamespace.name -}}
 {{- end -}}
 
 {{- define "elasticsearch.containerSecurityContext" -}}
@@ -36,42 +36,6 @@ runAsNonRoot: true
 runAsUser: 1000
 seccompProfile:
     type: RuntimeDefault
-{{- end -}}
-
-{{- define "liferay.validateCIDR" -}}
-{{- $ipv4 := "^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])/(3[0-2]|[12]?[0-9])$" -}}
-{{- $ipv6 := "^[0-9A-Fa-f:]*:[0-9A-Fa-f:]*/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$" -}}
-{{- if not (or (regexMatch $ipv4 (toString .)) (regexMatch $ipv6 (toString .))) -}}
-{{- fail (printf "The value %q contains an invalid CIDR: %s" "gateway.accessControl.allowedCIDRs" (toString .)) -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "liferay.validateDNS1123Name" -}}
-{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$" .) -}}
-{{- fail (printf "Name is not DNS-1123 compliant: %s" .) -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "liferay.validateEndpoint" -}}
-{{- $externalSecretKeys := dig "tls" "externalSecretKeys" (list) .endpoint -}}
-{{- if not (has (int .endpoint.port) (list 80 443)) -}}
-{{- fail (printf "The %s endpoint uses port %v, but gateways only listen on ports 80 and 443" .name .endpoint.port) -}}
-{{- end -}}
-{{- if and (eq (int .endpoint.port) 80) (not .endpoint.hostname) (ne .name "http") -}}
-{{- fail (printf "The %s endpoint uses port 80 without a hostname, which collides with the implicit http listener" .name) -}}
-{{- end -}}
-{{- if and (eq .endpoint.protocol "HTTPS") (not $externalSecretKeys) -}}
-{{- fail (printf "The %s endpoint serves HTTPS and must set tls.externalSecretKeys" .name) -}}
-{{- end -}}
-{{- if and (ne .endpoint.protocol "HTTPS") $externalSecretKeys -}}
-{{- fail (printf "The %s endpoint does not serve HTTPS and must not set tls.externalSecretKeys" .name) -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "liferay.validateSecretKey" -}}
-{{- if not (hasPrefix .prefix .key) -}}
-{{- fail (printf "Secret key must start with %s: %s" .prefix .key) -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "liferay.validateSecretNameSuffix" -}}
