@@ -42,7 +42,3 @@ variable "project_id" {
 variable "region" {
 	type=string
 }
-variable "regional_cluster" {
-	default=false
-	type=bool
-}

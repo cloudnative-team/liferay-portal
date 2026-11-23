@@ -32,7 +32,7 @@ resource "google_container_cluster" "primary" {
 		cluster_secondary_range_name="${var.deployment_name}-pods"
 		services_secondary_range_name="${var.deployment_name}-services"
 	}
-	location=var.regional_cluster ? var.region : local.first_zone
+	location=var.region
 	logging_config {
 		enable_components=var.control_plane_logging_config.enabled ? [
 			"APISERVER",
@@ -100,11 +100,11 @@ resource "google_container_cluster" "primary" {
 }
 resource "google_container_node_pool" "general_purpose" {
 	autoscaling {
-		max_node_count=var.max_node_count
-		min_node_count=var.min_node_count
+		total_max_node_count=var.max_node_count
+		total_min_node_count=var.min_node_count
 	}
 	cluster=google_container_cluster.primary.name
-	location=var.regional_cluster ? var.region : local.first_zone
+	location=google_container_cluster.primary.location
 	management {
 		auto_repair=true
 		auto_upgrade=true

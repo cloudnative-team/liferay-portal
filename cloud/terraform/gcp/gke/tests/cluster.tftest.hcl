@@ -82,19 +82,20 @@ run "should_enable_control_plane_logging_when_turned_on" {
 		}
 	}
 }
-run "should_locate_a_regional_cluster_in_the_region" {
+run "should_locate_the_cluster_in_the_region" {
 	assert {
 		condition=google_container_cluster.primary.location == "us-central1"
-		error_message="A regional cluster must be located in the region, not a zone"
+		error_message="The cluster must be regional, so its control plane spans the region's zones"
 	}
 	assert {
 		condition=google_container_node_pool.general_purpose.location == "us-central1"
 		error_message="The node pool must follow the cluster's regional location"
 	}
-	command=plan
-	variables {
-		regional_cluster=true
+	assert {
+		condition=length(google_container_cluster.primary.authenticator_groups_config) == 0
+		error_message="No authenticator groups config should be present by default"
 	}
+	command=plan
 }
 run "should_make_nodes_preemptible_with_spot_instances" {
 	assert {
@@ -120,21 +121,10 @@ run "should_not_accept_uppercase_deployment_name" {
 		deployment_name="Liferay-Test"
 	}
 }
-run "should_pin_a_non_regional_cluster_to_the_first_zone" {
-	assert {
-		condition=google_container_cluster.primary.location == "us-central1-a"
-		error_message="A nonregional cluster must be pinned to the first available zone"
-	}
-	assert {
-		condition=length(google_container_cluster.primary.authenticator_groups_config) == 0
-		error_message="No authenticator groups config should be present by default"
-	}
-	command=plan
-}
 run "should_set_node_autoscaling_bounds" {
 	assert {
-		condition=google_container_node_pool.general_purpose.autoscaling[0].max_node_count == 8 && google_container_node_pool.general_purpose.autoscaling[0].min_node_count == 2
-		error_message="Node pool autoscaling bounds must follow max_node_count/min_node_count"
+		condition=google_container_node_pool.general_purpose.autoscaling[0].total_max_node_count == 8 && google_container_node_pool.general_purpose.autoscaling[0].total_min_node_count == 2
+		error_message="Node pool autoscaling bounds must count nodes across all zones, following \"max_node_count\"/\"min_node_count\""
 	}
 	command=plan
 	variables {
