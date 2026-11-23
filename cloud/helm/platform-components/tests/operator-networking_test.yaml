@@ -1,6 +1,8 @@
 release:
     name: my-release
     namespace: argocd-system
+set:
+    gitops.repository.url: https://git.example.com/gitops.git
 suite: Operator Gateway Networking
 templates:
     -   templates/operator-networking.yaml

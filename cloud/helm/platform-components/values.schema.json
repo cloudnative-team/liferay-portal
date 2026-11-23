@@ -874,6 +874,7 @@
 						},
 						"url": {
 							"description": "Repository URL.",
+							"minLength": 1,
 							"type": "string"
 						},
 						"usernameProperty": {
