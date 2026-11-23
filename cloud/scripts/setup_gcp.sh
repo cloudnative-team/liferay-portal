@@ -47,6 +47,10 @@ function _configure_gcs_bucket {
 
 	local key_name="tfstate-${bucket_name}"
 
+	log_tfstate_setup "Enabling the Cloud KMS API."
+
+	gcloud services enable cloudkms.googleapis.com --project "${project_id}"
+
 	if ! gcloud kms keyrings describe \
 		"${key_name}" \
 		--location "${region}" \
