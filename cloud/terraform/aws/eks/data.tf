@@ -10,3 +10,5 @@ data "aws_eks_cluster_versions" "available" {
 	region=var.region
 	version_status="STANDARD_SUPPORT"
 }
+data "aws_partition" "current" {
+}

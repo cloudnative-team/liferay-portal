@@ -1,7 +1,3 @@
-variable "arn_partition" {
-	default="aws"
-	type=string
-}
 variable "deployment_name" {
 	type=string
 	validation {

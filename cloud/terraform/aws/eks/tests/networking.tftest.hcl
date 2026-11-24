@@ -13,6 +13,12 @@ override_data {
 		account_id="123456789012"
 	}
 }
+override_data {
+	target=data.aws_partition.current
+	values={
+		partition="aws"
+	}
+}
 override_module {
 	outputs={
 		cluster_addons={}
