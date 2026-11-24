@@ -68,6 +68,8 @@ resources:
 retry:
     initialDelay: 30s
     maxDelay: 30m
+schemaGate:
+    enabled: false
 securityContext:
     allowPrivilegeEscalation: false
     capabilities:

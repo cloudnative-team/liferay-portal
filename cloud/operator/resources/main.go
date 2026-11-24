@@ -11,11 +11,13 @@ import (
 	controller "github.com/liferay/liferay-portal/cloud/operator/internal/controller"
 	cx "github.com/liferay/liferay-portal/cloud/operator/internal/controller/cx"
 	licensing "github.com/liferay/liferay-portal/cloud/operator/internal/controller/licensing"
+	schema "github.com/liferay/liferay-portal/cloud/operator/internal/controller/schema"
 	provisioning "github.com/liferay/liferay-portal/cloud/operator/internal/provisioning"
 	corev1 "k8s.io/api/core/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	kubernetes "k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	cache "sigs.k8s.io/controller-runtime/pkg/cache"
@@ -48,13 +50,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	byObject := map[client.Object]cache.ByObject{
+		&corev1.ConfigMap{}: {Label: cxConfigMapSelector},
+	}
+
+	if config.SchemaGateEnabled {
+
+		// The schema gate watches the DXP pods only, so the operator does
+		// not cache every pod in the cluster.
+
+		byObject[&corev1.Pod{}] = cache.ByObject{
+			Label: labels.SelectorFromSet(
+				labels.Set{schema.LabelComponent: schema.LabelComponentLiferay},
+			),
+		}
+	}
+
 	manager, error := controllerruntime.NewManager(
 		controllerruntime.GetConfigOrDie(),
 		controllerruntime.Options{
 			Cache: cache.Options{
-				ByObject: map[client.Object]cache.ByObject{
-					&corev1.ConfigMap{}: {Label: cxConfigMapSelector},
-				},
+				ByObject: byObject,
 			},
 			HealthProbeBindAddress: config.ProbeAddress,
 			Metrics: metricsserver.Options{
@@ -117,6 +133,35 @@ func main() {
 		},
 	)
 
+	if config.SchemaGateEnabled {
+		clientset, error := kubernetes.NewForConfig(manager.GetConfig())
+
+		if error != nil {
+			controller.SetupLog.Error(error, "Unable to create the Kubernetes clientset")
+
+			os.Exit(1)
+		}
+
+		reconcilers = append(
+			reconcilers,
+			&schema.StatefulSetReconciler{
+				APIReader:           manager.GetAPIReader(),
+				Client:              manager.GetClient(),
+				DatabaseClientImage: config.DatabaseClientImage,
+				LogReader:           &schema.ClientsetLogReader{Clientset: clientset},
+				Recorder:            manager.GetEventRecorderFor("schemagate-controller"),
+				ReleaseCatalog: &schema.HTTPReleaseCatalog{
+					CacheDuration: time.Hour,
+					URL:           config.ReleasesURL,
+				},
+				UpgradeChecker: &schema.GogoUpgradeChecker{
+					Clientset: clientset,
+					Config:    manager.GetConfig(),
+				},
+			},
+		)
+	}
+
 	if error := controller.SetupWithManager(manager, reconcilers...); error != nil {
 		controller.SetupLog.Error(error, "Unable to set up controllers")
 
@@ -130,6 +175,7 @@ func main() {
 		"metricsAddress", config.MetricsAddress,
 		"probeAddress", config.ProbeAddress,
 		"provisioningBaseURL", config.ProvisioningBaseURL,
+		"schemaGateEnabled", config.SchemaGateEnabled,
 	)
 
 	if error := manager.Start(controllerruntime.SetupSignalHandler()); error != nil {
@@ -141,6 +187,7 @@ func main() {
 
 type config struct {
 	ClientExtensionsEnabled bool          `env:"CLIENT_EXTENSIONS_ENABLED" envDefault:"false"`
+	DatabaseClientImage     string        `env:"DATABASE_CLIENT_IMAGE" envDefault:"postgres:17-alpine"`
 	Debug                   bool          `env:"DEBUG" envDefault:"false"`
 	DownloadPollInterval    time.Duration `env:"DOWNLOAD_POLL_INTERVAL" envDefault:"15s"`
 	ExpirationGracePeriod   time.Duration `env:"EXPIRATION_GRACE_PERIOD" envDefault:"2160h"`
@@ -152,8 +199,10 @@ type config struct {
 	ProbeAddress            string        `env:"PROBE_ADDRESS" envDefault:":8081"`
 	ProvisioningBaseURL     string        `env:"PROVISIONING_BASE_URL" envDefault:"https://api.one.liferay.com"`
 	ProvisioningGracePeriod time.Duration `env:"PROVISIONING_GRACE_PERIOD" envDefault:"168h"`
+	ReleasesURL             string        `env:"RELEASES_URL" envDefault:"https://releases-cdn.liferay.com/releases.json"`
 	RetryInitialDelay       time.Duration `env:"RETRY_INITIAL_DELAY" envDefault:"30s"`
 	RetryMaxDelay           time.Duration `env:"RETRY_MAX_DELAY" envDefault:"30m"`
+	SchemaGateEnabled       bool          `env:"SCHEMA_GATE_ENABLED" envDefault:"false"`
 }
 
 var scheme = runtime.NewScheme()
