@@ -27,7 +27,6 @@ resource "google_container_cluster" "primary" {
 	}
 	enable_intranode_visibility=true
 	enable_shielded_nodes=true
-	initial_node_count=1
 	ip_allocation_policy {
 		cluster_secondary_range_name="${var.deployment_name}-pods"
 		services_secondary_range_name="${var.deployment_name}-services"
@@ -84,7 +83,6 @@ resource "google_container_cluster" "primary" {
 	release_channel {
 		channel="REGULAR"
 	}
-	remove_default_node_pool=true
 	resource_labels={
 		deployment_name=var.deployment_name
 		managed_by="terraform"
