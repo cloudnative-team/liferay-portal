@@ -119,6 +119,7 @@ run "should_shift_subnets_when_vpc_cidr_changes" {
 	}
 }
 variables {
+	database_engine="postgresql"
 	deployment_name="liferay-test"
 	region="us-east-1"
 }
