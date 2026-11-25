@@ -44,8 +44,8 @@ spec:
                 environmentId: {{ $environmentId }}
                 projectId: {{ $projectId }}
         deletionProtection: {{ and (not $forceDestroy) (eq $dataPlane $activeDataPlane) }}
-        engine: postgres
-        engineVersion: {{ $database.version | default "18" | quote }}
+        engine: {{ $databaseEngineSettings.engine }}
+        engineVersion: {{ $database.version | default $databaseEngineSettings.defaultVersion | quote }}
         iamDatabaseAuthenticationEnabled: true
         identifier: {{ $baseName }}-database-{{ $dataPlane }}
         instanceClass: {{ $database.instanceType | default "db.t3.medium" }}
@@ -70,7 +70,7 @@ spec:
             Active: {{ printf "%t" (eq $dataPlane $activeDataPlane) | quote }}
             Backup: "true"
             Name: {{ $baseName }}-database-{{ $dataPlane }}
-        username: {{ $databaseUsername }}
+        username: {{ $databaseEngineSettings.adminUsername }}
         vpcSecurityGroupIdSelector:
             matchLabels:
                 app: liferay
@@ -116,7 +116,7 @@ metadata:
     namespace: {{ $namespace }}
 spec:
     forProvider:
-        fromPort: 5432
+        fromPort: {{ $databaseEngineSettings.port }}
         ipProtocol: tcp
         referencedSecurityGroupId: {{ $env.clusterSecurityGroupId }}
         region: {{ $env.region }}
@@ -127,7 +127,7 @@ spec:
                 dataPlane: {{ $dataPlane }}
                 environmentId: {{ $environmentId }}
                 projectId: {{ $projectId }}
-        toPort: 5432
+        toPort: {{ $databaseEngineSettings.port }}
     managementPolicies: {{ $managementPolicies }}
 ---
 apiVersion: rds.aws.m.upbound.io/v1beta1

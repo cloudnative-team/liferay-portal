@@ -1,4 +1,3 @@
-{{- $databaseUsername := "liferay_database_admin" -}}
 {{- $env := index .context "apiextensions.crossplane.io/environment" -}}
 {{- $observedResources := .observed.resources | default dict -}}
 {{- $searchUsername := "liferay_search_admin" -}}
@@ -11,6 +10,9 @@
 {{- $backup := $xr.spec.backup -}}
 {{- $clusterSubnetIds := $env.clusterSubnetIds | fromJson -}}
 {{- $cmkEnabled := $xr.spec.cmk.enabled -}}
+{{- $databaseEngineSettings := get (dict
+    "mysql" (dict "adminUsername" "liferay_admin" "defaultVersion" "8.4" "engine" "mysql" "port" 3306)
+    "postgresql" (dict "adminUsername" "liferay_database_admin" "defaultVersion" "18" "engine" "postgres" "port" 5432)) $env.databaseEngine -}}
 {{- $environmentId := $xr.spec.environmentId -}}
 {{- $forceDestroy := $xr.spec.forceDestroy -}}
 {{- $managementPolicies := $xr.spec.orphanOnDelete | ternary (list "Create" "Observe" "Update") (list "*") | toJson -}}
