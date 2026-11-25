@@ -13,3 +13,6 @@ deploymentContext:
     partition: aws
     region: us-east-1
     vpcId: vpc-00000000000000000
+liferay-subchart-backup-restore:
+    database:
+        engine: postgresql

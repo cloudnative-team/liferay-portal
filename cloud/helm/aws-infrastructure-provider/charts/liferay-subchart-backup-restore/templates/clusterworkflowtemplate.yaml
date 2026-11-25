@@ -395,7 +395,7 @@ spec:
                             secretKeyRef:
                                 key: username
                                 name: liferay-database-{{ "{{" }}inputs.parameters.data-inactive}}-credentials
-                image: "{{ .Values.images.postgres.repository }}:{{ .Values.images.postgres.tag }}"
+                image: {{ include "backupRestore.databaseClientImage" . | quote }}
                 resources:
                     {{- .Values.resources.default | toYaml | nindent 20 }}
                 source: |-

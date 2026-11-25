@@ -15,6 +15,14 @@ function main {
 
 	for sql_file in /restore-sanitization/*.sql
 	do
+		{{- if eq (include "backupRestore.databaseEngine" .) "mysql" }}
+		MYSQL_PWD="${DATABASE_PASSWORD}" mysql \
+			--host "${DATABASE_ENDPOINT}" \
+			--port "${DATABASE_PORT}" \
+			--ssl-mode REQUIRED \
+			--user "${DATABASE_USERNAME}" \
+			lportal < "${sql_file}"
+		{{- else }}
 		PGPASSWORD="${DATABASE_PASSWORD}" psql \
 			--dbname lportal \
 			--file "${sql_file}" \
@@ -23,6 +31,7 @@ function main {
 			--set ON_ERROR_STOP=1 \
 			--single-transaction \
 			--username "${DATABASE_USERNAME}"
+		{{- end }}
 	done
 }
 
