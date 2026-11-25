@@ -1,3 +1,5 @@
+database:
+    engine: postgresql
 deploymentContext:
     accountId: "000000000000"
     clusterSecurityGroupId: sg-00000000000000000
