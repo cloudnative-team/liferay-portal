@@ -18,6 +18,11 @@
 		}
 	},
 	"region": "us-east-1",
+	"setup": {
+		"database": {
+			"engine": "postgresql"
+		}
+	},
 	"terraform": {
 		"platform": {
 			"keda_config": {
