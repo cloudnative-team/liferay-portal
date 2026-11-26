@@ -1,28 +1,39 @@
 {{- $backup := $xr.spec.backup }}
 {{- if $backup.enabled }}
 {{- $backupRestorePrincipal := printf "principal://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s.svc.id.goog/subject/ns/%s/sa/backup-restore-service-account" $env.projectNumber $env.projectId $namespace }}
+{{- $backupRestoreRole := dig "backupRestoreRole" "" $env | default (printf "projects/%s/roles/liferay_backup_restore" $env.projectId) }}
+{{- $backupRestoreConditions := list }}
+{{- range $dataPlane := list "blue" "green" }}
+    {{- $databaseInstanceName := printf "%s%s" $databaseInstanceNamePrefix $dataPlane }}
+    {{- $backupRestoreConditions = append $backupRestoreConditions (printf "resource.name == \"projects/%s/instances/%s\"" $env.projectId $databaseInstanceName) }}
+    {{- $backupRestoreConditions = append $backupRestoreConditions (printf "resource.name.startsWith(\"projects/%s/instances/%s/backupRuns/\")" $env.projectId $databaseInstanceName) }}
+{{- end }}
+{{- $backupRestoreCondition := join " || " $backupRestoreConditions }}
 apiVersion: cloudplatform.gcp.m.upbound.io/v1beta1
 kind: ProjectIAMMember
 metadata:
     annotations:
-        gotemplating.fn.crossplane.io/composition-resource-name: backup-restore-cloudsql-admin
+        gotemplating.fn.crossplane.io/composition-resource-name: backup-restore-cloudsql-role
 spec:
     forProvider:
+        condition:
+            expression: {{ $backupRestoreCondition }}
+            title: liferay-environment-database-instances
         member: {{ $backupRestorePrincipal | quote }}
         project: {{ $env.projectId }}
-        role: roles/cloudsql.admin
+        role: {{ $backupRestoreRole }}
     managementPolicies: {{ $managementPolicies }}
 ---
 apiVersion: cloudplatform.gcp.m.upbound.io/v1beta1
 kind: ProjectIAMMember
 metadata:
     annotations:
-        gotemplating.fn.crossplane.io/composition-resource-name: backup-restore-sts-admin
+        gotemplating.fn.crossplane.io/composition-resource-name: backup-restore-sts-user
 spec:
     forProvider:
         member: {{ $backupRestorePrincipal | quote }}
         project: {{ $env.projectId }}
-        role: roles/storagetransfer.admin
+        role: roles/storagetransfer.user
     managementPolicies: {{ $managementPolicies }}
 ---
 apiVersion: kubernetes.m.crossplane.io/v1alpha1

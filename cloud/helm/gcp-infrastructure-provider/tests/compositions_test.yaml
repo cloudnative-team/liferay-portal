@@ -9,6 +9,42 @@ templates:
     -   templates/compositions.yaml
 tests:
     -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: backupRestoreRole := dig .backupRestoreRole
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: roles/storagetransfer.user
+            -   documentIndex: 0
+                notMatchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: ProjectIAMCustomRole
+            -   documentIndex: 0
+                notMatchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: roles/cloudsql.admin
+            -   documentIndex: 0
+                notMatchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: roles/storagetransfer.admin
+        it: Binds the backup restore identity to a shared least privilege role
+    -   asserts:
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: range .dataPlane := list .blue. .green.
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: .databaseInstanceName := printf .%s%s. .databaseInstanceNamePrefix .dataPlane
+            -   documentIndex: 0
+                matchRegex:
+                    path: spec.pipeline[1].input.inline.template
+                    pattern: resource.name.startsWith.*instances/%s/backupRuns/
+        it: Confines the backup restore identity to the data planes of its own environment
+    -   asserts:
             -   hasDocuments:
                     count: 2
             -   documentIndex: 0

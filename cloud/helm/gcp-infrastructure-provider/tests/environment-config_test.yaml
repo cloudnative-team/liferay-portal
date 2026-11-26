@@ -5,6 +5,7 @@ set:
     database:
         engine: postgresql
     deploymentContext:
+        backupRestoreRole: organizations/000000000000/roles/liferaycloud.test.backup_restore
         deploymentName: liferay-test
         projectId: liferay-test-project
         projectNumber: "000000000000"
@@ -18,6 +19,7 @@ tests:
             -   equal:
                     path: data
                     value:
+                        backupRestoreRole: organizations/000000000000/roles/liferaycloud.test.backup_restore
                         databaseEngine: postgresql
                         deploymentName: liferay-test
                         projectId: liferay-test-project

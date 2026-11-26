@@ -1,6 +1,7 @@
 database:
     engine: ""
 deploymentContext:
+    backupRestoreRole: ""
     deploymentName: ""
     projectId: ""
     projectNumber: ""
