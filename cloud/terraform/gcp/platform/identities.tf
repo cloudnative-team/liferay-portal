@@ -22,6 +22,15 @@ resource "google_project_iam_custom_role" "backup_controller" {
 	role_id=replace("${var.deployment_name}_backup_controller_${random_id.backup_controller_role_id.hex}", "-", "_")
 	title="Liferay Backup Controller Role"
 }
+resource "google_project_iam_custom_role" "backup_restore" {
+	permissions=[
+		"cloudsql.backupRuns.get",
+		"cloudsql.instances.get",
+		"cloudsql.instances.restoreBackup",
+	]
+	role_id=replace("${var.deployment_name}_backup_restore_${random_id.backup_restore_role_id.hex}", "-", "_")
+	title="Liferay Backup Restore Role"
+}
 resource "google_project_iam_member" "backup_controller" {
 	member=local.workload_identity_members.backup_controller
 	project=var.project_id
@@ -44,5 +53,8 @@ resource "google_project_iam_member" "workload_identity" {
 	role=each.value.role
 }
 resource "random_id" "backup_controller_role_id" {
+	byte_length=2
+}
+resource "random_id" "backup_restore_role_id" {
 	byte_length=2
 }

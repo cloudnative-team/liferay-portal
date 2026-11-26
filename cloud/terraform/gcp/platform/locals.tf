@@ -6,6 +6,7 @@ locals {
 	} : var.cluster_secret_store.provider_hcl
 	default_secret_manager_enabled=var.cluster_secret_store.provider_hcl == null
 	deployment_context={
+		backupRestoreRole=google_project_iam_custom_role.backup_restore.name
 		deploymentName=var.deployment_name
 		projectId=var.project_id
 		projectNumber=local.project_number
