@@ -2,6 +2,13 @@ variable "arn_partition" {
 	default="aws"
 	type=string
 }
+variable "database_engine" {
+	type=string
+	validation {
+		condition=var.database_engine == "postgresql"
+		error_message="The variable \"database_engine\" must be \"postgresql\"."
+	}
+}
 variable "deployment_name" {
 	type=string
 	validation {

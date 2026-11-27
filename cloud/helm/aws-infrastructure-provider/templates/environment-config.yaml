@@ -1,5 +1,6 @@
 apiVersion: apiextensions.crossplane.io/v1beta1
 data:
+    databaseEngine: {{ .Values.database.engine | quote }}
     {{- range $key := list "accountId" "clusterSecurityGroupId" "clusterSubnetIds" "crossplaneIamBoundaryArn" "crossplaneIamPath" "deploymentName" "oidcIssuerUrl" "partition" "region" "vpcId" }}
     {{ $key }}: {{ index $.Values.deploymentContext $key | quote }}
     {{- end }}
