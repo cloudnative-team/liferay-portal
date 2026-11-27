@@ -2,13 +2,7 @@
 {{- if $backup.enabled }}
 {{- $backupRestorePrincipal := printf "principal://iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s.svc.id.goog/subject/ns/%s/sa/backup-restore-service-account" $env.projectNumber $env.projectId $namespace }}
 {{- $backupRestoreRole := dig "backupRestoreRole" "" $env | default (printf "projects/%s/roles/liferay_backup_restore" $env.projectId) }}
-{{- $backupRestoreConditions := list }}
-{{- range $dataPlane := list "blue" "green" }}
-    {{- $databaseInstanceName := printf "%s%s" $databaseInstanceNamePrefix $dataPlane }}
-    {{- $backupRestoreConditions = append $backupRestoreConditions (printf "resource.name == \"projects/%s/instances/%s\"" $env.projectId $databaseInstanceName) }}
-    {{- $backupRestoreConditions = append $backupRestoreConditions (printf "resource.name.startsWith(\"projects/%s/instances/%s/backupRuns/\")" $env.projectId $databaseInstanceName) }}
-{{- end }}
-{{- $backupRestoreCondition := join " || " $backupRestoreConditions }}
+{{- $backupRestoreCondition := printf "resource.name.startsWith(\"projects/%s/instances/%s-\")" $env.projectId $projectId }}
 apiVersion: cloudplatform.gcp.m.upbound.io/v1beta1
 kind: ProjectIAMMember
 metadata:
@@ -18,7 +12,7 @@ spec:
     forProvider:
         condition:
             expression: {{ $backupRestoreCondition }}
-            title: liferay-environment-database-instances
+            title: liferay-project-database-instances
         member: {{ $backupRestorePrincipal | quote }}
         project: {{ $env.projectId }}
         role: {{ $backupRestoreRole }}

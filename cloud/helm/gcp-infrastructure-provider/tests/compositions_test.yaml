@@ -34,16 +34,16 @@ tests:
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: range .dataPlane := list .blue. .green.
+                    pattern: backupRestoreCondition := printf .*resource.name.startsWith.*instances/%s-
             -   documentIndex: 0
                 matchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: .databaseInstanceName := printf .%s%s. .databaseInstanceNamePrefix .dataPlane
+                    pattern: backupRestoreCondition := printf .* .env.projectId .projectId
             -   documentIndex: 0
-                matchRegex:
+                notMatchRegex:
                     path: spec.pipeline[1].input.inline.template
-                    pattern: resource.name.startsWith.*instances/%s/backupRuns/
-        it: Confines the backup restore identity to the data planes of its own environment
+                    pattern: backupRestoreCondition := printf .*databaseInstanceNamePrefix
+        it: Confines the backup restore identity to the database instances of its own project
     -   asserts:
             -   hasDocuments:
                     count: 2
