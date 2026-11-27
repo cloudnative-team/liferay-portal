@@ -102,6 +102,20 @@ tests:
                                 storage: 1Gi
                         storageClassName: premium-rwo
     -   asserts:
+            -   equal:
+                    path: metadata.labels.workloadClass
+                    value: standard
+            -   equal:
+                    path: spec.template.metadata.labels.workloadClass
+                    value: standard
+            -   notExists:
+                    path: spec.selector.matchLabels.workloadClass
+        documentSelector:
+            path: kind
+            skipEmptyTemplates: true
+            value: StatefulSet
+        it: Labels the StatefulSet and its pods with the standard workload class
+    -   asserts:
             -   contains:
                     any: true
                     content:

@@ -145,6 +145,7 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 component: liferay
 helm.sh/chart: {{ include "liferay.chart" . }}
+workloadClass: standard
 {{- include "liferay.customLabels" . }}
 {{- end }}
 

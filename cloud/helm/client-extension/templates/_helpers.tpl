@@ -75,6 +75,7 @@
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ include "liferay-client-extension.chart" . }}
 {{ include "liferay-client-extension.selectorLabels" . }}
+workloadClass: custom
 {{- with .Values.labels }}
 {{ toYaml . }}
 {{- end }}

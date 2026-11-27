@@ -113,6 +113,7 @@ annotations:
 {{- end }}
 labels:
     {{- include "liferay-client-extension.selectorLabels" . | nindent 4 }}
+    workloadClass: custom
     {{- with .Values.podLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
