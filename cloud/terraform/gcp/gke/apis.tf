@@ -14,6 +14,7 @@ resource "google_project_service" "apis" {
 		[
 			"artifactregistry.googleapis.com",
 			"cloudbuild.googleapis.com",
+			"cloudkms.googleapis.com",
 			"cloudresourcemanager.googleapis.com",
 			"compute.googleapis.com",
 			"config.googleapis.com",

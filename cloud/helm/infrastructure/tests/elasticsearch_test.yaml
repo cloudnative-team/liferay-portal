@@ -2,6 +2,7 @@ release:
     name: my-release
     namespace: my-namespace
 set:
+    clusterSecretStoreName: my-secret-store
     search.engine: elasticsearch
 suite: Elasticsearch
 templates:

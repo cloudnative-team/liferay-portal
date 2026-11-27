@@ -54,10 +54,6 @@ variable "project_id" {
 variable "region" {
 	type=string
 }
-variable "regional_cluster" {
-	default=false
-	type=bool
-}
 variable "spot_instances" {
 	default=false
 	type=bool

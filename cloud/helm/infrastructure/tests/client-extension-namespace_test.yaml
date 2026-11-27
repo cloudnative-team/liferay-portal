@@ -2,6 +2,7 @@ release:
     name: my-release
     namespace: liferay-able-nonproduction
 set:
+    clusterSecretStoreName: my-secret-store
     environmentId: nonproduction
     projectId: able
 suite: Client Extension Namespace

@@ -1,8 +1,5 @@
 {{- $search := .Values.search.elasticsearch -}}
 {{- $accessControl := $search.accessControl -}}
-{{- if and $accessControl.allowedIngress (not $accessControl.enabled) -}}
-{{- fail "The value \"search.elasticsearch.accessControl.enabled\" must be true when \"search.elasticsearch.accessControl.allowedIngress\" is set" -}}
-{{- end -}}
 {{- if and .Values.enabled (eq (include "search.engine" .) "elasticsearch") $accessControl.enabled -}}
 {{- $searchName := include "elasticsearch.name" . -}}
 apiVersion: networking.k8s.io/v1
@@ -22,7 +19,7 @@ spec:
                             kubernetes.io/metadata.name: {{ .Release.Namespace }}
                 -   namespaceSelector:
                         matchLabels:
-                            kubernetes.io/metadata.name: {{ required "The value \"search.elasticsearch.accessControl.eckOperatorNamespace\" is required" $accessControl.eckOperatorNamespace }}
+                            kubernetes.io/metadata.name: {{ $accessControl.eckOperatorNamespace }}
             ports:
                 -   port: 9200
                     protocol: TCP
@@ -42,14 +39,13 @@ spec:
                 -   port: 9200
                     protocol: TCP
         {{- end }}
-        {{- range $index, $entry := $accessControl.allowedIngress }}
-        {{- $namespace := required (printf "\"search.elasticsearch.accessControl.allowedIngress[%d].namespace\" is required" $index) $entry.namespace }}
+        {{- range $entry := $accessControl.allowedIngress }}
         -   from:
                 {{- if $entry.podLabels }}
                 {{- range $labels := $entry.podLabels }}
                 -   namespaceSelector:
                         matchLabels:
-                            kubernetes.io/metadata.name: {{ $namespace }}
+                            kubernetes.io/metadata.name: {{ $entry.namespace }}
                     podSelector:
                         matchLabels:
                             {{- toYaml $labels | nindent 28 }}
@@ -57,10 +53,10 @@ spec:
                 {{- else }}
                 -   namespaceSelector:
                         matchLabels:
-                            kubernetes.io/metadata.name: {{ $namespace }}
+                            kubernetes.io/metadata.name: {{ $entry.namespace }}
                 {{- end }}
             ports:
-                -   port: {{ required (printf "\"search.elasticsearch.accessControl.allowedIngress[%d].port\" is required" $index) $entry.port }}
+                -   port: {{ $entry.port }}
                     protocol: TCP
         {{- end }}
     podSelector:

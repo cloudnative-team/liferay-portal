@@ -147,20 +147,10 @@ run "should_inject_an_external_secret_store_provider" {
 		}
 	}
 }
-run "should_look_up_a_regional_cluster_in_the_region" {
+run "should_look_up_the_cluster_in_the_region" {
 	assert {
 		condition=data.google_container_cluster.gke.location == "us-central1"
-		error_message="A regional cluster must be looked up in the region"
-	}
-	command=plan
-	variables {
-		regional_cluster=true
-	}
-}
-run "should_look_up_a_zonal_cluster_in_the_first_zone" {
-	assert {
-		condition=data.google_container_cluster.gke.location == "us-central1-a"
-		error_message="A zonal cluster must be looked up in the first zone of the region, where the gke stack creates it"
+		error_message="The cluster must be looked up in the region, where the gke stack creates it"
 	}
 	command=plan
 }

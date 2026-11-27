@@ -2,6 +2,7 @@ release:
     name: my-release
     namespace: argocd-system
 set:
+    gitops.repository.url: https://git.example.com/gitops.git
     networkPolicy.apiServerSources:
         -   ipBlock:
                 cidr: 10.0.0.0/16

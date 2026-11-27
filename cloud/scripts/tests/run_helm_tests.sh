@@ -69,6 +69,11 @@ function main {
 		then
 			"${cloud_dir}/scripts/tests/client_extension_applicationset_test.sh"
 		fi
+
+		if [[ ${chart} == infrastructure ]] || [[ ${chart} == platform-components ]]
+		then
+			"${cloud_dir}/scripts/tests/infrastructure_values_schema_test.sh"
+		fi
 	done
 }
 

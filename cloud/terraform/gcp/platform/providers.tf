@@ -16,7 +16,7 @@ terraform {
 	required_providers {
 		google={
 			source="hashicorp/google"
-			version="~> 7.43.0"
+			version="~> 8.1"
 		}
 		helm={
 			source="hashicorp/helm"
@@ -31,5 +31,5 @@ terraform {
 			version="~> 3.8.1"
 		}
 	}
-	required_version=">=1.10.0"
+	required_version=">=1.5.0"
 }

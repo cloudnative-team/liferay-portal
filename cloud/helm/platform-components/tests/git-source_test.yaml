@@ -4,6 +4,7 @@ release:
 set:
     clusterSecretStores:
         liferay-test-secret-store: {}
+    gitops.repository.url: https://git.example.com/gitops.git
 suite: Git Chart Sources
 templates:
     -   templates/application-infrastructure-provider.yaml

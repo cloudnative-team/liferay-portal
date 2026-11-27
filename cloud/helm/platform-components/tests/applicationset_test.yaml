@@ -4,6 +4,7 @@ release:
 set:
     clusterSecretStores:
         liferay-test-secret-store: {}
+    gitops.repository.url: https://git.example.com/gitops.git
 suite: ApplicationSets and AppProjects
 templates:
     -   templates/application-infrastructure-provider.yaml
@@ -326,8 +327,11 @@ tests:
         set:
             appProjects.infrastructure.enabled: false
     -   asserts:
-            -   isEmpty:
+            -   equal:
                     path: spec.sourceRepos
+                    value:
+                        -   https://git.example.com/gitops.git
+                        -   https://git.example.com/gitops.git/**
                 template: templates/appproject-application.yaml
             -   notContains:
                     content: /**

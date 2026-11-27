@@ -89,16 +89,16 @@ module "eks" {
 	endpoint_public_access=var.eks_allow_public_access
 	endpoint_public_access_cidrs=local.eks_api_public_access_cidrs
 	iam_role_additional_policies={
-		AmazonEKSBlockStoragePolicy="arn:${var.arn_partition}:iam::aws:policy/AmazonEKSBlockStoragePolicy"
-		AmazonEKSComputePolicy="arn:${var.arn_partition}:iam::aws:policy/AmazonEKSComputePolicy"
-		AmazonEKSLoadBalancingPolicy="arn:${var.arn_partition}:iam::aws:policy/AmazonEKSLoadBalancingPolicy"
-		AmazonEKSNetworkingPolicy="arn:${var.arn_partition}:iam::aws:policy/AmazonEKSNetworkingPolicy"
+		AmazonEKSBlockStoragePolicy="arn:${local.partition}:iam::aws:policy/AmazonEKSBlockStoragePolicy"
+		AmazonEKSComputePolicy="arn:${local.partition}:iam::aws:policy/AmazonEKSComputePolicy"
+		AmazonEKSLoadBalancingPolicy="arn:${local.partition}:iam::aws:policy/AmazonEKSLoadBalancingPolicy"
+		AmazonEKSNetworkingPolicy="arn:${local.partition}:iam::aws:policy/AmazonEKSNetworkingPolicy"
 	}
 	kubernetes_version=data.aws_eks_cluster_versions.available.cluster_versions[0].cluster_version
 	name=local.cluster_name
 	node_iam_role_additional_policies={
-		AWSXRayDaemonWriteAccess="arn:${var.arn_partition}:iam::aws:policy/AWSXRayDaemonWriteAccess"
-		CloudWatchAgentServerPolicy="arn:${var.arn_partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+		AWSXRayDaemonWriteAccess="arn:${local.partition}:iam::aws:policy/AWSXRayDaemonWriteAccess"
+		CloudWatchAgentServerPolicy="arn:${local.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
 	}
 	source="git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=de2aa10f25c7f2d2ab1264f6451f7cbf57f784c4"
 	subnet_ids=module.vpc.private_subnets
@@ -153,11 +153,11 @@ resource "aws_iam_role" "efs_csi_driver" {
 	name="${var.deployment_name}-efs_csi_driver"
 }
 resource "aws_iam_role_policy_attachment" "role_policy_attachment_ebs_csi_driver" {
-	policy_arn="arn:${var.arn_partition}:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+	policy_arn="arn:${local.partition}:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
 	role=aws_iam_role.ebs_csi_driver.name
 }
 resource "aws_iam_role_policy_attachment" "role_policy_attachment_efs_csi_driver" {
-	policy_arn="arn:${var.arn_partition}:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+	policy_arn="arn:${local.partition}:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
 	role=aws_iam_role.efs_csi_driver.name
 }
 resource "aws_kms_alias" "eks_kms_alias" {
