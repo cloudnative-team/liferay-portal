@@ -232,3 +232,12 @@ $configuration[0] as $configuration
 	}
 }
 | platform_values($configuration; "liferay-aws-infrastructure-provider"; $liferay_chart_name)
+* {
+	platformComponents: {
+		values: {
+			database: {
+				engine: $configuration.setup.database.engine
+			}
+		}
+	}
+}

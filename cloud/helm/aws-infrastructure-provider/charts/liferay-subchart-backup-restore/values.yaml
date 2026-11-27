@@ -6,6 +6,8 @@ argo:
             secondsAfterCompletion: 86400
 awsBackupService:
     restoreWaitTimeoutSeconds: 7200
+database:
+    engine: ""
 images:
     awsCli:
         repository: amazon/aws-cli
@@ -13,7 +15,10 @@ images:
     helmKubectl:
         repository: dtzar/helm-kubectl
         tag: 4.1.1
-    postgres:
+    mysql:
+        repository: mysql
+        tag: "8.4"
+    postgresql:
         repository: postgres
         tag: 18-alpine
 liferayInfrastructure:

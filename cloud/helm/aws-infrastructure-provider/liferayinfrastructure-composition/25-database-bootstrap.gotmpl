@@ -59,6 +59,18 @@ spec:
                                     -   /bin/sh
                                     -   /scripts/bootstrap-database.sh
                                 env:
+                                    {{- if eq $env.databaseEngine "mysql" }}
+                                    -   name: ADMIN_PASSWORD
+                                        valueFrom:
+                                            secretKeyRef:
+                                                key: password
+                                                name: liferay-database-{{ $activeDataPlane }}-credentials
+                                    -   name: DATABASE_ADMIN_USERNAME
+                                        valueFrom:
+                                            secretKeyRef:
+                                                key: username
+                                                name: liferay-database-{{ $activeDataPlane }}-credentials
+                                    {{- end }}
                                     -   name: DATABASE_NAME
                                         value: lportal
                                     -   name: LIFERAY_DATABASE_USERNAME
@@ -68,6 +80,18 @@ spec:
                                             secretKeyRef:
                                                 key: DATABASE_PASSWORD
                                                 name: database-app-password
+                                    {{- if eq $env.databaseEngine "mysql" }}
+                                    -   name: MYSQL_HOST
+                                        valueFrom:
+                                            secretKeyRef:
+                                                key: address
+                                                name: liferay-database-{{ $activeDataPlane }}-credentials
+                                    -   name: MYSQL_TCP_PORT
+                                        valueFrom:
+                                            secretKeyRef:
+                                                key: port
+                                                name: liferay-database-{{ $activeDataPlane }}-credentials
+                                    {{- else }}
                                     -   name: PGHOST
                                         valueFrom:
                                             secretKeyRef:
@@ -90,7 +114,8 @@ spec:
                                             secretKeyRef:
                                                 key: username
                                                 name: liferay-database-{{ $activeDataPlane }}-credentials
-                                image: postgres:18-alpine
+                                    {{- end }}
+                                image: {{ $env.databaseClientImage }}
                                 name: sql-runner
                                 resources:
                                     limits:

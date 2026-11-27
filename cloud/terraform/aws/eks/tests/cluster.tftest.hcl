@@ -79,6 +79,7 @@ run "should_not_accept_uppercase_deployment_name" {
 	}
 }
 variables {
+	database_engine="postgresql"
 	deployment_name="liferay-test"
 	region="us-east-1"
 }

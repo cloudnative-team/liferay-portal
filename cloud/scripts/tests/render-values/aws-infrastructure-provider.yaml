@@ -1,3 +1,5 @@
+database:
+    engine: postgresql
 deploymentContext:
     accountId: "000000000000"
     clusterSecurityGroupId: sg-00000000000000000
@@ -11,3 +13,6 @@ deploymentContext:
     partition: aws
     region: us-east-1
     vpcId: vpc-00000000000000000
+liferay-subchart-backup-restore:
+    database:
+        engine: postgresql
