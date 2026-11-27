@@ -52,7 +52,7 @@ override_data {
 }
 run "should_assemble_the_deployment_context" {
 	assert {
-		condition=join(",", keys(local.deployment_context)) == "deploymentName,projectId,projectNumber,region,vpcName"
+		condition=join(",", keys(local.deployment_context)) == "backupRestoreRole,deploymentName,projectId,projectNumber,region,vpcName"
 		error_message="The deployment context must carry exactly the keys the infrastructure provider consumes"
 	}
 	assert {
@@ -77,6 +77,10 @@ run "should_bind_each_workload_identity_to_its_kubernetes_service_account" {
 	assert {
 		condition=google_project_iam_member.backup_controller.role == google_project_iam_custom_role.backup_controller.name
 		error_message="The backup controller must be granted its custom role"
+	}
+	assert {
+		condition=local.deployment_context.backupRestoreRole == google_project_iam_custom_role.backup_restore.name
+		error_message="The backup restore role must reach the environment through the deployment context"
 	}
 	command=apply
 }
